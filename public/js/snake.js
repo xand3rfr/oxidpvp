@@ -3,7 +3,7 @@
 // wins. The host runs the simulation at a fixed tick and streams the board; guests send turns.
 (() => {
   const GW = 40, GH = 28, CELL = 24, W = GW * CELL, H = GH * CELL;
-  const TICK_MS = 115, COUNTDOWN = 3, ROUND_PAUSE = 2.4, WIN = 3, FOOD = 5, START_LEN = 4;
+  const TICK_MS = 100, COUNTDOWN = 3, ROUND_PAUSE = 2.4, WIN = 3, FOOD = 5, START_LEN = 4;
   const COLORS = ["#ff5b3a", "#4d8dff", "#22c55e", "#facc15"];
   const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
   const SPAWN = [[5, 14, 1], [GW - 6, 13, 3], [20, 3, 2], [19, GH - 4, 0]];
@@ -132,7 +132,7 @@
       return {
         t: "k", n: S.n, phase: S.phase, rw: S.rw, w: S.w, tick: TICK_MS, count: S.phase === "count" ? S.timer : 0,
         players: full ? S.players : undefined,
-        s: S.snakes.map((s) => ({ id: s.id, c: s.c, a: s.alive ? 1 : 0, d: s.dir, b: s.body.flat() })),
+        s: S.snakes.map((s) => ({ id: s.id, c: s.c, a: s.alive ? 1 : 0, d: s.dir, b: s.body.flat(), g: s.grow > 0 ? 1 : 0 })),
         f: S.food.flat(), e: events,
       };
     }
@@ -226,30 +226,45 @@
         ctx.beginPath(); ctx.arc(fx, fy, CELL * 0.28 + Math.sin(t + i) * 1.5, 0, Math.PI * 2); ctx.fill();
       }
       ctx.shadowBlur = 0;
-      // snakes
+      // snakes: drawn as smooth lines that glide between cells (like Light Cycles), so the
+      // board doesn't jump a whole square every tick.
+      const frac = V.phase === "play" ? Math.min(1, (performance.now() - gotAt) / V.tick) : 0;
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
       for (const sn of V.s) {
-        const color = COLORS[sn.c];
-        const b = sn.b;
+        const color = COLORS[sn.c], b = sn.b, n = b.length / 2;
+        if (!n) continue;
+        const f = sn.a ? frac : 0;
+        const pt = (k) => [(b[k * 2] + 0.5) * CELL, (b[k * 2 + 1] + 0.5) * CELL];
+        const [hx0, hy0] = pt(0);
+        const hx = hx0 + DX[sn.d] * CELL * f, hy = hy0 + DY[sn.d] * CELL * f;
+        const pts = [[hx, hy]];
+        for (let k = 0; k < n; k++) pts.push(pt(k));
+        if (n >= 2 && !sn.g) {
+          // tail slides toward the next segment unless the snake is growing
+          const [tx, ty] = pts[pts.length - 1], [px, py] = pts[pts.length - 2];
+          pts[pts.length - 1] = [tx + (px - tx) * f, ty + (py - ty) * f];
+        }
         ctx.globalAlpha = sn.a ? 1 : 0.25;
-        for (let i = b.length - 2; i >= 0; i -= 2) {
-          const x = b[i] * CELL, y = b[i + 1] * CELL;
-          const head = i === 0;
-          ctx.fillStyle = color;
-          if (head) { ctx.shadowColor = color; ctx.shadowBlur = 18; }
-          const pad = head ? 1 : i >= b.length - 4 ? 4 : 2.5; // taper just the tail tip
-          ctx.beginPath(); ctx.roundRect(x + pad, y + pad, CELL - pad * 2, CELL - pad * 2, head ? 7 : 5); ctx.fill();
-          ctx.shadowBlur = 0;
+        ctx.beginPath();
+        pts.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+        ctx.strokeStyle = color;
+        ctx.lineWidth = CELL * 0.72;
+        if (sn.a) { ctx.shadowColor = color; ctx.shadowBlur = 14; }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = CELL * 0.22;
+        ctx.strokeStyle = "rgba(255,255,255,0.18)";
+        ctx.stroke();
+        // head + eyes
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(hx, hy, CELL * 0.46, 0, Math.PI * 2); ctx.fill();
+        const ex = DX[sn.d], ey = DY[sn.d];
+        ctx.fillStyle = "#0a0a0f";
+        for (const side of [-1, 1]) {
+          const px = hx + ex * 4 + (ey ? side * 5 : 0), py = hy + ey * 4 + (ex ? side * 5 : 0);
+          ctx.beginPath(); ctx.arc(px, py, 2.6, 0, Math.PI * 2); ctx.fill();
         }
-        if (b.length >= 2) {
-          const hx = (b[0] + 0.5) * CELL, hy = (b[1] + 0.5) * CELL;
-          const d = sn.d, ex = DX[d], ey = DY[d];
-          ctx.fillStyle = "#0a0a0f";
-          for (const side of [-1, 1]) {
-            const px = hx + ex * 4 + (ey ? side * 5 : 0), py = hy + ey * 4 + (ex ? side * 5 : 0);
-            ctx.beginPath(); ctx.arc(px, py, 2.6, 0, Math.PI * 2); ctx.fill();
-          }
-          if (room && players[sn.c] && players[sn.c].id === room.myId && V.phase === "count") label("YOU", hx, hy - 26, color);
-        }
+        if (room && players[sn.c] && players[sn.c].id === room.myId && V.phase === "count") label("YOU", hx, hy - 26, color);
         ctx.globalAlpha = 1;
       }
       if (V.phase === "count") {
