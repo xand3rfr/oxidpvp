@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <script>try{var t=JSON.parse(localStorage.getItem("oxidpvp-theme")||"{}"),d=document.documentElement;if(t.mode==="light")d.dataset.theme="light";if(t.accent&&t.accent!=="violet")d.dataset.accent=t.accent}catch(e){}</script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#07070a">
   <title>OXIDPVP · Games</title>
@@ -19,9 +20,11 @@
         <a href="#games">Games</a>
         <a href="rooms.html">Public rooms</a>
         <a href="leaderboard.html">Leaderboard</a>
+        <a href="daily.html">Daily Word</a>
       </div>
       <div class="nav-right">
         <span class="status-pill"><i></i>Servers online</span>
+        <button class="btn ghost" id="navSettings" type="button">Settings</button>
         <a class="btn primary" href="#games">Play now</a>
       </div>
     </div>
@@ -31,12 +34,12 @@
     <div class="wrap">
       <section class="hero">
         <div>
-          <span class="eyebrow"><b>New</b>9 more games, public rooms &amp; global leaderboards</span>
+          <span class="eyebrow"><b>New</b>Poker, Telephone, Tank Duel, Daily Word &amp; themes</span>
           <h1>Play with friends.<br><span class="grad-text">Right in your browser.</span></h1>
           <p class="hero-lead">Pick a game, send your friends a link, and you're playing. No downloads, no accounts, and chat built in.</p>
           <div class="hero-cta">
             <a class="btn primary lg" href="#games">Browse games</a>
-            <a class="btn lg" href="#how">How it works</a>
+            <a class="btn lg" href="daily.html" id="dailyBtn">📅 Daily Word</a>
           </div>
           <form class="code-join" id="codeJoin" autocomplete="off">
             <label for="codeIn">Got a code?</label>
@@ -926,6 +929,11 @@
         <div class="stat-games" id="statGames"></div>
       </section>
 
+      <section class="section" id="achievements">
+        <div class="section-head"><div><h2>Achievements</h2><p id="achCount">Saved on this device.</p></div></div>
+        <div class="ach-grid" id="achGrid"></div>
+      </section>
+
       <section class="section" id="how">
         <div class="section-head"><div><h2>How it works</h2><p>From zero to playing in about ten seconds.</p></div></div>
         <div class="steps3">
@@ -967,6 +975,34 @@
       let saved = "all";
       try { saved = localStorage.getItem("oxidpvp-filter") || "all"; } catch {}
       apply(buttons.some((b) => b.dataset.f === saved) ? saved : "all");
+
+      document.getElementById("navSettings").addEventListener("click", () => GameUtil.openSettings());
+
+      // Achievements
+      window.renderAch = () => {
+        const grid = document.getElementById("achGrid");
+        grid.textContent = "";
+        const list = GameUtil.achievements();
+        const got = list.filter((a) => a.got).length;
+        document.getElementById("achCount").textContent = `${got} of ${list.length} unlocked · saved on this device`;
+        for (const a of list) {
+          const el = document.createElement("div");
+          el.className = "ach" + (a.got ? " got" : "");
+          const hide = a.secret && !a.got;
+          el.innerHTML = `<span class="ach-i"></span><div><b></b><small></small></div>`;
+          el.querySelector(".ach-i").textContent = hide ? "❔" : a.icon;
+          el.querySelector("b").textContent = hide ? "Secret" : a.name;
+          el.querySelector("small").textContent = hide ? "Keep exploring…" : a.desc;
+          grid.append(el);
+        }
+      };
+      renderAch();
+
+      // Daily Word streak on the button
+      try {
+        const d = JSON.parse(localStorage.getItem("oxidpvp-daily") || "{}");
+        if (d.streak) document.getElementById("dailyBtn").textContent = `📅 Daily Word · ${d.streak}🔥`;
+      } catch {}
 
       // Join by code: ask the server which game the code belongs to.
       const codeIn = document.getElementById("codeIn"), codeErr = document.getElementById("codeErr");
@@ -1051,6 +1087,7 @@
       const dot = document.getElementById("samDot"), msg = document.getElementById("samMsg");
       let t;
       dot.addEventListener("click", () => {
+        if (window.GameUtil) { GameUtil.achieve("sam"); renderAch(); }
         msg.classList.add("on");
         clearTimeout(t);
         t = setTimeout(() => msg.classList.remove("on"), 3000);

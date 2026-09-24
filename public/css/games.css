@@ -6,7 +6,7 @@
   background: var(--surface); border: 1px solid var(--line-2); color: var(--muted);
   transition: background .2s, border-color .2s, color .2s, box-shadow .2s;
 }
-.turn-banner.mine { color: #fff; border-color: rgba(167,139,250,.6); background: rgba(139,92,246,.18); box-shadow: 0 0 30px -8px var(--accent-glow); }
+.turn-banner.mine { color: #fff; border-color: rgba(var(--accent-hi-rgb),.6); background: rgba(var(--accent-rgb),.18); box-shadow: 0 0 30px -8px var(--accent-glow); }
 .turn-banner .chip { width: 12px; height: 12px; border-radius: 50%; }
 
 /* ---------- Connect 4 ---------- */
@@ -69,8 +69,8 @@
 .sq.last { box-shadow: inset 0 0 0 2px var(--yellow); z-index: 1; }
 .target .sq { cursor: default; }
 .target.live .sq:not(.hit):not(.miss) { cursor: crosshair; }
-.target.live .sq:not(.hit):not(.miss):hover { background: rgba(139,92,246,.35); box-shadow: inset 0 0 0 1px var(--accent-hi); }
-.target.live { filter: drop-shadow(0 0 24px rgba(139,92,246,.25)); }
+.target.live .sq:not(.hit):not(.miss):hover { background: rgba(var(--accent-rgb),.35); box-shadow: inset 0 0 0 1px var(--accent-hi); }
+.target.live { filter: drop-shadow(0 0 24px rgba(var(--accent-rgb),.25)); }
 .fleet-left { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 .fleet-left i { height: 8px; border-radius: 4px; background: var(--muted); display: block; }
 .fleet-left i.gone { background: var(--surface-3); }
@@ -81,7 +81,7 @@
 /* ---------- Quiz Battle ---------- */
 .tv { width: min(760px, 100%); display: flex; flex-direction: column; gap: 16px; }
 .tv-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 500; color: var(--muted); }
-.tv-cat { font-size: 12px; font-weight: 600; color: var(--accent-hi); padding: 3px 10px; border-radius: 999px; background: rgba(139,92,246,.12); border: 1px solid rgba(139,92,246,.35); }
+.tv-cat { font-size: 12px; font-weight: 600; color: var(--accent-hi); padding: 3px 10px; border-radius: 999px; background: rgba(var(--accent-rgb),.12); border: 1px solid rgba(var(--accent-rgb),.35); }
 .tv-clock { width: 100%; height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
 .tv-clock i { display: block; height: 100%; width: 100%; border-radius: 999px; background: var(--grad); box-shadow: 0 0 12px var(--accent-glow); }
 .tv-clock.urgent i { background: var(--danger); box-shadow: 0 0 12px var(--danger); }
@@ -124,7 +124,7 @@
   display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 999px;
   background: var(--surface); border: 1px solid var(--line); font-size: 13px; font-weight: 500;
 }
-.tv-board .pl.me { border-color: rgba(139,92,246,.5); background: rgba(139,92,246,.1); }
+.tv-board .pl.me { border-color: rgba(var(--accent-rgb),.5); background: rgba(var(--accent-rgb),.1); }
 .tv-board .pl .avatar { width: 24px; height: 24px; font-size: 10px; }
 .tv-board .pl .pts { font-family: var(--mono); color: var(--muted); }
 .tv-board .pl .gain { font-family: var(--mono); font-size: 11px; color: var(--green); }
@@ -154,7 +154,7 @@
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; transition: opacity .2s; }
 .chips.off { opacity: .35; pointer-events: none; }
 .chip { font-size: 12px; font-weight: 500; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--muted); background: var(--surface-2); }
-.chip.on { color: #fff; border-color: rgba(139,92,246,.6); background: rgba(139,92,246,.22); }
+.chip.on { color: #fff; border-color: rgba(var(--accent-rgb),.6); background: rgba(var(--accent-rgb),.22); }
 .custom-q { border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; background: var(--field); }
 .custom-q summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .custom-q summary span { color: var(--accent-hi); }

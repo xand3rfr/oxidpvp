@@ -10,7 +10,7 @@
 .table {
   flex: 1; min-height: 0;
   display: grid; grid-template-rows: auto 1fr auto;
-  background: radial-gradient(ellipse 60% 55% at 50% 48%, rgba(139,92,246,.08), transparent 70%);
+  background: radial-gradient(ellipse 60% 55% at 50% 48%, rgba(var(--accent-rgb),.08), transparent 70%);
 }
 
 /* opponents */
@@ -23,7 +23,7 @@
   transition: border-color .2s, box-shadow .2s, transform .2s, background .2s;
   min-width: 150px;
 }
-.opp.turn { border-color: rgba(167,139,250,.6); background: rgba(139,92,246,.12); box-shadow: 0 0 30px -10px var(--accent-glow); transform: translateY(2px); }
+.opp.turn { border-color: rgba(var(--accent-hi-rgb),.6); background: rgba(var(--accent-rgb),.12); box-shadow: 0 0 30px -10px var(--accent-glow); transform: translateY(2px); }
 .opp .avatar { width: 34px; height: 34px; font-size: 13px; }
 .opp.turn .avatar { box-shadow: 0 0 0 2px var(--accent-hi); }
 .opp .meta { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
@@ -136,11 +136,11 @@
 
 .card.back {
   background:
-    radial-gradient(circle at 50% 50%, rgba(139,92,246,.35), transparent 60%),
+    radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb),.35), transparent 60%),
     repeating-linear-gradient(135deg, rgba(255,255,255,.03) 0 6px, transparent 6px 12px),
     linear-gradient(160deg, #1f1f2b, #0e0e14);
 }
-.card.back::before { border-color: rgba(167,139,250,.25); }
+.card.back::before { border-color: rgba(var(--accent-hi-rgb),.25); }
 .card.back .logo {
   position: absolute; left: 50%; top: 50%; width: 36%; aspect-ratio: 1; border-radius: 26%;
   transform: translate(-50%, -50%) rotate(-12deg);
@@ -189,4 +189,4 @@
   .center { gap: 10px; }
 }
 .badge.team { left: 8px; right: auto; background: var(--accent); box-shadow: 0 4px 12px -4px var(--accent-glow); }
-.opp.partner { border-color: rgba(139,92,246,.55); }
+.opp.partner { border-color: rgba(var(--accent-rgb),.55); }

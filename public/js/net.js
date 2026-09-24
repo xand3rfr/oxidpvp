@@ -252,10 +252,16 @@
     start: [[392, 0.08, "square", 0.05], [523, 0.08, "square", 0.05, 0.1], [784, 0.16, "square", 0.05, 0.2]],
     boom: "noise",
   };
+  const VOL_KEY = "oxidpvp-volume";
   const sfx = (() => {
-    let ac = null, muted = store.get(MUTE_KEY) === "1";
+    let ac = null, out = null, muted = store.get(MUTE_KEY) === "1";
+    let vol = store.get(VOL_KEY) == null ? 0.8 : Math.max(0, Math.min(1, +store.get(VOL_KEY) || 0));
     const ctx = () => {
-      if (!ac) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; ac = new C(); }
+      if (!ac) {
+        const C = window.AudioContext || window.webkitAudioContext; if (!C) return null;
+        ac = new C();
+        out = ac.createGain(); out.gain.value = vol; out.connect(ac.destination);
+      }
       if (ac.state === "suspended") ac.resume();
       return ac;
     };
@@ -272,7 +278,7 @@
           const src = a.createBufferSource(), g = a.createGain(), f = a.createBiquadFilter();
           f.type = "lowpass"; f.frequency.value = 900;
           src.buffer = buf; g.gain.value = 0.35;
-          src.connect(f).connect(g).connect(a.destination);
+          src.connect(f).connect(g).connect(out);
           src.start(now);
           return;
         }
@@ -282,7 +288,7 @@
           g.gain.setValueAtTime(0, t);
           g.gain.linearRampToValueAtTime(vol, t + 0.01);
           g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-          o.connect(g).connect(a.destination);
+          o.connect(g).connect(out);
           o.start(t); o.stop(t + dur + 0.03);
         }
       } catch {}
@@ -290,7 +296,81 @@
     return {
       play,
       get muted() { return muted; },
-      toggle() { muted = !muted; store.set(MUTE_KEY, muted ? "1" : "0"); if (!muted) play("pop"); return muted; },
+      toggle() { muted = !muted; store.set(MUTE_KEY, muted ? "1" : "0"); if (!muted) play("pop"); music.refresh(); return muted; },
+      get volume() { return vol; },
+      setVolume(v) { vol = Math.max(0, Math.min(1, v)); store.set(VOL_KEY, String(vol)); if (out) out.gain.value = vol; },
+      audio: () => { try { return ctx(); } catch { return null; } },
+    };
+  })();
+
+  // ---------- Background music ----------
+  // A soft generated loop (no audio files): pad chords, a bass note and a gentle arpeggio.
+  // Off by default; turned on in Settings. Respects the mute button.
+  const MUSIC_KEY = "oxidpvp-music", MUSIC_VOL_KEY = "oxidpvp-music-vol";
+  const music = (() => {
+    let on = store.get(MUSIC_KEY) === "1";
+    let vol = store.get(MUSIC_VOL_KEY) == null ? 0.5 : Math.max(0, Math.min(1, +store.get(MUSIC_VOL_KEY) || 0));
+    let gain = null, timer = 0, next = 0, step = 0, started = false;
+    const STEP = 0.3; // seconds per eighth note (100 bpm)
+    const CHORDS = [[57, 60, 64, 67], [53, 57, 60, 64], [48, 52, 55, 59], [55, 59, 62, 65]]; // Am7 Fmaj7 Cmaj7 G7
+    const ARP = [0, 1, 2, 3, 2, 1, 2, 3];
+    const mtof = (m) => 440 * 2 ** ((m - 69) / 12);
+    function note(a, freq, t, dur, type, v) {
+      const o = a.createOscillator(), g = a.createGain();
+      o.type = type; o.frequency.value = freq;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(v, t + Math.min(0.08, dur / 3));
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(gain);
+      o.start(t); o.stop(t + dur + 0.05);
+    }
+    function schedule() {
+      const a = sfx.audio();
+      if (!a || !gain) return;
+      if (next < a.currentTime) next = a.currentTime + 0.05;
+      while (next < a.currentTime + 0.6) {
+        const chord = CHORDS[Math.floor(step / 16) % CHORDS.length], s16 = step % 16;
+        if (s16 === 0) {
+          for (const m of chord) note(a, mtof(m), next, STEP * 16, "sine", 0.035);
+          note(a, mtof(chord[0] - 24), next, STEP * 8, "triangle", 0.09);
+        }
+        if (s16 === 8) note(a, mtof(chord[0] - 24), next, STEP * 8, "triangle", 0.07);
+        note(a, mtof(chord[ARP[step % 8]] + 12), next, STEP * 1.6, "triangle", step % 2 ? 0.025 : 0.04);
+        next += STEP; step++;
+      }
+    }
+    function start() {
+      if (started || !on || sfx.muted || document.hidden) return;
+      const a = sfx.audio();
+      if (!a) return;
+      if (!gain) { gain = a.createGain(); gain.connect(a.destination); }
+      gain.gain.cancelScheduledValues(a.currentTime);
+      gain.gain.setValueAtTime(0, a.currentTime);
+      gain.gain.linearRampToValueAtTime(vol, a.currentTime + 1.5);
+      next = a.currentTime + 0.1;
+      started = true;
+      timer = setInterval(schedule, 150);
+      schedule();
+    }
+    function stop() {
+      if (!started) return;
+      started = false;
+      clearInterval(timer);
+      const a = sfx.audio();
+      if (a && gain) { gain.gain.cancelScheduledValues(a.currentTime); gain.gain.setValueAtTime(gain.gain.value, a.currentTime); gain.gain.linearRampToValueAtTime(0, a.currentTime + 0.3); }
+    }
+    const refresh = () => (on && !sfx.muted && !document.hidden ? start() : stop());
+    // Browsers only allow audio after a click or key press.
+    const kick = () => { refresh(); };
+    addEventListener("pointerdown", kick, { once: true });
+    addEventListener("keydown", kick, { once: true });
+    document.addEventListener("visibilitychange", refresh);
+    return {
+      get on() { return on; },
+      get volume() { return vol; },
+      set(v) { on = !!v; store.set(MUSIC_KEY, on ? "1" : "0"); refresh(); },
+      setVolume(v) { vol = Math.max(0, Math.min(1, v)); store.set(MUSIC_VOL_KEY, String(vol)); const a = sfx.audio(); if (gain && a && started) gain.gain.setValueAtTime(vol, a.currentTime); },
+      refresh,
     };
   })();
 
@@ -304,7 +384,160 @@
     const g = s[game] || (s[game] = { w: 0, l: 0, d: 0 });
     if (result === "win") g.w++; else if (result === "loss") g.l++; else g.d++;
     store.set(STATS_KEY, JSON.stringify(s));
+    const meta = readMeta();
+    meta.streak = result === "win" ? (meta.streak || 0) + 1 : result === "loss" ? 0 : meta.streak || 0;
+    meta.best = Math.max(meta.best || 0, meta.streak);
+    store.set(META_KEY, JSON.stringify(meta));
+    checkAchievements();
     if (reportTo && !reportTo.conn.closed) reportTo.conn.send({ rec: { r: result, name: reportTo.name } });
+  }
+
+  // ---------- Achievements ----------
+  const META_KEY = "oxidpvp-meta", ACH_KEY = "oxidpvp-ach";
+  const readMeta = () => { try { return JSON.parse(store.get(META_KEY)) || {}; } catch { return {}; } };
+  const readAch = () => { try { return JSON.parse(store.get(ACH_KEY)) || {}; } catch { return {}; } };
+  const sum = (st) => {
+    let w = 0, played = 0, games = 0, wonGames = 0;
+    for (const g of Object.values(st)) { const n = g.w + g.l + g.d; w += g.w; played += n; if (n) games++; if (g.w) wonGames++; }
+    return { w, played, games, wonGames };
+  };
+  const winsIn = (st, id) => (st[id] ? st[id].w : 0);
+  const ACHIEVEMENTS = [
+    { id: "first", icon: "🏆", name: "First blood", desc: "Win a game", test: (t) => t.w >= 1 },
+    { id: "w10", icon: "🔥", name: "On fire", desc: "Win 10 games", test: (t) => t.w >= 10 },
+    { id: "w50", icon: "👑", name: "Champion", desc: "Win 50 games", test: (t) => t.w >= 50 },
+    { id: "p25", icon: "🎮", name: "Regular", desc: "Play 25 games", test: (t) => t.played >= 25 },
+    { id: "p100", icon: "💯", name: "No life", desc: "Play 100 games", test: (t) => t.played >= 100 },
+    { id: "explore", icon: "🧭", name: "Explorer", desc: "Play 10 different games", test: (t) => t.games >= 10 },
+    { id: "allround", icon: "🌈", name: "All-rounder", desc: "Win at 5 different games", test: (t) => t.wonGames >= 5 },
+    { id: "streak3", icon: "⚡", name: "Hat trick", desc: "Win 3 games in a row", test: (t, m) => (m.best || 0) >= 3 },
+    { id: "streak5", icon: "🌪️", name: "Unstoppable", desc: "Win 5 games in a row", test: (t, m) => (m.best || 0) >= 5 },
+    { id: "chess", icon: "♞", name: "Grandmaster", desc: "Win 5 games of Chess", test: (t, m, st) => winsIn(st, "chess") >= 5 },
+    { id: "poker", icon: "🃏", name: "High roller", desc: "Win a game of Poker", test: (t, m, st) => winsIn(st, "poker") >= 1 },
+    { id: "party", icon: "🎉", name: "Life of the party", desc: "Win 10 party games", test: (t, m, st) => GAMES.filter((g) => !g.duel).reduce((a, g) => a + winsIn(st, g.id), 0) >= 10 },
+    { id: "ace", icon: "⛳", name: "Hole in one", desc: "Sink a Mini Golf hole in one stroke", special: true },
+    { id: "fast", icon: "⏱️", name: "Lightning", desc: "React in under 200 ms", special: true },
+    { id: "daily", icon: "📅", name: "Wordsmith", desc: "Solve a Daily Word", special: true },
+    { id: "daily7", icon: "🗓️", name: "Dedicated", desc: "Solve the Daily Word 7 days in a row", special: true },
+    { id: "sam", icon: "🟣", name: "Samuel Hines was here", desc: "Find the Sam corner", special: true, secret: true },
+    { id: "konami", icon: "🕹️", name: "Cheat code", desc: "Enter the secret code", special: true, secret: true },
+  ];
+  function unlock(id) {
+    const got = readAch();
+    if (got[id]) return false;
+    const a = ACHIEVEMENTS.find((x) => x.id === id);
+    if (!a) return false;
+    got[id] = Date.now();
+    store.set(ACH_KEY, JSON.stringify(got));
+    setTimeout(() => { toast(`${a.icon} Achievement unlocked: ${a.name}`, 3200); sfx.play("win"); }, 600);
+    return true;
+  }
+  function checkAchievements() {
+    const st = readStats(), t = sum(st), m = readMeta();
+    for (const a of ACHIEVEMENTS) if (!a.special && a.test(t, m, st)) unlock(a.id);
+  }
+  const achievements = () => { const got = readAch(); return ACHIEVEMENTS.map((a) => ({ ...a, got: got[a.id] || 0 })); };
+
+  // ---------- Secret: the Konami code ----------
+  (() => {
+    const CODE = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "KeyB", "KeyA"];
+    let i = 0;
+    addEventListener("keydown", (e) => {
+      i = e.code === CODE[i] ? i + 1 : e.code === CODE[0] ? 1 : 0;
+      if (i < CODE.length) return;
+      i = 0;
+      const on = document.documentElement.classList.toggle("party");
+      toast(on ? "🕹️ Party mode ON" : "Party mode off");
+      unlock("konami");
+    });
+  })();
+
+  // ---------- Settings panel: profile, look, sound ----------
+  const THEME_KEY = "oxidpvp-theme";
+  const ACCENTS = { violet: "#8b5cf6", blue: "#3b82f6", teal: "#14b8a6", green: "#22c55e", orange: "#f97316", red: "#ef4444", pink: "#ec4899" };
+  const readTheme = () => { try { return { mode: "dark", accent: "violet", ...(JSON.parse(store.get(THEME_KEY)) || {}) }; } catch { return { mode: "dark", accent: "violet" }; } };
+  function applyTheme(t) {
+    const d = document.documentElement;
+    if (t.mode === "light") d.dataset.theme = "light"; else delete d.dataset.theme;
+    if (t.accent && t.accent !== "violet") d.dataset.accent = t.accent; else delete d.dataset.accent;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = t.mode === "light" ? "#f4f4f7" : "#07070a";
+  }
+  applyTheme(readTheme());
+  const nameListeners = [];
+  function openSettings() {
+    document.querySelector(".settings-overlay")?.remove();
+    const ov = document.createElement("div");
+    ov.className = "overlay settings-overlay";
+    ov.innerHTML = `
+      <div class="panel settings" role="dialog" aria-label="Settings">
+        <div class="set-top"><h2>Settings</h2><button class="chat-close" type="button" aria-label="Close">&times;</button></div>
+        <section><h3>Profile</h3>
+          <div class="set-profile"><span class="set-av"></span><input class="set-name" maxlength="16" placeholder="Your name" aria-label="Your name"></div>
+          <div class="set-emojis"></div><div class="set-colors"></div>
+          <p class="set-note">Used in every game. Changes apply the next time you join a room.</p>
+        </section>
+        <section><h3>Look</h3>
+          <div class="seg set-mode"><button type="button" data-v="dark">Dark</button><button type="button" data-v="light">Light</button></div>
+          <div class="set-accents"></div>
+        </section>
+        <section><h3>Sound</h3>
+          <label class="set-row"><span>Sound effects</span><input type="range" class="set-vol" min="0" max="100"></label>
+          <label class="set-row"><span>Background music</span><input type="checkbox" class="set-music"></label>
+          <label class="set-row"><span>Music volume</span><input type="range" class="set-mvol" min="0" max="100"></label>
+        </section>
+      </div>`;
+    document.body.append(ov);
+    const q = (sel) => ov.querySelector(sel);
+    const close = () => { ov.remove(); removeEventListener("keydown", esc, true); };
+    const esc = (e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
+    addEventListener("keydown", esc, true);
+    q(".chat-close").addEventListener("click", close);
+    ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
+    // profile
+    let av = myAvatar();
+    const nameIn = q(".set-name");
+    nameIn.value = savedName();
+    const paintAv = () => {
+      const el = q(".set-av"); el.replaceWith(Object.assign(avatarEl({ av, name: nameIn.value }, "lg set-av")));
+      ov.querySelectorAll(".set-emojis button").forEach((b) => b.classList.toggle("on", b.textContent === av.e));
+      ov.querySelectorAll(".set-colors button").forEach((b, i) => b.classList.toggle("on", i === av.c));
+    };
+    for (const e of AVATARS) {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = e;
+      b.addEventListener("click", () => { av = { ...av, e }; store.set(AV_KEY, JSON.stringify(av)); paintAv(); sfx.play("click"); });
+      q(".set-emojis").append(b);
+    }
+    AV_COLORS.forEach((c, i) => {
+      const b = document.createElement("button"); b.type = "button"; b.style.background = c; b.setAttribute("aria-label", "Avatar color " + (i + 1));
+      b.addEventListener("click", () => { av = { ...av, c: i }; store.set(AV_KEY, JSON.stringify(av)); paintAv(); sfx.play("click"); });
+      q(".set-colors").append(b);
+    });
+    nameIn.addEventListener("input", () => { if (nameIn.value.trim()) store.set(NAME_KEY, cleanName(nameIn.value)); for (const f of nameListeners) f(); });
+    nameIn.addEventListener("keydown", (e) => e.stopPropagation());
+    paintAv();
+    // look
+    const t = readTheme();
+    const paintLook = () => {
+      ov.querySelectorAll(".set-mode button").forEach((b) => b.classList.toggle("on", b.dataset.v === t.mode));
+      ov.querySelectorAll(".set-accents button").forEach((b) => b.classList.toggle("on", b.dataset.v === t.accent));
+    };
+    ov.querySelectorAll(".set-mode button").forEach((b) => b.addEventListener("click", () => { t.mode = b.dataset.v; store.set(THEME_KEY, JSON.stringify(t)); applyTheme(t); paintLook(); }));
+    for (const [k, c] of Object.entries(ACCENTS)) {
+      const b = document.createElement("button"); b.type = "button"; b.dataset.v = k; b.style.background = c; b.setAttribute("aria-label", k + " accent");
+      b.addEventListener("click", () => { t.accent = k; store.set(THEME_KEY, JSON.stringify(t)); applyTheme(t); paintLook(); sfx.play("click"); });
+      q(".set-accents").append(b);
+    }
+    paintLook();
+    // sound
+    const vol = q(".set-vol"), mOn = q(".set-music"), mVol = q(".set-mvol");
+    vol.value = Math.round(sfx.volume * 100);
+    mOn.checked = music.on;
+    mVol.value = Math.round(music.volume * 100);
+    vol.addEventListener("input", () => sfx.setVolume(vol.value / 100));
+    vol.addEventListener("change", () => sfx.play("pop"));
+    mOn.addEventListener("change", () => { music.set(mOn.checked); if (mOn.checked && sfx.muted) toast("Sound is muted. Unmute to hear the music."); });
+    mVol.addEventListener("input", () => music.setVolume(mVol.value / 100));
   }
 
   // ---------- Public room listing (host only) ----------
@@ -353,6 +586,7 @@
     chat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>',
     on: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     off: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zM17 9l5 6M22 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    gear: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2.1 1.2M17.7 15.3l2.1 1.2M4.2 16.5l2.1-1.2M17.7 8.7l2.1-1.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
     swap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h13l-3-3M20 16H7l3 3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   };
 
@@ -380,6 +614,7 @@
           </form>
         </div>
         <div class="dock-row">
+          <button class="dock-btn gear" type="button" title="Settings" aria-label="Settings">${ICON.gear}</button>
           <button class="dock-btn mute" type="button"></button>
           <button class="dock-btn react-btn" type="button" title="React" aria-label="React" hidden>😀</button>
           <button class="dock-btn switch-btn" type="button" title="Switch game" hidden>${ICON.swap}<span>Switch game</span></button>
@@ -401,6 +636,7 @@
       const paintMute = () => { muteBtn.innerHTML = sfx.muted ? ICON.off : ICON.on; muteBtn.title = sfx.muted ? "Sound off" : "Sound on"; muteBtn.setAttribute("aria-label", muteBtn.title); };
       paintMute();
       muteBtn.addEventListener("click", () => { sfx.toggle(); paintMute(); });
+      $(".gear").addEventListener("click", () => openSettings());
       $(".chat-toggle").addEventListener("click", () => toggle());
       $(".chat-panel .chat-close").addEventListener("click", () => toggle(false));
       $(".switch-pop .chat-close").addEventListener("click", () => pop(null));
@@ -1432,7 +1668,8 @@
   window.Lobby = { mount };
   window.Room = { mount: mountRoom };
   window.GameUtil = {
-    fitCanvas, toast, loop, shuffle, touchControls, isTouch: () => touchMode, avatar: avatarEl, cleanName,
+    fitCanvas, toast, loop, shuffle, touchControls, isTouch: () => touchMode, openSettings, achieve: unlock, achievements,
+    meta: readMeta, onNameChange: (f) => nameListeners.push(f), myName: savedName, myAvatar, avatar: avatarEl, cleanName,
     sfx: (n) => sfx.play(n), record, stats: readStats, games: GAMES, joinByCode, pageFor, gameById,
   };
 })();

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>try{var t=JSON.parse(localStorage.getItem("oxidpvp-theme")||"{}"),d=document.documentElement;if(t.mode==="light")d.dataset.theme="light";if(t.accent&&t.accent!=="violet")d.dataset.accent=t.accent}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07070a">
+  <title>Daily Word · OXIDPVP</title>
+  <meta name="description" content="One five-letter word a day. Six guesses. Keep your streak alive.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="game-page">
+  <header class="topbar">
+    <a class="back" href="index.html">&larr; <span>Games</span></a>
+    <div class="tb-title">Daily Word <span class="dw-num" id="num"></span></div>
+    <button class="btn ghost" type="button" onclick="GameUtil.openSettings()">Settings</button>
+  </header>
+  <main class="dw">
+    <div class="dw-grid" id="grid"></div>
+    <div class="dw-done" id="done" hidden>
+      <strong id="doneTitle"></strong>
+      <span id="doneSub"></span>
+      <div class="dw-stats" id="stats"></div>
+      <button class="btn primary" id="share" type="button">Share result</button>
+      <small id="next"></small>
+    </div>
+    <div class="dw-keys" id="keys"></div>
+  </main>
+  <script src="js/net.js"></script>
+  <script src="js/daily.js"></script>
+</body>
+</html>

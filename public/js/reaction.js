@@ -57,6 +57,7 @@
     setPad(m.w < 0 ? "wait" : link.spectator || m.w !== me ? "lose" : "win", head, link.spectator ? `${name(0)}: ${fmtT(t[0])} · ${name(1)}: ${fmtT(t[1])}` : `You: ${fmtT(mine)} · Them: ${fmtT(theirs)}`);
     if (!link.spectator) GameUtil.sfx(m.w === me ? "good" : m.w < 0 ? "pop" : "bad");
     // Personal best, saved on this device.
+    if (!link.spectator && mine > 0 && mine < 200) GameUtil.achieve("fast");
     if (!link.spectator && mine > 0) {
       let best = 0;
       try { best = +localStorage.getItem("oxidpvp-reaction-best") || 0; } catch {}

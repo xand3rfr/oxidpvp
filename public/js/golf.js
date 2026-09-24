@@ -143,6 +143,8 @@
     balls = s.b.map((q) => ({ x: q.x, y: q.y, tx: q.x, ty: q.y }));
     if (prev && prev.n === s.n) {
       if (s.b.some((q, i) => q.done && !prev.b[i].done && Math.hypot(q.x - HOLES[s.hole].cup[0], q.y - HOLES[s.hole].cup[1]) < 1)) GameUtil.sfx("good");
+      const mine = s.b[me];
+      if (!link.spectator && mine.done && !prev.b[me].done && mine.strokes === 1 && Math.hypot(mine.x - HOLES[s.hole].cup[0], mine.y - HOLES[s.hole].cup[1]) < 1) { GameUtil.toast("⛳ Hole in one!"); GameUtil.achieve("ace"); }
       if (!s.moving && prev.moving === false && s.turn === me && prev.turn !== me && s.phase === "play") GameUtil.sfx("turn");
       if (s.moving && !prev.moving) GameUtil.sfx("pop");
     }
