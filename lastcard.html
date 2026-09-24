@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Last Card · OXIDPVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/cards.css">
+</head>
+<body class="game-page">
+  <header class="topbar">
+    <a class="back" href="index.html">&larr; <span>Games</span></a>
+    <div class="tb-title">Last Card</div>
+    <div class="net" id="dirEl" title="Turn direction"></div>
+  </header>
+
+  <main class="table" id="table">
+    <section class="opps" id="opps"></section>
+
+    <section class="center">
+      <div class="piles">
+        <button class="pile deck" id="deck" aria-label="Draw a card">
+          <div class="card back"><i class="logo"></i></div>
+          <span class="deck-n" id="deckN"></span>
+        </button>
+        <div class="pile discard" id="discard"></div>
+      </div>
+      <div class="info">
+        <div class="status-line" id="status"></div>
+        <div class="timer"><i id="timerBar"></i></div>
+        <div class="log" id="log"></div>
+      </div>
+    </section>
+
+    <section class="me">
+      <div class="actions">
+        <button class="btn call" id="callBtn" hidden>Last card!</button>
+        <button class="btn catch" id="catchBtn" hidden>Catch!</button>
+        <button class="btn" id="passBtn" hidden>Keep it &amp; pass</button>
+      </div>
+      <div class="hand" id="hand"></div>
+    </section>
+  </main>
+
+  <div class="overlay" id="picker" hidden>
+    <div class="panel picker">
+      <h1>Pick a color</h1>
+      <div class="swatches">
+        <button data-c="r" class="sw-r" aria-label="Red"></button>
+        <button data-c="y" class="sw-y" aria-label="Yellow"></button>
+        <button data-c="g" class="sw-g" aria-label="Green"></button>
+        <button data-c="b" class="sw-b" aria-label="Blue"></button>
+      </div>
+      <button class="btn ghost full" id="pickCancel">Cancel</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="result" hidden>
+    <div class="panel result">
+      <div class="big" id="resultTitle">You win!</div>
+      <ul class="standings" id="standings"></ul>
+      <div class="row">
+        <a class="btn ghost" href="index.html">Leave</a>
+        <button class="btn primary" id="again">Play again</button>
+      </div>
+      <p class="muted" id="againWait" style="font-size:13px;margin-top:12px" hidden>Waiting for the host to start the next round…</p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="js/net.js"></script>
+  <script src="js/lastcard.js"></script>
+</body>
+</html>
