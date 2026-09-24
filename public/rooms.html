@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07070a">
+  <title>Public rooms · OXIDPVP</title>
+  <meta name="description" content="Open game rooms you can jump into right now.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-in">
+      <a class="brand" href="index.html"><i class="brand-mark"></i><span>OXID<b>PVP</b></span></a>
+      <div class="nav-links">
+        <a href="index.html#games">Games</a>
+        <a href="rooms.html" aria-current="page">Public rooms</a>
+        <a href="leaderboard.html">Leaderboard</a>
+      </div>
+      <div class="nav-right">
+        <a class="btn primary" href="index.html#games">Play now</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="hub">
+    <div class="wrap page">
+      <div class="page-head">
+        <div>
+          <h1>Public rooms</h1>
+          <p class="muted">Rooms whose host ticked "List in public rooms". Jump in and play with whoever's there.</p>
+        </div>
+        <select id="filter" aria-label="Filter by game"><option value="">All games</option></select>
+      </div>
+      <div class="room-list" id="list"></div>
+      <div class="empty" id="empty" hidden>
+        <div class="empty-ico">🛋️</div>
+        <h2>No public rooms right now</h2>
+        <p class="muted">Start one yourself: pick a game, create a room, and tick "List in public rooms".</p>
+        <a class="btn primary" href="index.html#games">Pick a game</a>
+      </div>
+      <p class="muted refresh" id="refresh"></p>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script>
+    (() => {
+      const list = document.getElementById("list"), empty = document.getElementById("empty"), filter = document.getElementById("filter");
+      for (const g of GameUtil.games) filter.append(new Option(g.title, g.id));
+      let rooms = [];
+      function render() {
+        const f = filter.value;
+        const shown = rooms.filter((r) => GameUtil.gameById(r.game) && (!f || r.game === f));
+        list.textContent = "";
+        empty.hidden = shown.length > 0;
+        for (const r of shown) {
+          const g = GameUtil.gameById(r.game);
+          const full = r.players >= r.max;
+          const canJoin = !r.started && !full;
+          const canWatch = g.duel && r.watch && (r.started || full);
+          const card = document.createElement("div");
+          card.className = "room-card";
+          const top = document.createElement("div"); top.className = "room-top";
+          const t = document.createElement("b"); t.textContent = g.title;
+          const st = document.createElement("span");
+          st.className = "room-status " + (canJoin ? "open" : canWatch ? "watch" : "busy");
+          st.textContent = canJoin ? "Waiting for players" : canWatch ? "In progress · watch" : r.started ? "In progress" : "Full";
+          top.append(t, st);
+          const meta = document.createElement("div"); meta.className = "room-meta";
+          const host = document.createElement("span"); host.textContent = "Host: " + (r.host || "?");
+          const n = document.createElement("span"); n.textContent = `${r.players} / ${r.max} players`;
+          meta.append(host, n);
+          const a = document.createElement("a");
+          a.className = "btn " + (canJoin ? "primary" : "");
+          a.href = GameUtil.pageFor(r.game, r.code);
+          a.textContent = canJoin ? "Join" : canWatch ? "Watch" : "Can't join";
+          if (!canJoin && !canWatch) { a.removeAttribute("href"); a.classList.add("disabled"); }
+          card.append(top, meta, a);
+          list.append(card);
+        }
+      }
+      async function load() {
+        try {
+          const r = await fetch("/api/rooms", { cache: "no-store" });
+          rooms = (await r.json()).rooms || [];
+          document.getElementById("refresh").textContent = "Updates every few seconds.";
+        } catch { document.getElementById("refresh").textContent = "Couldn't load rooms. Retrying…"; }
+        render();
+      }
+      filter.addEventListener("change", render);
+      load();
+      setInterval(load, 5000);
+    })();
+  </script>
+</body>
+</html>

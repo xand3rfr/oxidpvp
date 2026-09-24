@@ -17,7 +17,8 @@
       <a class="brand" href="index.html"><i class="brand-mark"></i><span>OXID<b>PVP</b></span></a>
       <div class="nav-links">
         <a href="#games">Games</a>
-        <a href="#how">How it works</a>
+        <a href="rooms.html">Public rooms</a>
+        <a href="leaderboard.html">Leaderboard</a>
       </div>
       <div class="nav-right">
         <span class="status-pill"><i></i>Servers online</span>
@@ -43,6 +44,7 @@
             <button class="btn" type="submit">Join</button>
           </form>
           <p class="code-err" id="codeErr" aria-live="polite"></p>
+          <p class="open-rooms" id="openRooms" hidden><a href="rooms.html"><i></i><span></span></a></p>
           <div class="hero-meta">
             <div><b>16</b><span>games</span></div>
             <div><b>2–10</b><span>players</span></div>
@@ -611,6 +613,15 @@
           list.append(a);
         }
       }
+
+      // "N open rooms" link under the code box.
+      fetch("/api/rooms", { cache: "no-store" }).then((r) => r.json()).then(({ rooms }) => {
+        const open = (rooms || []).filter((r) => !r.started && r.players < r.max).length;
+        if (!open) return;
+        const el = document.getElementById("openRooms");
+        el.querySelector("span").textContent = `${open} public room${open === 1 ? "" : "s"} open right now →`;
+        el.hidden = false;
+      }).catch(() => {});
 
       // Hover glow follows the cursor.
       for (const c of cards) {
