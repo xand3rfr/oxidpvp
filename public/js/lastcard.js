@@ -38,9 +38,13 @@
     (card.c !== "w" ? COLOR_NAME[card.c] + " " : "") +
     ({ skip: "Skip", rev: "Reverse", d2: "+2", wild: "Wild", d4: "Wild +4" }[card.v] || card.v);
 
-  function createEngine(roomPlayers, hostId, emit) {
+  // teams: with exactly 4 players, seats alternate A B A B so partners sit opposite, and a
+  // team wins as soon as either partner empties their hand.
+  function createEngine(roomPlayers, hostId, emit, teams) {
+    const seated = teams && roomPlayers.length === 4 ? shuffle(roomPlayers.slice()) : roomPlayers;
     const G = {
-      players: roomPlayers.map((p) => ({ id: p.id, name: p.name, av: p.av, hand: [], called: false })),
+      teams: !!(teams && roomPlayers.length === 4), winTeam: null,
+      players: seated.map((p, i) => ({ id: p.id, name: p.name, av: p.av, hand: [], called: false, team: i % 2 })),
       deck: [], discard: [], color: "r", turn: 0, dir: 1,
       drew: false, drawnId: null, vulnerable: null, winner: null,
       log: "", fx: null, turnEnds: 0, seq: 0, round: 0,
@@ -86,7 +90,7 @@
       G.color = first.c;
       G.dir = 1;
       G.turn = Math.floor(Math.random() * n());
-      G.drew = false; G.drawnId = null; G.vulnerable = null; G.winner = null;
+      G.drew = false; G.drawnId = null; G.vulnerable = null; G.winner = null; G.winTeam = null;
       G.turnEnds = Date.now() + TURN_MS;
       G.round++;
       G.log = `Round ${G.round}: ${G.players[G.turn].name} goes first`;
@@ -147,7 +151,8 @@
 
         if (!p.hand.length) {
           G.winner = pid;
-          G.log = `${p.name} wins the round!`;
+          if (G.teams) G.winTeam = p.team;
+          G.log = G.teams ? `${p.name} wins it for their team!` : `${p.name} wins the round!`;
           emit();
           return;
         }
@@ -206,6 +211,7 @@
       const i = G.players.findIndex((p) => p.id === pid);
       if (i < 0) return;
       const [p] = G.players.splice(i, 1);
+      if (G.teams) { G.teams = false; G.winTeam = null; } // a partner left: back to every player for themselves
       G.deck.push(...p.hand);
       shuffle(G.deck);
       if (G.vulnerable === pid) G.vulnerable = null;
@@ -231,7 +237,8 @@
       return {
         t: "st", seq: G.seq, me: pid,
         hand: p ? p.hand : [],
-        players: G.players.map((x) => ({ id: x.id, name: x.name, av: x.av, n: x.hand.length, called: x.called })),
+        players: G.players.map((x) => ({ id: x.id, name: x.name, av: x.av, n: x.hand.length, called: x.called, team: G.teams ? x.team : null })),
+        winTeam: G.winTeam,
         top: top(), under: G.discard.slice(-4, -1),
         color: G.color, turn: cur ? cur.id : null, dir: G.dir, deck: G.deck.length,
         drew: !!(cur && cur.id === pid && G.drew), drawnId: cur && cur.id === pid ? G.drawnId : null,
@@ -303,8 +310,8 @@
       if (v.fx && v.fx.k === "catch") GameUtil.sfx(v.fx.pid === v.me ? "bad" : "good");
       if (v.turn === v.me && prev.turn !== v.me && v.winner == null) setTimeout(() => GameUtil.sfx("turn"), 200);
       if (v.winner != null && prev.winner == null) {
-        GameUtil.sfx(v.winner === v.me ? "win" : "lose");
-        GameUtil.record("lastcard", v.winner === v.me ? "win" : "loss");
+        GameUtil.sfx(iWon(v) ? "win" : "lose");
+        GameUtil.record("lastcard", iWon(v) ? "win" : "loss");
       }
     }
     turnEndsLocal = performance.now() + v.left;
@@ -314,6 +321,8 @@
     render();
   }
 
+  const teamOf = (v, id) => { const p = v.players.find((x) => x.id === id); return p ? p.team : null; };
+  const iWon = (v) => v.winner === v.me || (v.winTeam != null && teamOf(v, v.me) === v.winTeam);
   function render() {
     if (!V) return;
     const me = V.me, myTurn = V.turn === me && V.winner == null;
@@ -330,6 +339,7 @@
       const fan = h("div", "fan");
       for (let i = 0; i < Math.min(p.n, 8); i++) fan.append(h("i", "mini"));
       box.append(GameUtil.avatar(p), meta, fan);
+      if (p.team != null && p.team === teamOf(V, me)) { box.classList.add("partner"); box.append(h("span", "badge team", "PARTNER")); }
       if (p.n === 1 && p.called) box.append(h("span", "badge", "LAST"));
       else if (p.id === V.vulnerable) box.append(h("span", "badge danger", "1 LEFT"));
       opps.append(box);
@@ -364,7 +374,7 @@
     // status
     const status = $("status");
     status.textContent = "";
-    if (V.winner != null) status.append(V.winner === me ? "You win the round!" : `${nameOf(V.winner)} wins the round`);
+    if (V.winner != null) status.append(V.winner === me ? "You win the round!" : iWon(V) ? `${nameOf(V.winner)} won it for your team!` : `${nameOf(V.winner)} wins the round`);
     else if (myTurn) status.append(V.drew ? "Play the card you drew, or keep it" : "Your turn");
     else status.append(`${nameOf(V.turn)}'s turn`);
     if (V.top && V.top.c === "w" && V.winner == null) {
@@ -401,11 +411,11 @@
     // results
     const result = $("result");
     if (V.winner != null) {
-      $("resultTitle").textContent = V.winner === me ? "You win!" : `${nameOf(V.winner)} wins`;
+      $("resultTitle").textContent = V.winTeam != null ? (iWon(V) ? "Your team wins!" : "Their team wins") : V.winner === me ? "You win!" : `${nameOf(V.winner)} wins`;
       const list = $("standings");
       list.textContent = "";
       [...V.players].sort((a, b) => a.n - b.n).forEach((p) => {
-        const li = h("li", p.id === V.winner ? "win" : "");
+        const li = h("li", p.id === V.winner || (V.winTeam != null && p.team === V.winTeam) ? "win" : "");
         li.append(GameUtil.avatar(p), h("span", "pname", p.name + (p.id === me ? " (you)" : "")),
           h("span", "n", p.n === 0 ? "out" : p.n + " left"));
         list.append(li);
@@ -464,7 +474,25 @@
   // =====================================================================
   // Lobby hookup
   // =====================================================================
+  // ---------- lobby settings ----------
+  const MODE_KEY = "oxidpvp-lastcard-mode";
+  const loadMode = () => { try { return localStorage.getItem(MODE_KEY) || "solo"; } catch { return "solo"; } };
+  function buildSettings(el) {
+    el.innerHTML = `<div class="set-head">Mode</div><div class="seg" data-k="mode"></div>`;
+    const seg = el.querySelector(".seg");
+    for (const [k, label] of [["solo", "Free-for-all"], ["teams", "2v2 teams (4 players)"]]) {
+      const b = h("button", "", label);
+      b.type = "button";
+      b.dataset.v = k;
+      b.addEventListener("click", () => { try { localStorage.setItem(MODE_KEY, k); } catch {} paint(); });
+      seg.append(b);
+    }
+    const paint = () => [...seg.children].forEach((b) => b.classList.toggle("on", b.dataset.v === loadMode()));
+    paint();
+  }
+
   Room.mount({
+    lobbyExtra: buildSettings,
     game: "lastcard",
     title: "Last Card",
     subtitle: "Match color or number, 2 to 6 players. Empty your hand first, and don't forget to call your last card.",
@@ -484,7 +512,8 @@
             else r.sendTo(p.id, engine.view(p.id));
           }
           engine.G.fx = null;
-        });
+        }, loadMode() === "teams");
+        if (loadMode() === "teams" && r.players.length !== 4) GameUtil.toast("2v2 teams needs exactly 4 players, so it's every player for themselves.");
         r.onData((from, m) => engine.act(from, m));
         r.onLeave((id) => engine.leave(id));
         r.onRejoin((id) => { engine.G.seq++; r.sendTo(id, engine.view(id)); });

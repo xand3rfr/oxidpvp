@@ -188,3 +188,5 @@
   .hand { --w: 68px; }
   .center { gap: 10px; }
 }
+.badge.team { left: 8px; right: auto; background: var(--accent); box-shadow: 0 4px 12px -4px var(--accent-glow); }
+.opp.partner { border-color: rgba(139,92,246,.55); }
