@@ -63,7 +63,7 @@
   let link = null, S = null, V = null, me = 1, pending = false;
 
   function tryMove(c) {
-    if (!link || !V || V.win || V.turn !== me || pending) return;
+    if (!link || link.spectator || !V || V.win || V.turn !== me || pending) return;
     if (V.b[at(c, ROWS - 1)]) return; // column full
     if (link.isHost) { if (drop(S, me, c)) publish(); }
     else { pending = true; link.send({ t: "drop", c }); }
@@ -109,13 +109,18 @@
       d.classList.toggle("win", V.line.includes(i));
     }
 
-    const myTurn = !V.win && V.turn === me;
+    const spec = link && link.spectator;
+    const myTurn = !spec && !V.win && V.turn === me;
+    const who = (piece) => (piece === me ? link.myName : link.oppName);
+    if (prev && prev.n === V.n && V.last !== prev.last) GameUtil.sfx("pop");
+    if (myTurn && (!prev || prev.turn !== V.turn || prev.n !== V.n)) setTimeout(() => GameUtil.sfx("turn"), 250);
     boardEl.classList.toggle("live", myTurn);
     const banner = $("banner");
     banner.classList.toggle("mine", myTurn);
     $("bannerChip").style.background = PIECE_COLOR[V.win && V.win < 3 ? V.win : V.turn];
     $("bannerText").textContent =
       V.win === 3 ? "Board full, draw" :
+      spec ? (V.win ? `${who(V.win)} got four` : `${who(V.turn)}'s move`) :
       V.win ? (V.win === me ? "Four in a row!" : "They got four") :
       myTurn ? "Your move" : "Their move";
 
@@ -123,10 +128,17 @@
     $("s0").textContent = mine;
     $("s1").textContent = theirs;
 
+    if (V.win && (!prev || !prev.win || prev.n !== V.n)) {
+      if (!spec) {
+        GameUtil.sfx(V.win === 3 ? "pop" : V.win === me ? "win" : "lose");
+        GameUtil.record("connect", V.win === 3 ? "draw" : V.win === me ? "win" : "loss");
+      }
+    }
     if (V.win) {
       setTimeout(() => {
         if (!V || !V.win) return;
-        $("resultTitle").textContent = V.win === 3 ? "Draw" : V.win === me ? "You win" : "You lose";
+        $("resultTitle").textContent = V.win === 3 ? "Draw" : spec ? `${who(V.win)} wins` : V.win === me ? "You win" : "You lose";
+        rematchBtn.hidden = !!spec;
         $("resultScore").textContent = `${mine} – ${theirs}`;
         rematchBtn.disabled = false;
         rematchBtn.textContent = "Next round";
@@ -154,8 +166,10 @@
     onStart(l) {
       link = l;
       me = l.isHost ? 1 : 2;
+      $("name0").textContent = l.spectator ? l.myName : "You";
       $("name1").textContent = l.oppName;
       V = null; pending = false;
+      if (l.isHost) l.onRejoin(() => l.send({ t: "s", s: S }));
       $("sw0").style.background = PIECE_COLOR[me];
       $("sw1").style.background = PIECE_COLOR[3 - me];
       l.onData((d) => {
@@ -166,7 +180,7 @@
         } else if (d.t === "s") show(d.s);
       });
       if (l.isHost) { S = newState(Math.random() < 0.5 ? 1 : 2); publish(); }
-      GameUtil.toast(l.isHost ? "Connected. You're orange." : "Connected. You're yellow.");
+      if (!l.spectator) GameUtil.toast(l.isHost ? "Connected. You're orange." : "Connected. You're yellow.");
       return () => {
         link = null; S = null; V = null;
         resultEl.hidden = true;

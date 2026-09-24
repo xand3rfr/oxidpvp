@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07070a">
+  <title>Codewords · OXIDPVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/games.css">
+  <link rel="stylesheet" href="css/party.css">
+</head>
+<body class="game-page">
+  <header class="topbar">
+    <a class="back" href="index.html">&larr; <span>Games</span></a>
+    <div class="tb-title">Codewords</div>
+    <div class="net" id="side"></div>
+  </header>
+  <main class="play cw">
+    <section class="cw-setup" id="setup">
+      <h2>Pick your team</h2>
+      <p class="muted">Each team needs one spymaster (who gives clues) and at least one guesser.</p>
+      <div class="cw-teams">
+        <div class="cw-team t0">
+          <h3>Red</h3>
+          <ul id="redTeam"></ul>
+          <div class="cw-join"><button class="btn sm" data-team="0" data-role="op" type="button">Guess for Red</button><button class="btn sm" data-team="0" data-role="spy" type="button">Red spymaster</button></div>
+        </div>
+        <div class="cw-team t1">
+          <h3>Blue</h3>
+          <ul id="blueTeam"></ul>
+          <div class="cw-join"><button class="btn sm" data-team="1" data-role="op" type="button">Guess for Blue</button><button class="btn sm" data-team="1" data-role="spy" type="button">Blue spymaster</button></div>
+        </div>
+      </div>
+      <p class="muted" id="setupMsg"></p>
+      <div class="cw-setup-btns">
+        <button class="btn" id="shuffleTeams" type="button" hidden>Shuffle teams</button>
+        <button class="btn primary" id="startBtn" type="button" hidden>Start game</button>
+      </div>
+    </section>
+
+    <section class="cw-game" id="game" hidden>
+      <div class="cw-score">
+        <span class="cw-count t0"><b id="redLeft">0</b> left</span>
+        <span class="cw-turn" id="turnText"></span>
+        <span class="cw-count t1"><b id="blueLeft">0</b> left</span>
+      </div>
+      <div class="cw-clue" id="clue"></div>
+      <form class="cw-clueform" id="clueForm" hidden autocomplete="off">
+        <input id="clueWord" maxlength="24" placeholder="One-word clue" aria-label="Clue word">
+        <select id="clueNum" aria-label="Number of words">
+          <option>0</option><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option>
+        </select>
+        <button class="btn primary" type="submit">Give clue</button>
+      </form>
+      <div class="cw-board" id="board"></div>
+      <div class="cw-foot">
+        <span class="muted" id="myRole"></span>
+        <button class="btn" id="endTurn" type="button" hidden>End turn</button>
+      </div>
+      <div class="cw-side">
+        <ul class="cw-list t0" id="redList"></ul>
+        <ol class="cw-log" id="log"></ol>
+        <ul class="cw-list t1" id="blueList"></ul>
+      </div>
+    </section>
+  </main>
+  <div class="overlay" id="result" hidden>
+    <div class="panel result">
+      <div class="big" id="resultTitle"></div>
+      <p class="muted" id="resultNote" style="margin-top:8px"></p>
+      <ul class="standings" id="standings"></ul>
+      <div class="row">
+        <a class="btn ghost" href="index.html">Leave</a>
+        <button class="btn" id="peek" type="button">See board</button>
+        <button class="btn primary" id="again">Play again</button>
+      </div>
+      <p class="muted" id="againWait" style="font-size:13px;margin-top:12px" hidden>Waiting for the host to start another game…</p>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script src="js/party.js"></script>
+  <script src="js/codewords-words.js"></script>
+  <script src="js/codewords.js"></script>
+</body>
+</html>

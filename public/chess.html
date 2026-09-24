@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07070a">
+  <title>Chess · OXIDPVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/games.css">
+  <link rel="stylesheet" href="css/party.css">
+</head>
+<body class="game-page">
+  <header class="topbar">
+    <a class="back" href="index.html">&larr; <span>Games</span></a>
+    <div class="tb-title">Chess</div>
+    <div class="net" id="net"><i class="dot"></i><span>offline</span></div>
+  </header>
+  <main class="play ch">
+    <div class="ch-wrap">
+      <div class="ch-left">
+        <div class="ch-player opp"><span class="ch-name" id="nameOpp">Opponent</span><span class="ch-mat" id="matOpp"></span><span class="ch-clock"><b id="clockOpp">10:00</b></span></div>
+        <div class="ch-board-wrap">
+          <div class="ch-board" id="board"></div>
+          <div class="ch-promo" id="promo" hidden></div>
+        </div>
+        <div class="ch-player me"><span class="ch-name" id="nameMe">You</span><span class="ch-mat" id="matMe"></span><span class="ch-clock"><b id="clockMe">10:00</b></span></div>
+      </div>
+      <aside class="ch-side">
+        <p class="ch-status" id="status"></p>
+        <div class="ch-draw" id="drawBanner" hidden>
+          <span>Your opponent offers a draw.</span>
+          <button class="btn sm primary" id="acceptDraw" type="button">Accept</button>
+        </div>
+        <ol class="ch-moves" id="moves"></ol>
+        <div class="ch-actions" id="actions">
+          <button class="btn" id="offerDraw" type="button">Offer draw</button>
+          <button class="btn ghost" id="resign" type="button">Resign</button>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <div class="overlay" id="result" hidden>
+    <div class="panel result">
+      <div class="big" id="resultTitle">You win</div>
+      <div class="final" id="resultScore"></div>
+      <div class="row">
+        <button class="btn ghost" id="peek" type="button">See board</button>
+        <button class="btn primary" id="rematch" type="button">Rematch</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script src="js/party.js"></script>
+  <script type="module" src="js/chess.js"></script>
+</body>
+</html>

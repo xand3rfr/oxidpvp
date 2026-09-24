@@ -111,10 +111,12 @@
   function applyEvent(e) {
     if (e.k === "h") {
       burst(e.x, e.y, COLORS[e.v], 10, 240);
+      GameUtil.sfx("click");
       if (e.v === myIdx) shake = Math.max(shake, 6);
     } else if (e.k === "k") {
       burst(e.x, e.y, COLORS[e.v], 40, 420, 0.8, 4);
       burst(e.x, e.y, "#ffffff", 12, 200, 0.4, 2);
+      GameUtil.sfx("boom");
       particles.push({ ring: true, x: e.x, y: e.y, life: 0.5, max: 0.5, color: COLORS[e.v] });
       if (e.v === myIdx) shake = 16; else shake = Math.max(shake, 5);
     } else if (e.k === "w") {
@@ -132,6 +134,12 @@
   }
 
   function stepLocal(dt) {
+    if (link && link.spectator) { // follow the guest's player from snapshots instead of our own input
+      const v = playerView(myIdx), k = 1 - Math.exp(-dt * 20);
+      if (Math.hypot(v.x - me.x, v.y - me.y) > 120) { me.x = v.x; me.y = v.y; }
+      me.x += (v.x - me.x) * k; me.y += (v.y - me.y) * k; me.a = v.a; me.dashT = v.dash ? 0.05 : 0;
+      return;
+    }
     me.dashCd = Math.max(0, me.dashCd - dt);
     me.fireCd = Math.max(0, me.fireCd - dt);
     const view = playerView(myIdx);
@@ -363,7 +371,7 @@
       if (snap) {
         const el = Math.min(0.1, (performance.now() - snapAt) / 1000);
         for (const b of snap.b) {
-          if (b[4] === myIdx) continue;
+          if (b[4] === myIdx && !link.spectator) continue;
           const x = b[0] + b[2] * el, y = b[1] + b[3] * el;
           if (!inWall(x, y)) drawBullet(x, y, b[2], b[3], COLORS[b[4]]);
         }
@@ -430,8 +438,10 @@
     $("s0").textContent = sc[myIdx];
     $("s1").textContent = sc[oppIdx];
     if (w >= 0) {
-      const won = w === myIdx;
-      $("resultTitle").textContent = won ? "Victory" : "Defeat";
+      const won = w === myIdx, spec = link && link.spectator;
+      if (link && !spec) { GameUtil.sfx(won ? "win" : "lose"); GameUtil.record("arena", won ? "win" : "loss"); }
+      $("resultTitle").textContent = spec ? `${(w === 0 ? link.names[0] : link.names[1])} wins` : won ? "Victory" : "Defeat";
+      rematchBtn.hidden = !!spec;
       $("resultTitle").style.color = won ? COLORS[myIdx] : "#ecedef";
       $("resultScore").textContent = sc[myIdx] + " – " + sc[oppIdx];
       rematchBtn.disabled = false;
@@ -490,6 +500,7 @@
     title: "Arena",
     subtitle: "Top-down 1v1 shooter. First to 5 eliminations wins.",
     onStart(l) {
+      document.getElementById("name0").textContent = l.spectator ? l.myName : "You";
       document.getElementById("name1").textContent = l.oppName;
       link = l;
       myIdx = l.isHost ? 0 : 1;
@@ -513,7 +524,7 @@
       running = true;
       last = performance.now();
       stopLoop = GameUtil.loop(frame);
-      GameUtil.toast("Connected. Fight!");
+      if (!l.spectator) GameUtil.toast("Connected. Fight!");
 
       return () => {
         running = false;
