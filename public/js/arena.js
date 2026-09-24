@@ -457,7 +457,7 @@
     if (S) hostTick(dt);
     else {
       stepLocalBullets(dt);
-      if (now - lastPosSend >= 16) {
+      if (now - lastPosSend >= 33) {
         lastPosSend = now;
         link.send({ t: "p", x: Math.round(me.x * 10) / 10, y: Math.round(me.y * 10) / 10, a: Math.round(me.a * 100) / 100, d: me.dashT > 0 ? 1 : 0, seq: lastSeq });
       }

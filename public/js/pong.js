@@ -153,7 +153,7 @@
     if (S) return S.ball;
     if (!snap) return { x: W / 2, y: H / 2, vx: 0, vy: 0 };
     const [x, y, vx, vy] = snap.b;
-    const el = Math.min(0.08, (performance.now() - snapAt) / 1000);
+    const el = Math.min(0.12, (performance.now() - snapAt) / 1000);
     let bx = x + vx * el, by = y + vy * el;
     if (by < BR) by = 2 * BR - by;
     if (by > H - BR) by = 2 * (H - BR) - by;
@@ -288,8 +288,8 @@
     sendAcc += dt;
     if (S) {
       hostTick(dt);
-      if (sendAcc >= 1 / 60) { sendAcc = 0; sendSnapshot(); }
-    } else if (sendAcc >= 1 / 60) {
+      if (sendAcc >= 1 / 30) { sendAcc = 0; sendSnapshot(); }
+    } else if (sendAcc >= 1 / 30) {
       sendAcc = 0;
       link.send({ t: "y", y: Math.round(myY * 10) / 10 });
     }

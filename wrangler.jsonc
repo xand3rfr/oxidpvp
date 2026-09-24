@@ -8,5 +8,10 @@
     "binding": "ASSETS",
     // Everything is a static file except /api/*, which runs worker.js.
     "run_worker_first": ["/api/*"]
-  }
+  },
+  // One Durable Object per game room (SQLite-backed, so it works on the free plan).
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "GameRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }]
 }
