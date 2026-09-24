@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Battleship · OXIDPVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/games.css">
+</head>
+<body class="game-page">
+  <header class="topbar">
+    <a class="back" href="index.html">&larr; <span>Games</span></a>
+    <div class="scoreboard">
+      <div class="side"><i class="sw" style="background:var(--p1)"></i><span class="name">You</span><span class="num" id="s0">0</span></div>
+      <span class="sep">:</span>
+      <div class="side"><span class="num" id="s1">0</span><span class="name">Opponent</span><i class="sw" style="background:var(--p2)"></i></div>
+    </div>
+    <div class="net" id="net"><i class="dot"></i><span>offline</span></div>
+  </header>
+  <main class="play">
+    <div class="turn-banner" id="banner"><span id="bannerText">Place your fleet</span></div>
+    <div class="bs-wrap">
+      <section class="bs-side" id="targetSide" hidden>
+        <div class="bs-label"><span class="left">Enemy waters</span><span id="enemyLeft"></span></div>
+        <div class="grid10 target bs-board" id="target"></div>
+        <div class="fleet-left" id="enemyFleet"></div>
+      </section>
+      <section class="bs-side" id="homeSide">
+        <div class="bs-label"><span class="left">Your fleet</span></div>
+        <div class="grid10 bs-board" id="home"></div>
+        <div class="fleet-left" id="myFleet" hidden></div>
+      </section>
+    </div>
+    <div class="bs-tools" id="tools">
+      <button class="btn" id="shuffle">Shuffle</button>
+      <button class="btn primary" id="ready">Ready</button>
+      <button class="btn primary" id="rematch2" hidden>Rematch</button>
+    </div>
+    <p class="bs-tip" id="tip">Drag a ship to move it. Tap a ship to rotate it. Ships can't overlap.</p>
+  </main>
+
+  <div class="overlay" id="result" hidden>
+    <div class="panel result">
+      <div class="big" id="resultTitle">Victory</div>
+      <div class="final" id="resultScore">1 – 0</div>
+      <div class="row">
+        <button class="btn ghost" id="peek">See boards</button>
+        <button class="btn primary" id="rematch">Rematch</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script src="js/battleship.js"></script>
+</body>
+</html>

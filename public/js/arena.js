@@ -414,7 +414,7 @@
 
     if (!mine.alive && winner() < 0) {
       ctx.fillStyle = "rgba(236,237,239,0.85)";
-      ctx.font = "600 22px Inter, system-ui, sans-serif";
+      ctx.font = "600 22px 'IBM Plex Sans', system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("Eliminated. Respawning…", W / 2, 60);
     }

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz Battle · OXIDPVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/games.css">
+</head>
+<body class="game-page">
+  <header class="topbar">
+    <a class="back" href="index.html">&larr; <span>Games</span></a>
+    <div class="tb-title">Quiz Battle</div>
+    <div class="net" id="myScore"></div>
+  </header>
+  <main class="play">
+    <div class="tv">
+      <div class="tv-top"><span id="qNum">Get ready…</span><span class="tv-cat" id="qCat" hidden></span></div>
+      <div class="tv-clock" id="clock"><i id="clockBar"></i></div>
+      <div class="tv-q" id="question">Waiting for the first question…</div>
+      <div class="tv-opts" id="opts"></div>
+      <div class="tv-msg" id="msg"></div>
+      <div class="tv-board" id="board"></div>
+    </div>
+  </main>
+  <p class="hint"><kbd>Click</kbd> / <kbd>Tap</kbd> or press <kbd>1</kbd>–<kbd>4</kbd> · right answers score up to 1000, faster = more</p>
+
+  <div class="overlay" id="result" hidden>
+    <div class="panel result">
+      <div class="big" id="resultTitle">You win</div>
+      <ul class="standings" id="standings"></ul>
+      <div class="row">
+        <a class="btn ghost" href="index.html">Leave</a>
+        <button class="btn primary" id="again">Play again</button>
+      </div>
+      <p class="muted" id="againWait" style="font-size:13px;margin-top:12px" hidden>Waiting for the host to start another game…</p>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script src="js/trivia-questions.js"></script>
+  <script src="js/trivia.js"></script>
+</body>
+</html>

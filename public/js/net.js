@@ -447,6 +447,7 @@
   }
 
   function toast(msg, ms = 2200) {
+    for (const old of document.querySelectorAll(".toast")) old.remove();
     const t = document.createElement("div");
     t.className = "toast";
     t.textContent = msg;
