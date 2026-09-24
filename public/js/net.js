@@ -34,6 +34,7 @@
     { id: "typing", page: "typing", title: "Type Race", min: 2, max: 8 },
     { id: "rps", page: "rps", title: "RPS Tournament", min: 2, max: 8 },
     { id: "snake", page: "snake", title: "Snake Battle", min: 2, max: 4 },
+    { id: "royale", page: "royale", title: "Snake Royale", min: 2, max: 8 },
     { id: "vote", page: "mostlikely", title: "Most Likely To", min: 3, max: 10 },
     { id: "bluff", page: "bluff", title: "Bluff", min: 3, max: 8 },
     { id: "hangman", page: "hangman", title: "Hangman", min: 2, max: 8 },

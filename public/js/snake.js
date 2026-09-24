@@ -1,12 +1,21 @@
 // Snake Battle for 2–4 players. Everyone steers a snake on the same board: eat to grow, and
 // don't hit a wall, yourself or anyone else. Last snake alive wins the round; first to 3 rounds
 // wins. The host runs the simulation at a fixed tick and streams the board; guests send turns.
+// Snake Royale (royale.html sets window.SNAKE_MODE = "royale") is the same game for up to 8
+// players on a bigger board, where a danger zone closes in from the edges over time.
 (() => {
-  const GW = 40, GH = 28, CELL = 24, W = GW * CELL, H = GH * CELL;
-  const TICK_MS = 100, COUNTDOWN = 3, ROUND_PAUSE = 2.4, WIN = 3, FOOD = 5, START_LEN = 4;
-  const COLORS = ["#ff5b3a", "#4d8dff", "#22c55e", "#facc15"];
+  const ROYALE = window.SNAKE_MODE === "royale";
+  const GW = ROYALE ? 52 : 40, GH = ROYALE ? 34 : 28, CELL = ROYALE ? 20 : 24, W = GW * CELL, H = GH * CELL;
+  const TICK_MS = 100, COUNTDOWN = 3, ROUND_PAUSE = 2.4, WIN = ROYALE ? 2 : 3, FOOD = ROYALE ? 9 : 5, START_LEN = 4;
+  const COLORS = ["#ff5b3a", "#4d8dff", "#22c55e", "#facc15", "#ec4899", "#14b8a6", "#a855f7", "#f97316"];
   const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
-  const SPAWN = [[5, 14, 1], [GW - 6, 13, 3], [20, 3, 2], [19, GH - 4, 0]];
+  const SPAWN = ROYALE
+    ? [[6, 8, 1], [GW - 7, GH - 9, 3], [GW - 9, 6, 2], [8, GH - 7, 0], [6, GH - 12, 1], [GW - 7, 11, 3], [GW / 2 + 5, 5, 2], [GW / 2 - 6, GH - 6, 0]]
+    : [[5, 14, 1], [GW - 6, 13, 3], [20, 3, 2], [19, GH - 4, 0]];
+  // Royale zone: after SHRINK_AFTER ticks the safe area shrinks by a cell on every side every
+  // SHRINK_EVERY ticks, down to a small box in the middle. Leaving it is fatal.
+  const SHRINK_AFTER = 120, SHRINK_EVERY = 25, MIN_W = 14, MIN_H = 8;
+  const maxZone = Math.min((GW - MIN_W) / 2, (GH - MIN_H) / 2) | 0;
   const $ = (id) => document.getElementById(id);
   const { h, results, hideResults } = Party;
 
@@ -39,8 +48,9 @@
   function createSim(room, out) {
     const S = {
       players: room.players.map((p, i) => ({ id: p.id, name: p.name, av: p.av, c: i, wins: 0 })),
-      snakes: [], food: [], phase: "idle", timer: 0, acc: 0, n: 0, rw: null, w: null, tickN: 0,
+      snakes: [], food: [], phase: "idle", timer: 0, acc: 0, n: 0, rw: null, w: null, tickN: 0, zone: 0, roundTicks: 0,
     };
+    const inZone = (x, y) => x >= S.zone && y >= S.zone && x < GW - S.zone && y < GH - S.zone;
     const occupied = () => {
       const set = new Set();
       for (const s of S.snakes) if (s.alive) for (const [x, y] of s.body) set.add(y * GW + x);
@@ -50,7 +60,7 @@
       const occ = occupied();
       for (const [x, y] of S.food) occ.add(y * GW + x);
       for (let k = 0; k < 200; k++) {
-        const x = 1 + Math.floor(Math.random() * (GW - 2)), y = 1 + Math.floor(Math.random() * (GH - 2));
+        const x = S.zone + 1 + Math.floor(Math.random() * (GW - 2 * S.zone - 2)), y = S.zone + 1 + Math.floor(Math.random() * (GH - 2 * S.zone - 2));
         if (!occ.has(y * GW + x)) { S.food.push([x, y]); return; }
       }
     }
@@ -61,7 +71,7 @@
         for (let i = 0; i < START_LEN; i++) body.push([x - DX[d] * i, y - DY[d] * i]);
         return { id: p.id, c: p.c, body, dir: d, q: [], grow: 0, alive: true };
       });
-      S.food = [];
+      S.food = []; S.zone = 0; S.roundTicks = 0;
       for (let i = 0; i < FOOD; i++) addFood();
       S.phase = "count"; S.timer = COUNTDOWN; S.n++; S.rw = null;
       publish(true);
@@ -88,6 +98,10 @@
     }
     function tick() {
       S.tickN++;
+      if (ROYALE && ++S.roundTicks > SHRINK_AFTER && (S.roundTicks - SHRINK_AFTER) % SHRINK_EVERY === 0 && S.zone < maxZone) {
+        S.zone++;
+        S.food = S.food.filter(([x, y]) => inZone(x, y));
+      }
       const live = S.snakes.filter((s) => s.alive);
       for (const s of live) if (s.q.length) s.dir = s.q.shift();
       const heads = live.map((s) => [s.body[0][0] + DX[s.dir], s.body[0][1] + DY[s.dir]]);
@@ -96,7 +110,7 @@
       for (const s of live) s.body.forEach(([x, y], i) => { if (i < s.body.length - 1 || s.grow > 0) occ.set(y * GW + x, s); });
       const dead = live.map((s, i) => {
         const [x, y] = heads[i];
-        return x < 0 || y < 0 || x >= GW || y >= GH || occ.has(y * GW + x);
+        return !inZone(x, y) || occ.has(y * GW + x);
       });
       heads.forEach(([x, y], i) => heads.forEach(([x2, y2], j) => { if (i !== j && x === x2 && y === y2) dead[i] = true; }));
       const events = [];
@@ -105,7 +119,7 @@
           s.alive = false;
           events.push({ k: "x", c: s.c, x: s.body[0][0], y: s.body[0][1] });
           // Leave a little food where it died.
-          s.body.forEach(([x, y], k) => { if (k % 3 === 1 && x >= 0 && y >= 0 && x < GW && y < GH) S.food.push([x, y]); });
+          s.body.forEach(([x, y], k) => { if (k % 3 === 1 && inZone(x, y)) S.food.push([x, y]); });
           return;
         }
         s.body.unshift(heads[i]);
@@ -131,7 +145,8 @@
     }
     function snapshot(full, events = []) {
       return {
-        t: "k", n: S.n, phase: S.phase, rw: S.rw, w: S.w, tick: TICK_MS, count: S.phase === "count" ? S.timer : 0,
+        t: "k", n: S.n, phase: S.phase, rw: S.rw, w: S.w, tick: TICK_MS, count: S.phase === "count" ? S.timer : 0, z: S.zone,
+        zn: ROYALE && S.zone < maxZone ? Math.max(0, SHRINK_EVERY - ((S.roundTicks - SHRINK_AFTER) % SHRINK_EVERY + SHRINK_EVERY) % SHRINK_EVERY) + Math.max(0, SHRINK_AFTER - S.roundTicks) : -1,
         players: full ? S.players : undefined,
         s: S.snakes.map((s) => ({ id: s.id, c: s.c, a: s.alive ? 1 : 0, d: s.dir, b: s.body.flat(), g: s.grow > 0 ? 1 : 0 })),
         f: S.food.flat(), e: events,
@@ -172,6 +187,7 @@
     for (const e of m.e || []) {
       const cx = (e.x + 0.5) * CELL, cy = (e.y + 0.5) * CELL;
       if (e.k === "x") { burst(cx, cy, COLORS[e.c], 28); GameUtil.sfx("boom"); }
+      else if (e.k === "z") GameUtil.sfx("tick");
       else if (e.k === "e") { burst(cx, cy, COLORS[e.c], 8); if (players[e.c] && players[e.c].id === room.myId) GameUtil.sfx("pop"); }
     }
     if (prev && prev.phase !== m.phase) {
@@ -181,7 +197,7 @@
       const won = m.w === room.myId;
       setTimeout(() => {
         GameUtil.sfx(won ? "win" : "lose");
-        GameUtil.record("snake", won ? "win" : "loss");
+        GameUtil.record(ROYALE ? "royale" : "snake", won ? "win" : "loss");
         const winner = players.find((p) => p.id === m.w);
         results({
           title: won ? "You win!" : winner ? `${winner.name} wins` : "Game over",
@@ -217,6 +233,19 @@
     ctx.fillStyle = "rgba(255,255,255,0.035)";
     for (let y = 0; y < GH; y++) for (let x = (y % 2); x < GW; x += 2) ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
 
+    if (V && V.z) {
+      // danger zone
+      const z = V.z * CELL;
+      ctx.fillStyle = "rgba(239,68,68,0.16)";
+      ctx.fillRect(0, 0, W, z); ctx.fillRect(0, H - z, W, z); ctx.fillRect(0, z, z, H - 2 * z); ctx.fillRect(W - z, z, z, H - 2 * z);
+      ctx.strokeStyle = "rgba(248,113,113,0.8)"; ctx.lineWidth = 3;
+      ctx.strokeRect(z, z, W - 2 * z, H - 2 * z);
+    }
+    if (V && V.zn >= 0 && V.zn <= 30 && V.phase === "play") {
+      ctx.font = "600 16px 'Geist Mono', ui-monospace, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+      ctx.fillStyle = "rgba(248,113,113,0.9)";
+      ctx.fillText(`ZONE CLOSING IN ${Math.ceil((V.zn * TICK_MS) / 1000)}`, W / 2, 10);
+    }
     if (V) {
       // food
       const t = performance.now() / 400;
@@ -317,12 +346,19 @@
 
   $("again").addEventListener("click", () => { if (sim) sim.newMatch(); });
 
-  Room.mount({
+  Room.mount(Object.assign(ROYALE ? {
+    game: "royale",
+    title: "Snake Royale",
+    subtitle: "Up to 8 snakes, one shrinking arena. Stay inside the zone and be the last one slithering. First to 2 rounds.",
+    min: 2,
+    max: 8,
+  } : {
     game: "snake",
     title: "Snake Battle",
     subtitle: "Eat, grow, and make everyone else crash. Last snake alive takes the round; first to 3 wins. 2 to 4 players.",
     min: 2,
     max: 4,
+  }, {
     onStart(r) {
       room = r; V = null; particles = [];
       players = r.players.map((p, i) => ({ ...p, c: i, wins: 0 }));
@@ -344,5 +380,5 @@
         render(0);
       };
     },
-  });
+  }));
 })();
