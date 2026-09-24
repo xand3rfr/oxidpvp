@@ -53,6 +53,8 @@
     { id: "dots", page: "dots", title: "Dots & Boxes", duel: true },
     { id: "golf", page: "golf", title: "Mini Golf", duel: true },
     { id: "hockey", page: "hockey", title: "Air Hockey", duel: true },
+    { id: "tanks", page: "tanks", title: "Tank Duel", duel: true },
+    { id: "reaction", page: "reaction", title: "Reaction Duel", duel: true },
   ];
   const gameById = (id) => GAMES.find((g) => g.id === id);
   const pageFor = (id, hash) => { const g = gameById(id); return g ? `${g.page}.html${hash ? "#" + hash : ""}` : "index.html"; };

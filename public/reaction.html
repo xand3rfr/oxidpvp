@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07070a">
+  <title>Reaction Duel · OXIDPVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/games.css">
+  <link rel="stylesheet" href="css/party.css">
+</head>
+<body class="game-page">
+  <header class="topbar">
+    <a class="back" href="index.html">&larr; <span>Games</span></a>
+    <div class="scoreboard">
+      <div class="side"><i class="sw" id="sw0"></i><span class="name" id="name0">You</span><span class="num" id="s0">0</span></div>
+      <span class="sep">:</span>
+      <div class="side"><span class="num" id="s1">0</span><span class="name" id="name1">Opponent</span><i class="sw" id="sw1"></i></div>
+    </div>
+    <div class="net" id="net"><i class="dot"></i><span>offline</span></div>
+  </header>
+  <main class="rx">
+    <button class="rx-pad wait" id="pad" type="button"><strong id="big">Get ready…</strong><span id="small"></span></button>
+    <p class="hint"><span id="best"></span> · <kbd>Click</kbd> / <kbd>Tap</kbd> / <kbd>Space</kbd> when it turns green · first to 5</p>
+  </main>
+
+  <div class="overlay" id="result" hidden>
+    <div class="panel result">
+      <div class="big" id="resultTitle">You win</div>
+      <div class="final" id="resultScore"></div>
+      <div class="row">
+        <button class="btn ghost" id="peek" type="button">See board</button>
+        <button class="btn primary" id="rematch" type="button">Rematch</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script src="js/party.js"></script>
+  <script src="js/reaction.js"></script>
+</body>
+</html>
