@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07070a">
+  <title>RPS Tournament · OXIDPVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/games.css">
+  <link rel="stylesheet" href="css/party.css">
+</head>
+<body class="game-page">
+  <header class="topbar">
+    <a class="back" href="index.html">&larr; <span>Games</span></a>
+    <div class="tb-title">RPS Tournament</div>
+    <div class="net" id="side"></div>
+  </header>
+  <main class="play rps">
+    <div class="rps-round" id="roundName"></div>
+    <section class="rps-arena" id="arena" hidden>
+      <div class="rps-vs">
+        <div class="rps-side" id="meSide"></div>
+        <span class="rps-x">VS</span>
+        <div class="rps-side" id="oppSide"></div>
+      </div>
+      <div class="rps-timer"><i id="timerBar"></i></div>
+      <div class="rps-reveal" id="reveal"></div>
+      <div class="rps-buttons" id="buttons"></div>
+    </section>
+    <p class="muted rps-spec" id="spectate" hidden>You're out. Watch the rest of the bracket below!</p>
+    <section class="rps-bracket" id="bracket"></section>
+  </main>
+  <div class="overlay" id="result" hidden>
+    <div class="panel result">
+      <div class="big" id="resultTitle"></div>
+      <ul class="standings" id="standings"></ul>
+      <div class="row">
+        <a class="btn ghost" href="index.html">Leave</a>
+        <button class="btn primary" id="again">Play again</button>
+      </div>
+      <p class="muted" id="againWait" style="font-size:13px;margin-top:12px" hidden>Waiting for the host to start another game…</p>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script src="js/party.js"></script>
+  <script src="js/rps.js"></script>
+</body>
+</html>
