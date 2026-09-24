@@ -612,3 +612,50 @@ button.bl-opt:disabled { opacity: .55; cursor: default; }
 .gf-card tr.p0 th { box-shadow: inset 3px 0 #ff5b3a; }
 .gf-card tr.p1 th { box-shadow: inset 3px 0 #4d8dff; }
 .game-page #c { touch-action: none; }
+
+/* ---------- Wavelength ---------- */
+.wl-clue.wait { color: var(--muted); font-size: clamp(18px, 3vw, 24px); font-weight: 600; }
+.wl-dial { width: min(820px, 100%); }
+.wl-ends { display: flex; justify-content: space-between; font-weight: 700; font-size: 15px; margin-bottom: 10px; }
+.wl-ends span:first-child { color: #60a5fa; } .wl-ends span:last-child { color: #f472b6; }
+.wl-track { position: relative; height: 84px; border-radius: 16px; border: 1px solid var(--line-2); background: linear-gradient(90deg, rgba(96,165,250,.28), rgba(139,92,246,.18) 50%, rgba(244,114,182,.28)); }
+.wl-track input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; margin: 0; cursor: pointer; touch-action: none; }
+.wl-track input:disabled { cursor: default; pointer-events: none; }
+.wl-thumb { position: absolute; top: -6px; bottom: -6px; width: 6px; margin-left: -3px; border-radius: 3px; background: #fff; box-shadow: 0 0 16px rgba(255,255,255,.7); pointer-events: none; }
+.wl-target { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: inherit; }
+.wl-target i { position: absolute; top: 0; bottom: 0; left: var(--x); transform: translateX(-50%); }
+.wl-target .z3 { width: 40%; background: rgba(250,204,21,.14); }
+.wl-target .z2 { width: 24%; background: rgba(250,204,21,.22); }
+.wl-target .z1 { width: 10%; background: rgba(250,204,21,.55); }
+.wl-mark { position: absolute; top: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+.wl-mark .avatar { box-shadow: 0 0 0 2px #0a0a0f; }
+.wl-mark.me .avatar { box-shadow: 0 0 0 2px var(--accent); }
+.wl-form { display: flex; gap: 8px; width: min(560px, 100%); }
+.wl-form input { flex: 1; }
+/* shared text field for newer party games */
+.wl-form input, .p-input {
+  flex: 1; min-width: 0; height: 48px; padding: 0 14px; border-radius: 12px; background: var(--field); border: 1px solid var(--line-2);
+  color: var(--text); font: 600 16px var(--sans); outline: none;
+}
+.wl-form input:focus, .p-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,92,246,.2); }
+
+/* ---------- Imposter ---------- */
+.im-card { width: min(560px, 100%); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 20px; border-radius: 18px; border: 1px solid var(--line-2); background: linear-gradient(180deg, rgba(139,92,246,.14), rgba(139,92,246,.04)); text-align: center; }
+.im-card.imp { background: linear-gradient(180deg, rgba(244,63,94,.2), rgba(244,63,94,.05)); border-color: rgba(244,63,94,.5); }
+.im-cat { font-size: 13px; color: var(--muted); } .im-cat b { color: var(--text); }
+.im-hint { order: 3; font-size: 13px; color: var(--muted); }
+.im-word { font-size: clamp(26px, 5vw, 40px); font-weight: 800; letter-spacing: -0.03em; }
+.im-card.imp .im-word { color: #fda4af; }
+.im-list { width: min(720px, 100%); display: flex; flex-direction: column; gap: 8px; }
+.im-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text); font: inherit; text-align: left; }
+button.im-row { cursor: pointer; } button.im-row:hover { border-color: var(--accent-hi); }
+.im-row.turn { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.im-row.picked { border-color: var(--accent); background: rgba(139,92,246,.18); }
+.im-row.imp { border-color: #f43f5e; background: rgba(244,63,94,.14); }
+.im-name { font-weight: 600; min-width: 90px; }
+.im-words { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.im-words b { font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
+.im-typing { color: var(--dim); animation: pulse 1s infinite; }
+.im-votes { font: 600 12px var(--mono); color: #fda4af; }
+.im-voted { font: 500 12px var(--mono); color: var(--dim); }
+.im-opts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; width: min(720px, 100%); }

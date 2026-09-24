@@ -38,6 +38,8 @@
     { id: "bluff", page: "bluff", title: "Bluff", min: 3, max: 8 },
     { id: "hangman", page: "hangman", title: "Hangman", min: 2, max: 8 },
     { id: "bingo", page: "bingo", title: "Bingo", min: 2, max: 10 },
+    { id: "wave", page: "wavelength", title: "Wavelength", min: 3, max: 10 },
+    { id: "imposter", page: "imposter", title: "Imposter", min: 3, max: 10 },
     { id: "chess", page: "chess", title: "Chess", duel: true },
     { id: "connect", page: "connect4", title: "Connect 4", duel: true },
     { id: "battleship", page: "battleship", title: "Battleship", duel: true, noSpectate: true },
