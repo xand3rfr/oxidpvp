@@ -575,3 +575,25 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 .sam-dot { position: relative; }
 .sam-msg { font: 500 12px/1 var(--mono); color: var(--text); background: var(--surface); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 10px; opacity: 0; transform: translateX(-4px); pointer-events: none; transition: opacity .2s, transform .2s; white-space: nowrap; }
 .sam-msg.on { opacity: 1; transform: none; }
+
+/* ---------- Touch controls ---------- */
+body { touch-action: manipulation; }
+.touch-ui { display: none; }
+body.touching .touch-ui { display: block; }
+.touch-ui .tz { position: fixed; bottom: 24px; z-index: 15; display: flex; align-items: flex-end; gap: 14px; }
+.touch-ui .tz-left { left: 24px; }
+.touch-ui .tz-right { right: 24px; bottom: 88px; flex-direction: row-reverse; }
+.t-btn { -webkit-tap-highlight-color: transparent; touch-action: none; user-select: none; border: 1px solid var(--line-3); background: rgba(24,24,33,.72); backdrop-filter: blur(6px); color: var(--text); border-radius: 18px; }
+.t-btn.on { background: var(--accent); border-color: var(--accent); }
+.t-action { width: 76px; height: 76px; border-radius: 50%; font: 700 13px/1 var(--mono); text-transform: uppercase; letter-spacing: .04em; }
+.t-dpad { display: grid; grid-template: repeat(3, 58px) / repeat(3, 58px); gap: 4px; }
+.t-dpad .t-btn { position: relative; }
+.t-dpad .t-btn::after { content: ""; position: absolute; inset: 0; margin: auto; width: 0; height: 0; border: 9px solid transparent; }
+.t-up { grid-area: 1 / 2; } .t-up::after { border-bottom-color: var(--text) !important; border-top-width: 0 !important; }
+.t-down { grid-area: 3 / 2; } .t-down::after { border-top-color: var(--text) !important; border-bottom-width: 0 !important; }
+.t-left { grid-area: 2 / 1; } .t-left::after { border-right-color: var(--text) !important; border-left-width: 0 !important; }
+.t-right { grid-area: 2 / 3; } .t-right::after { border-left-color: var(--text) !important; border-right-width: 0 !important; }
+.t-stick { position: relative; width: 132px; height: 132px; border-radius: 50%; border: 1px solid var(--line-3); background: rgba(24,24,33,.5); backdrop-filter: blur(6px); touch-action: none; display: grid; place-items: center; }
+.t-stick i { width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,.22); border: 1px solid var(--line-3); pointer-events: none; }
+.t-stick.on i { background: var(--accent); transition: none; }
+.t-stick span { position: absolute; bottom: -20px; font: 600 10px/1 var(--mono); color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }

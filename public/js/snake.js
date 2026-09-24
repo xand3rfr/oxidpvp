@@ -31,6 +31,7 @@
     swipe = { x: e.clientX, y: e.clientY };
   });
   canvas.addEventListener("pointerup", () => { swipe = null; });
+  GameUtil.touchControls({ dpad: (d) => turn(d) });
 
   // =====================================================================
   // Host simulation

@@ -47,10 +47,19 @@
     mouse.x = ((e.clientX - r.left) / r.width) * W;
     mouse.y = ((e.clientY - r.top) / r.height) * H;
   };
-  addEventListener("pointermove", toWorld);
+  addEventListener("pointermove", (e) => { if (e.pointerType === "mouse" || e.target === canvas) toWorld(e); });
   canvas.addEventListener("pointerdown", (e) => { if (e.button === 0) { toWorld(e); mouse.down = true; } });
   addEventListener("pointerup", () => { mouse.down = false; });
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+  // Touch: left stick moves, right stick aims and fires while held, button dashes.
+  const tstick = { mx: 0, my: 0, ax: 0, ay: 0, aim: false };
+  GameUtil.touchControls({
+    sticks: [
+      { side: "left", label: "Move", onMove: (x, y) => { tstick.mx = x; tstick.my = y; } },
+      { side: "right", label: "Aim + fire", onMove: (x, y, on) => { tstick.ax = x; tstick.ay = y; tstick.aim = on && Math.hypot(x, y) > 0.25; } },
+    ],
+    buttons: [{ side: "right", label: "Dash", onDown: () => { dashQueued = true; } }],
+  });
 
   // ---------- Helpers ----------
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -147,13 +156,15 @@
 
     let mx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
     let my = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
+    if (!mx && !my && Math.hypot(tstick.mx, tstick.my) > 0.2) { mx = tstick.mx; my = tstick.my; }
     const len = Math.hypot(mx, my);
-    if (len) { mx /= len; my /= len; }
+    if (len > 1) { mx /= len; my /= len; }
+    if (tstick.aim) { mouse.x = me.x + tstick.ax * 140; mouse.y = me.y + tstick.ay * 140; }
     me.a = Math.atan2(mouse.y - me.y, mouse.x - me.x);
 
     if (dashQueued && me.dashCd <= 0) {
-      me.ddx = len ? mx : Math.cos(me.a);
-      me.ddy = len ? my : Math.sin(me.a);
+      me.ddx = len ? mx / len : Math.cos(me.a);
+      me.ddy = len ? my / len : Math.sin(me.a);
       me.dashT = DASH_TIME;
       me.dashCd = DASH_CD;
       burst(me.x, me.y, COLORS[myIdx], 12, 180, 0.35);
@@ -171,7 +182,7 @@
     }
     collide(me);
 
-    if (mouse.down && me.fireCd <= 0) {
+    if ((mouse.down || tstick.aim) && me.fireCd <= 0) {
       me.fireCd = FIRE_CD;
       fire(me.x + Math.cos(me.a) * (R + 8), me.y + Math.sin(me.a) * (R + 8), me.a);
     }

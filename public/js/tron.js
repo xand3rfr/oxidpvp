@@ -33,6 +33,7 @@
     swipe = { x: e.clientX, y: e.clientY };
   });
   canvas.addEventListener("pointerup", () => { swipe = null; });
+  GameUtil.touchControls({ dpad: (d) => turn(d) });
   canvas.addEventListener("pointercancel", () => { swipe = null; });
 
   // ---------- Shared view state (built from messages) ----------

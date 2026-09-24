@@ -1347,6 +1347,73 @@
     return () => { running = false; cancelAnimationFrame(rafId); worker.terminate(); };
   }
 
+
+  // ---------- Touch controls (touchscreen Chromebooks, tablets) ----------
+  // On-screen controls for games that otherwise need a keyboard. They only show once someone
+  // actually touches the screen, and hide again when a mouse or keyboard is used.
+  let touchMode = false;
+  const setTouch = (on) => { if (on !== touchMode) { touchMode = on; document.body.classList.toggle("touching", on); } };
+  addEventListener("pointerdown", (e) => { if (e.pointerType === "touch" || e.pointerType === "pen") setTouch(true); }, true);
+  addEventListener("pointermove", (e) => { if (e.pointerType === "mouse" && (e.movementX || e.movementY)) setTouch(false); }, true);
+  addEventListener("keydown", (e) => { if (!/^(Tab|Shift|Control|Alt|Meta)/.test(e.key) && e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") setTouch(false); }, true);
+
+  // opts: { dpad(dir 0..3), sticks: [{ side, label, onMove(x, y, active) }], buttons: [{ side, label, onDown, onUp }] }
+  function touchControls(opts) {
+    const root = document.createElement("div");
+    root.className = "touch-ui";
+    const zone = (side) => {
+      let z = root.querySelector(".tz-" + side);
+      if (!z) { z = document.createElement("div"); z.className = "tz tz-" + side; root.append(z); }
+      return z;
+    };
+    const hold = (el, down, up) => {
+      el.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); el.setPointerCapture(e.pointerId); el.classList.add("on"); down && down(); });
+      const end = () => { if (el.classList.contains("on")) { el.classList.remove("on"); up && up(); } };
+      el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end); el.addEventListener("lostpointercapture", end);
+      el.addEventListener("contextmenu", (e) => e.preventDefault());
+    };
+    if (opts.dpad) {
+      const pad = document.createElement("div");
+      pad.className = "t-dpad";
+      ["up", "right", "down", "left"].forEach((name, dir) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "t-btn t-" + name; b.setAttribute("aria-label", name);
+        hold(b, () => opts.dpad(dir));
+        pad.append(b);
+      });
+      zone(opts.dpadSide || "left").append(pad);
+    }
+    for (const st of opts.sticks || []) {
+      const base = document.createElement("div");
+      base.className = "t-stick";
+      const knob = document.createElement("i");
+      base.append(knob);
+      if (st.label) { const l = document.createElement("span"); l.textContent = st.label; base.append(l); }
+      let id = null;
+      const move = (e) => {
+        const r = base.getBoundingClientRect(), R = r.width / 2;
+        let x = (e.clientX - r.left - R) / R, y = (e.clientY - r.top - R) / R;
+        const len = Math.hypot(x, y);
+        if (len > 1) { x /= len; y /= len; }
+        knob.style.transform = `translate(${x * R * 0.55}px, ${y * R * 0.55}px)`;
+        st.onMove(x, y, true);
+      };
+      base.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); id = e.pointerId; base.setPointerCapture(id); base.classList.add("on"); move(e); });
+      base.addEventListener("pointermove", (e) => { if (e.pointerId === id) move(e); });
+      const end = (e) => { if (e.pointerId !== id) return; id = null; base.classList.remove("on"); knob.style.transform = ""; st.onMove(0, 0, false); };
+      base.addEventListener("pointerup", end); base.addEventListener("pointercancel", end);
+      zone(st.side || "left").append(base);
+    }
+    for (const bt of opts.buttons || []) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "t-btn t-action"; b.textContent = bt.label;
+      hold(b, bt.onDown, bt.onUp);
+      zone(bt.side || "right").append(b);
+    }
+    document.body.append(root);
+    return { remove: () => root.remove() };
+  }
+
   const shuffle = (a) => {
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -1358,7 +1425,7 @@
   window.Lobby = { mount };
   window.Room = { mount: mountRoom };
   window.GameUtil = {
-    fitCanvas, toast, loop, shuffle, avatar: avatarEl, cleanName,
+    fitCanvas, toast, loop, shuffle, touchControls, isTouch: () => touchMode, avatar: avatarEl, cleanName,
     sfx: (n) => sfx.play(n), record, stats: readStats, games: GAMES, joinByCode, pageFor, gameById,
   };
 })();
