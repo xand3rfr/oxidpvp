@@ -11,7 +11,14 @@
   },
   // One Durable Object per game room (SQLite-backed, so it works on the free plan).
   "durable_objects": {
-    "bindings": [{ "name": "ROOMS", "class_name": "GameRoom" }]
+    "bindings": [
+      { "name": "ROOMS", "class_name": "GameRoom" },
+      { "name": "DIRECTORY", "class_name": "Directory" },
+      { "name": "BOARD", "class_name": "Leaderboard" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }]
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["GameRoom"] },
+    { "tag": "v2", "new_sqlite_classes": ["Directory", "Leaderboard"] }
+  ]
 }

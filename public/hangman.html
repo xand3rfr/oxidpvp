@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07070a">
+  <title>Hangman · OXIDPVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/games.css">
+  <link rel="stylesheet" href="css/party.css">
+</head>
+<body class="game-page">
+  <header class="topbar">
+    <a class="back" href="index.html">&larr; <span>Games</span></a>
+    <div class="tb-title">Hangman</div>
+    <div class="net" id="side"></div>
+  </header>
+  <main class="play hm">
+    <div class="tv-top ml-top"><span id="round"></span><span class="tv-cat" id="cat"></span><span class="ml-timer" id="timer"></span></div>
+    <div class="hm-stage">
+      <svg class="hm-gallows" viewBox="0 0 200 220" aria-hidden="true">
+        <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path id="hm-base" d="M20 205h120"/>
+          <path id="hm-pole" d="M50 205V20"/>
+          <path id="hm-beam" d="M50 20h90"/>
+          <path id="hm-rope" d="M140 20v28"/>
+          <circle id="hm-head" cx="140" cy="66" r="18"/>
+          <path id="hm-body" d="M140 84v56"/>
+          <path id="hm-arms" d="M112 104l28-10 28 10"/>
+          <path id="hm-legs" d="M140 140l-22 38M140 140l22 38"/>
+        </g>
+      </svg>
+      <div class="hm-right">
+        <div class="hm-puzzle" id="puzzle"></div>
+        <p class="muted" id="misses"></p>
+      </div>
+    </div>
+    <p class="tv-msg" id="status"></p>
+    <div class="hm-keys" id="keys"></div>
+    <form class="bl-write hm-solve" id="solveForm" autocomplete="off" hidden>
+      <input id="solveIn" maxlength="30" placeholder="Know it? Type the whole answer" aria-label="Solve">
+      <button class="btn" type="submit">Solve</button>
+    </form>
+    <div class="tv-board" id="board"></div>
+  </main>
+  <div class="overlay" id="result" hidden>
+    <div class="panel result">
+      <div class="big" id="resultTitle"></div>
+      <ul class="standings" id="standings"></ul>
+      <div class="row">
+        <a class="btn ghost" href="index.html">Leave</a>
+        <button class="btn primary" id="again">Play again</button>
+      </div>
+      <p class="muted" id="againWait" style="font-size:13px;margin-top:12px" hidden>Waiting for the host to start another game…</p>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script src="js/party.js"></script>
+  <script src="js/hangman-words.js"></script>
+  <script src="js/hangman.js"></script>
+</body>
+</html>

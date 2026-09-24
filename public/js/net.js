@@ -34,12 +34,21 @@
     { id: "typing", page: "typing", title: "Type Race", min: 2, max: 8 },
     { id: "rps", page: "rps", title: "RPS Tournament", min: 2, max: 8 },
     { id: "snake", page: "snake", title: "Snake Battle", min: 2, max: 4 },
+    { id: "vote", page: "mostlikely", title: "Most Likely To", min: 3, max: 10 },
+    { id: "bluff", page: "bluff", title: "Bluff", min: 3, max: 8 },
+    { id: "hangman", page: "hangman", title: "Hangman", min: 2, max: 8 },
+    { id: "bingo", page: "bingo", title: "Bingo", min: 2, max: 10 },
     { id: "chess", page: "chess", title: "Chess", duel: true },
     { id: "connect", page: "connect4", title: "Connect 4", duel: true },
     { id: "battleship", page: "battleship", title: "Battleship", duel: true, noSpectate: true },
     { id: "tron", page: "tron", title: "Light Cycles", duel: true },
     { id: "arena", page: "arena", title: "Arena", duel: true },
     { id: "pong", page: "pong", title: "Pong", duel: true },
+    { id: "checkers", page: "checkers", title: "Checkers", duel: true },
+    { id: "uttt", page: "ultimate", title: "Ultimate Tic-Tac-Toe", duel: true },
+    { id: "dots", page: "dots", title: "Dots & Boxes", duel: true },
+    { id: "golf", page: "golf", title: "Mini Golf", duel: true },
+    { id: "hockey", page: "hockey", title: "Air Hockey", duel: true },
   ];
   const gameById = (id) => GAMES.find((g) => g.id === id);
   const pageFor = (id, hash) => { const g = gameById(id); return g ? `${g.page}.html${hash ? "#" + hash : ""}` : "index.html"; };
@@ -281,11 +290,29 @@
   // ---------- Local win stats ----------
   const STATS_KEY = "oxidpvp-stats";
   const readStats = () => { try { return JSON.parse(store.get(STATS_KEY)) || {}; } catch { return {}; } };
+  // The room we're in, so results also go to the global leaderboard (via the room server).
+  let reportTo = null;
   function record(game, result) {
     const s = readStats();
     const g = s[game] || (s[game] = { w: 0, l: 0, d: 0 });
     if (result === "win") g.w++; else if (result === "loss") g.l++; else g.d++;
     store.set(STATS_KEY, JSON.stringify(s));
+    if (reportTo && !reportTo.conn.closed) reportTo.conn.send({ rec: { r: result, name: reportTo.name } });
+  }
+
+  // ---------- Public room listing (host only) ----------
+  const PUB_KEY = "oxidpvp-public";
+  function lister(conn, info) {
+    let on = store.get(PUB_KEY) === "1", timer = 0;
+    const push = () => { const c = conn(); if (c) c.send({ pub: on ? { on: true, ...info() } : { on: false } }); };
+    const restart = () => { clearInterval(timer); if (on) timer = setInterval(push, 20000); };
+    return {
+      get on() { return on; },
+      set(v) { on = !!v; store.set(PUB_KEY, on ? "1" : "0"); push(); restart(); },
+      start() { restart(); if (on) push(); },
+      update() { if (on) push(); },
+      stop() { clearInterval(timer); },
+    };
   }
 
   // ---------- Toasts + connection banner ----------
@@ -581,6 +608,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
             Copy invite link
           </button>
+          <label class="pub-toggle" hidden><input type="checkbox"><span>List in <a href="rooms.html" target="_blank">public rooms</a> so anyone can join</span></label>
           <div class="plist-head"><span>Players</span><span class="pcount"></span></div>
           <ul class="plist"></ul>
           <div class="lobby-extra"></div>
@@ -687,6 +715,12 @@
       },
       hide() { root.hidden = true; },
       extra: () => $(".lobby-extra"),
+      pubToggle(show, checked, onChange) {
+        const t = $(".pub-toggle"), box = t.querySelector("input");
+        t.hidden = !show;
+        box.checked = !!checked;
+        box.onchange = onChange ? () => onChange(box.checked) : null;
+      },
     };
 
     // Arrivals: invite links, switch-game hops, and reloads that should rejoin.
@@ -748,6 +782,7 @@
     let pingTimer = 0, graceTimer = 0, moving = false;
     const helloTimers = new Map();
     const peopleList = () => [hostP, opp, ...specs.values()].filter(Boolean);
+    const pub = lister(() => (isHost ? conn : null), () => ({ host: hostP ? hostP.name : "", players: opp ? 2 : 1, max: 2, started, watch: spectate }));
 
     const ui = shell({
       game, title, subtitle,
@@ -774,6 +809,7 @@
     function broadcastPeople() {
       if (isHost && conn) conn.send({ to: "all", d: { __sys: "people", host: hostP, opp, specs: [...specs.values()] } });
       renderPeople();
+      pub.update();
     }
 
     function teardown(bye) {
@@ -782,6 +818,8 @@
       for (const t of helloTimers.values()) clearTimeout(t);
       helloTimers.clear();
       if (stopGame) { try { stopGame(); } catch {} stopGame = null; }
+      pub.stop(); ui.pubToggle(false);
+      if (reportTo && reportTo.conn === conn) reportTo = null;
       if (conn) { conn.close(bye); conn = null; }
       if (bye) sess.del("oxid-session");
       opp = hostP = null; specs = new Map(); started = false; spectator = false;
@@ -845,10 +883,13 @@
       if (my !== gen) return c.close();
       conn = c;
       hostP = me;
+      reportTo = { conn: c, name: me.name };
       ui.showRoom(code, { isHost: true, party: false });
       renderPeople();
       ui.setStatus("");
       enterDock();
+      ui.pubToggle(true, pub.on, (v) => pub.set(v));
+      pub.start();
     }
     function onHostMsg(m) {
       if (m.sys === "join" || m.sys === "rejoin") {
@@ -936,6 +977,7 @@
       }
       if (my !== gen) return cn.close();
       conn = cn;
+      reportTo = { conn: cn, name: me.name };
       sess.set("oxid-session", { game, code: c });
       if (cn.welcome.hostAway) banner("The host lost connection. Waiting for them…");
       ui.showRoom(c, { isHost: false, party: false });
@@ -1013,6 +1055,7 @@
         toast(`Watching ${hostP.name} vs ${guestP.name}`, 3000);
       }
       renderPeople();
+      pub.update();
       sfx.play("start");
       stopGame = onStart(link) || null;
     }
@@ -1053,6 +1096,7 @@
       const ids = players.filter((p) => p.id !== myId).map((p) => p.id);
       if (conn && ids.length) conn.send({ to: ids, d: m });
     };
+    const pub = lister(() => (isHost ? conn : null), () => ({ host: players[0] ? players[0].name : "", players: players.length, max, started }));
 
     function render() { ui.people(players.map((p) => ({ ...p, me: p.id === myId })), { min, max, isHost, party: true }); }
 
@@ -1061,6 +1105,8 @@
       for (const t of [...graceTimers.values(), ...helloTimers.values()]) clearTimeout(t);
       graceTimers.clear(); helloTimers.clear();
       if (stopGame) { try { stopGame(); } catch {} stopGame = null; }
+      pub.stop(); ui.pubToggle(false);
+      if (reportTo && reportTo.conn === conn) reportTo = null;
       if (conn) { conn.close(bye); conn = null; }
       if (bye) sess.del("oxid-session");
       handlers = []; leaveHandlers = []; rejoinHandlers = [];
@@ -1118,10 +1164,13 @@
       conn = c;
       myId = 0;
       players = [{ id: 0, ...ui.profile() }];
+      reportTo = { conn: c, name: players[0].name };
       ui.showRoom(code, { isHost: true, party: true });
       render();
       ui.setStatus("Share the link. Start when everyone's in.");
       enterDock();
+      ui.pubToggle(true, pub.on, (v) => pub.set(v));
+      pub.start();
     }
     function onGuestData(id, d) {
       if (d.__sys === "hello") {
@@ -1170,11 +1219,12 @@
       players = players.filter((x) => x.id !== id);
       talk.system(`${p.name} left`);
       if (!started) broadcastLobby();
-      else { for (const h of leaveHandlers) h(id); toast(p.name + " left the game"); }
+      else { for (const h of leaveHandlers) h(id); toast(p.name + " left the game"); pub.update(); }
     }
     function broadcastLobby() {
       toPlayers({ __sys: "lobby", players });
       render();
+      pub.update();
     }
 
     // --- Guest ---
@@ -1186,6 +1236,7 @@
       const me = ui.profile();
       ui.setStatus(resume ? "Rejoining…" : "Connecting…", "pulse");
       const hello = () => conn && conn.send({ d: { __sys: "hello", name: me.name, av: me.av } });
+      const myName = me.name;
       let cn;
       try {
         cn = await connectGuest(game, c, {
@@ -1226,6 +1277,7 @@
       }
       if (my !== gen) return cn.close();
       conn = cn;
+      reportTo = { conn: cn, name: myName };
       sess.set("oxid-session", { game, code: c });
       if (cn.welcome.hostAway) banner("The host lost connection. Waiting for them…");
       hello();
@@ -1245,6 +1297,7 @@
         onLeave: (fn) => leaveHandlers.push(fn),
         onRejoin: (fn) => rejoinHandlers.push(fn),
       };
+      pub.update();
       sfx.play("start");
       stopGame = onStart(room) || null;
     }
@@ -1306,6 +1359,6 @@
   window.Room = { mount: mountRoom };
   window.GameUtil = {
     fitCanvas, toast, loop, shuffle, avatar: avatarEl, cleanName,
-    sfx: (n) => sfx.play(n), record, stats: readStats, games: GAMES, joinByCode,
+    sfx: (n) => sfx.play(n), record, stats: readStats, games: GAMES, joinByCode, pageFor, gameById,
   };
 })();

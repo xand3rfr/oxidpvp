@@ -1,0 +1,23 @@
+// Hangman puzzles: [category, answer]. Letters and spaces only.
+window.HANGMAN_WORDS = [
+  ["Animal", "HIPPOPOTAMUS"], ["Animal", "CHIMPANZEE"], ["Animal", "PORCUPINE"], ["Animal", "RATTLESNAKE"], ["Animal", "JELLYFISH"],
+  ["Animal", "WOODPECKER"], ["Animal", "CHAMELEON"], ["Animal", "ARMADILLO"], ["Animal", "ALLIGATOR"], ["Animal", "HAMMERHEAD SHARK"],
+  ["Animal", "POLAR BEAR"], ["Animal", "SEA TURTLE"], ["Animal", "BALD EAGLE"], ["Animal", "GOLDEN RETRIEVER"], ["Animal", "GIANT PANDA"],
+  ["Food", "SPAGHETTI"], ["Food", "PEPPERONI PIZZA"], ["Food", "CHOCOLATE CAKE"], ["Food", "PANCAKES"], ["Food", "GUACAMOLE"],
+  ["Food", "CHEESEBURGER"], ["Food", "STRAWBERRY"], ["Food", "PINEAPPLE"], ["Food", "MACARONI AND CHEESE"], ["Food", "FRENCH FRIES"],
+  ["Food", "BLUEBERRY MUFFIN"], ["Food", "CHICKEN NUGGETS"], ["Food", "POPCORN"], ["Food", "WATERMELON"], ["Food", "PEANUT BUTTER"],
+  ["Place", "SWIMMING POOL"], ["Place", "MOVIE THEATER"], ["Place", "AMUSEMENT PARK"], ["Place", "LIBRARY"], ["Place", "SPACE STATION"],
+  ["Place", "LIGHTHOUSE"], ["Place", "GROCERY STORE"], ["Place", "HAUNTED HOUSE"], ["Place", "VOLCANO"], ["Place", "RAINFOREST"],
+  ["Place", "SKYSCRAPER"], ["Place", "PLAYGROUND"], ["Place", "AQUARIUM"], ["Place", "TRAIN STATION"], ["Place", "BOWLING ALLEY"],
+  ["Thing", "SKATEBOARD"], ["Thing", "TRAMPOLINE"], ["Thing", "HEADPHONES"], ["Thing", "TELESCOPE"], ["Thing", "UMBRELLA"],
+  ["Thing", "BACKPACK"], ["Thing", "FLASHLIGHT"], ["Thing", "TOOTHBRUSH"], ["Thing", "CALCULATOR"], ["Thing", "SUNGLASSES"],
+  ["Thing", "VIDEO GAME CONSOLE"], ["Thing", "ROLLER COASTER"], ["Thing", "HOT AIR BALLOON"], ["Thing", "SNOWBOARD"], ["Thing", "MICROWAVE"],
+  ["Job", "ASTRONAUT"], ["Job", "FIREFIGHTER"], ["Job", "VETERINARIAN"], ["Job", "PHOTOGRAPHER"], ["Job", "ARCHITECT"],
+  ["Job", "LIFEGUARD"], ["Job", "MAGICIAN"], ["Job", "DETECTIVE"], ["Job", "SCIENTIST"], ["Job", "PILOT"],
+  ["Sport", "BASKETBALL"], ["Sport", "VOLLEYBALL"], ["Sport", "ICE HOCKEY"], ["Sport", "TABLE TENNIS"], ["Sport", "GYMNASTICS"],
+  ["Sport", "SKATEBOARDING"], ["Sport", "BADMINTON"], ["Sport", "SWIMMING"], ["Sport", "ROCK CLIMBING"], ["Sport", "SURFING"],
+  ["Nature", "THUNDERSTORM"], ["Nature", "WATERFALL"], ["Nature", "RAINBOW"], ["Nature", "SNOWFLAKE"], ["Nature", "SUNFLOWER"],
+  ["Nature", "EARTHQUAKE"], ["Nature", "GLACIER"], ["Nature", "TORNADO"], ["Nature", "MOUNTAIN RANGE"], ["Nature", "SHOOTING STAR"],
+  ["Game words", "HIGH SCORE"], ["Game words", "GAME OVER"], ["Game words", "PLAYER ONE"], ["Game words", "BOSS BATTLE"], ["Game words", "POWER UP"],
+  ["Game words", "EXTRA LIFE"], ["Game words", "LEVEL UP"], ["Game words", "CHECKPOINT"], ["Game words", "LEADERBOARD"], ["Game words", "RESPAWN"],
+];
