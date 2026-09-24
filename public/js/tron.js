@@ -5,8 +5,8 @@
   const GW = 64, GH = 40, CELL = 20, W = GW * CELL, H = GH * CELL;
   const WIN = 5, COUNTDOWN = 3, ROUND_PAUSE = 2.2;
   const TICK_START = 82, TICK_MIN = 48, TICK_ACCEL_EVERY = 22; // ms, speeds up over a round
-  const COLORS = ["#ff4f1f", "#4d74ff"];
-  const INK = "#0a0a09", LINE = "#efe7d6", FLOOR = "#141311";
+  const COLORS = ["#ff5b3a", "#4d8dff"];
+  const LINE = "#ededf3", FLOOR = "#0a0a0f";
   const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
   const SPAWN = [[8, GH / 2, 1], [GW - 9, GH / 2 - 1, 3]];
 
@@ -173,12 +173,12 @@
 
     // graph-paper grid
     ctx.lineWidth = 1;
-    ctx.strokeStyle = "#1f1d1a";
+    ctx.strokeStyle = "rgba(255,255,255,0.035)";
     ctx.beginPath();
     for (let x = 1; x < GW; x++) { ctx.moveTo(x * CELL + 0.5, 0); ctx.lineTo(x * CELL + 0.5, H); }
     for (let y = 1; y < GH; y++) { ctx.moveTo(0, y * CELL + 0.5); ctx.lineTo(W, y * CELL + 0.5); }
     ctx.stroke();
-    ctx.strokeStyle = "#2c2924";
+    ctx.strokeStyle = "rgba(255,255,255,0.07)";
     ctx.beginPath();
     for (let x = 8; x < GW; x += 8) { ctx.moveTo(x * CELL, 0); ctx.lineTo(x * CELL, H); }
     for (let y = 8; y < GH; y += 8) { ctx.moveTo(0, y * CELL); ctx.lineTo(W, y * CELL); }
@@ -192,9 +192,11 @@
         for (const i of [0, 1]) {
           const tr = V.trails[i];
           if (!tr.length) continue;
-          ctx.lineCap = "square"; ctx.lineJoin = "miter";
-          ctx.lineWidth = pass ? 8 : 14;
-          ctx.strokeStyle = pass ? COLORS[i] : INK;
+          ctx.lineCap = "round"; ctx.lineJoin = "round";
+          ctx.lineWidth = pass ? 7 : 12;
+          ctx.strokeStyle = COLORS[i];
+          ctx.globalAlpha = pass ? 1 : 0.35;
+          ctx.shadowColor = COLORS[i]; ctx.shadowBlur = pass ? 0 : 18;
           ctx.beginPath();
           ctx.moveTo((tr[0][0] + 0.5) * CELL, (tr[0][1] + 0.5) * CELL);
           for (const [x, y] of tr) ctx.lineTo((x + 0.5) * CELL, (y + 0.5) * CELL);
@@ -203,13 +205,12 @@
           if (V.alive[i] && frac > 0) { ex += DX[V.dir[i]] * CELL * frac; ey += DY[V.dir[i]] * CELL * frac; }
           ctx.lineTo(ex, ey);
           ctx.stroke();
+          ctx.globalAlpha = 1; ctx.shadowBlur = 0;
           if (pass && V.alive[i]) {
-            ctx.fillStyle = COLORS[i];
-            ctx.strokeStyle = INK; ctx.lineWidth = 3;
-            ctx.fillRect(ex - 9, ey - 9, 18, 18);
-            ctx.strokeRect(ex - 9, ey - 9, 18, 18);
-            ctx.fillStyle = INK;
-            ctx.fillRect(ex - 3 + DX[V.dir[i]] * 4, ey - 3 + DY[V.dir[i]] * 4, 6, 6);
+            ctx.shadowColor = COLORS[i]; ctx.shadowBlur = 24;
+            ctx.fillStyle = "#fff";
+            ctx.beginPath(); ctx.roundRect(ex - 8, ey - 8, 16, 16, 4); ctx.fill();
+            ctx.shadowBlur = 0;
           }
         }
       }
@@ -238,25 +239,23 @@
       ctx.fillRect(p.x - p.sz / 2, p.y - p.sz / 2, p.sz, p.sz);
     }
     ctx.globalAlpha = 1;
-    ctx.strokeStyle = LINE; ctx.lineWidth = 6;
+    ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 4;
     ctx.strokeRect(0, 0, W, H);
   }
   function label(t, x, y, color) {
-    ctx.font = "600 16px 'IBM Plex Mono', ui-monospace, monospace";
-    const w = ctx.measureText(t).width + 14;
-    ctx.fillStyle = INK; ctx.fillRect(x - w / 2 + 3, y - 12 + 3, w, 24);
-    ctx.fillStyle = color; ctx.fillRect(x - w / 2, y - 12, w, 24);
-    ctx.fillStyle = INK; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = "600 15px 'Geist Mono', ui-monospace, monospace";
+    const w = ctx.measureText(t).width + 18;
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.roundRect(x - w / 2, y - 12, w, 24, 12); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText(t, x, y + 1);
   }
   function banner(t, size) {
-    ctx.font = `400 ${size}px 'Archivo Black', 'Arial Black', sans-serif`;
+    ctx.font = `800 ${size}px Geist, system-ui, sans-serif`;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.lineWidth = size / 6; ctx.strokeStyle = INK; ctx.lineJoin = "round";
-    ctx.strokeText(t, W / 2 + size / 16, H / 2 + size / 16);
-    ctx.fillStyle = INK; ctx.fillText(t, W / 2 + size / 16, H / 2 + size / 16);
-    ctx.strokeText(t, W / 2, H / 2);
-    ctx.fillStyle = "#ffd23f"; ctx.fillText(t, W / 2, H / 2);
+    ctx.shadowColor = "rgba(139,92,246,0.9)"; ctx.shadowBlur = 40;
+    ctx.fillStyle = "#fff"; ctx.fillText(t, W / 2, H / 2);
+    ctx.shadowBlur = 0;
   }
 
   // ---------- HUD ----------
@@ -303,6 +302,7 @@
     onStart(l) {
       link = l;
       me = l.isHost ? 0 : 1;
+      $("name1").textContent = l.oppName;
       V = blankView();
       $("sw0").style.background = COLORS[me];
       $("sw1").style.background = COLORS[1 - me];

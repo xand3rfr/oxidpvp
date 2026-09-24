@@ -154,6 +154,7 @@
     onStart(l) {
       link = l;
       me = l.isHost ? 1 : 2;
+      $("name1").textContent = l.oppName;
       V = null; pending = false;
       $("sw0").style.background = PIECE_COLOR[me];
       $("sw1").style.background = PIECE_COLOR[3 - me];

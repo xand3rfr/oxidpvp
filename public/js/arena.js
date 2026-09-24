@@ -414,7 +414,7 @@
 
     if (!mine.alive && winner() < 0) {
       ctx.fillStyle = "rgba(236,237,239,0.85)";
-      ctx.font = "600 22px 'IBM Plex Sans', system-ui, sans-serif";
+      ctx.font = "600 22px Geist, system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("Eliminated. Respawning…", W / 2, 60);
     }
@@ -490,6 +490,7 @@
     title: "Arena",
     subtitle: "Top-down 1v1 shooter. First to 5 eliminations wins.",
     onStart(l) {
+      document.getElementById("name1").textContent = l.oppName;
       link = l;
       myIdx = l.isHost ? 0 : 1;
       oppIdx = 1 - myIdx;

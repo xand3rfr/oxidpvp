@@ -314,6 +314,7 @@
     onStart(l) {
       link = l;
       V = null; prevV = null; sentFleet = false; drag = null;
+      $("name1").textContent = l.oppName;
       for (const b of [$("rematch"), $("rematch2")]) { b.disabled = false; b.textContent = "Rematch"; }
       if (l.isHost) {
         game = createGame();
