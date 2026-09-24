@@ -181,7 +181,7 @@
 
     // big background scores
     const sc = scores();
-    ctx.font = "700 180px 'JetBrains Mono', ui-monospace, monospace";
+    ctx.font = "600 180px 'IBM Plex Mono', ui-monospace, monospace";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillStyle = "rgba(255,255,255,0.035)";
     ctx.fillText(sc[0], W / 4, H / 2);
@@ -214,7 +214,7 @@
     }
     if (link) {
       ctx.fillStyle = "rgba(255,255,255,0.35)";
-      ctx.font = "600 12px Inter, system-ui, sans-serif";
+      ctx.font = "600 12px 'IBM Plex Sans', system-ui, sans-serif";
       ctx.fillText("YOU", paddleX(myIdx) + PW / 2, myY - PH / 2 - 16);
     }
 
@@ -244,7 +244,7 @@
     const st = serveTime();
     if (link && st > 0 && winner() < 0) {
       ctx.fillStyle = "rgba(236,237,239,0.9)";
-      ctx.font = "600 20px Inter, system-ui, sans-serif";
+      ctx.font = "600 20px 'IBM Plex Sans', system-ui, sans-serif";
       ctx.fillText(sc[0] + sc[1] === 0 ? "Get ready" : "Serve in " + Math.ceil(st), W / 2, H / 2 - 60);
     }
   }
