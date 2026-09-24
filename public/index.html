@@ -3,244 +3,300 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07070a">
   <title>OXIDPVP · Games</title>
-  <meta name="description" content="Free multiplayer browser games. Make a room, send your friends the code, play. No downloads, no accounts.">
+  <meta name="description" content="Free multiplayer browser games. Make a room, send your friends the link, play. No downloads, no accounts.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <nav class="nav">
+    <div class="nav-in">
+      <a class="brand" href="index.html"><i class="brand-mark"></i><span>OXID<b>PVP</b></span></a>
+      <div class="nav-links">
+        <a href="#games">Games</a>
+        <a href="#how">How it works</a>
+      </div>
+      <div class="nav-right">
+        <span class="status-pill"><i></i>Servers online</span>
+        <a class="btn primary" href="#games">Play now</a>
+      </div>
+    </div>
+  </nav>
+
   <div class="hub">
-    <header class="masthead">
-      <span class="brand"><i class="brand-mark"></i><span>Oxid<b>PvP</b></span></span>
-      <div class="issue"><span>7 games</span><span>free forever</span><span>no sign-up</span></div>
-    </header>
+    <div class="wrap">
+      <section class="hero">
+        <div>
+          <span class="eyebrow"><b>New</b>Quiz Battle, Connect 4, Battleship &amp; Light Cycles</span>
+          <h1>Play with friends.<br><span class="grad-text">Right in your browser.</span></h1>
+          <p class="hero-lead">Pick a game, send your friends a link, and you're playing. No downloads, no accounts, and chat built in.</p>
+          <div class="hero-cta">
+            <a class="btn primary lg" href="#games">Browse games</a>
+            <a class="btn lg" href="#how">How it works</a>
+          </div>
+          <div class="hero-meta">
+            <div><b>7</b><span>games</span></div>
+            <div><b>2–8</b><span>players</span></div>
+            <div><b>0</b><span>downloads</span></div>
+          </div>
+        </div>
 
-    <section class="hero">
-      <h1>Games you play <span class="hl">with friends</span>, not <span class="strike">bots</span>.</h1>
-      <ol class="steps">
-        <li><span><b>Pick a game</b> from the list below.</span></li>
-        <li><span><b>Make a room.</b> You get a 5-letter code.</span></li>
-        <li><span><b>Text the code</b> to your friends. They type it in and you're playing.</span></li>
-      </ol>
-    </section>
+        <div class="mock" aria-hidden="true">
+          <div class="mock-bar"><i></i><i></i><i></i><span>oxidpvp.net/trivia.html#K7QX2</span></div>
+          <div class="mock-body">
+            <div class="mock-label">Room code</div>
+            <div class="mock-code"><span>K</span><span>7</span><span>Q</span><span>X</span><span>2</span></div>
+            <div class="mock-label">Players · 3 / 8</div>
+            <div class="mock-row"><span class="avatar">A</span>Alex<em>host</em></div>
+            <div class="mock-row"><span class="avatar">J</span>Jordan<em class="on">ready</em></div>
+            <div class="mock-row"><span class="avatar">S</span>Sam<em class="on">ready</em></div>
+            <div class="mock-chat">
+              <p><b>Jordan</b>ok I'm going to win this one</p>
+              <p><b>Sam</b>no chance lol</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <div class="section-head">
-      <h2>The games</h2>
-      <span id="count">7 of 7</span>
+      <section class="section" id="games">
+        <div class="section-head">
+          <div>
+            <h2>Games</h2>
+            <p id="count">7 games</p>
+          </div>
+          <div class="filters" role="group" aria-label="Filter games">
+            <button class="filter" data-f="all" aria-pressed="true">All</button>
+            <button class="filter" data-f="party" aria-pressed="false">Party</button>
+            <button class="filter" data-f="duel" aria-pressed="false">1v1</button>
+            <button class="filter" data-f="turn" aria-pressed="false">Turn-based</button>
+            <button class="filter" data-f="live" aria-pressed="false">Real-time</button>
+          </div>
+        </div>
+
+        <div class="cards" id="cards">
+          <a class="game-card" href="lastcard.html" data-tags="party turn">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <defs>
+                  <radialGradient id="lcBg" cx="50%" cy="70%" r="70%"><stop offset="0" stop-color="#3a1426"/><stop offset="1" stop-color="#0c0b11"/></radialGradient>
+                  <linearGradient id="lcR" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f87171"/><stop offset="1" stop-color="#b91c1c"/></linearGradient>
+                  <linearGradient id="lcY" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fcd34d"/><stop offset="1" stop-color="#d97706"/></linearGradient>
+                  <linearGradient id="lcB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#60a5fa"/><stop offset="1" stop-color="#1d4ed8"/></linearGradient>
+                  <linearGradient id="lcK" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2a36"/><stop offset="1" stop-color="#111118"/></linearGradient>
+                </defs>
+                <rect width="320" height="180" fill="url(#lcBg)"/>
+                <g transform="translate(160 188)" font-family="Geist, system-ui, sans-serif" font-weight="800" text-anchor="middle" fill="#fff">
+                  <g transform="rotate(-24)"><rect x="-32" y="-132" width="64" height="94" rx="9" fill="url(#lcR)"/><rect x="-26" y="-126" width="52" height="82" rx="6" fill="none" stroke="#fff" stroke-opacity=".3"/><text y="-74" font-size="30">7</text></g>
+                  <g transform="rotate(-8)"><rect x="-32" y="-136" width="64" height="94" rx="9" fill="url(#lcY)"/><rect x="-26" y="-130" width="52" height="82" rx="6" fill="none" stroke="#fff" stroke-opacity=".3"/><text y="-78" font-size="26">+2</text></g>
+                  <g transform="rotate(8)"><rect x="-32" y="-136" width="64" height="94" rx="9" fill="url(#lcB)"/><rect x="-26" y="-130" width="52" height="82" rx="6" fill="none" stroke="#fff" stroke-opacity=".3"/><text y="-78" font-size="30">3</text></g>
+                  <g transform="rotate(24)">
+                    <rect x="-32" y="-132" width="64" height="94" rx="9" fill="url(#lcK)" stroke="#fff" stroke-opacity=".12"/>
+                    <g transform="translate(0 -85)">
+                      <path d="M0 0V-18A18 18 0 0 1 18 0Z" fill="#ef4444"/><path d="M0 0H18A18 18 0 0 1 0 18Z" fill="#f5b41a"/>
+                      <path d="M0 0V18A18 18 0 0 1 -18 0Z" fill="#22a861"/><path d="M0 0H-18A18 18 0 0 1 0 -18Z" fill="#3b82f6"/>
+                      <circle r="18" fill="none" stroke="#fff" stroke-width="2.5"/>
+                    </g>
+                  </g>
+                </g>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>Last Card</h3></div>
+              <p>An UNO-style card game. Match the color or number, stack skips and +4s on your friends, and call "last card" before someone catches you.</p>
+              <div class="tags"><span class="tag">2–6 players</span><span class="tag">Turn-based</span><span class="tag">Mobile</span></div>
+              <div class="card-cta">Play Last Card <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+
+          <a class="game-card" href="trivia.html" data-tags="party turn">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <defs>
+                  <radialGradient id="tvBg" cx="30%" cy="30%" r="80%"><stop offset="0" stop-color="#2a1a52"/><stop offset="1" stop-color="#0c0b11"/></radialGradient>
+                  <linearGradient id="tvQ" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c4b5fd"/><stop offset="1" stop-color="#7c3aed"/></linearGradient>
+                </defs>
+                <rect width="320" height="180" fill="url(#tvBg)"/>
+                <rect x="34" y="28" width="150" height="72" rx="14" fill="#181821" stroke="#fff" stroke-opacity=".12"/>
+                <text x="109" y="80" text-anchor="middle" font-family="Geist, system-ui, sans-serif" font-weight="800" font-size="48" fill="url(#tvQ)">?</text>
+                <g font-family="Geist Mono, monospace" font-weight="600" font-size="12" fill="#fff">
+                  <rect x="196" y="28" width="92" height="30" rx="9" fill="#181821" stroke="#8b5cf6"/><rect x="202" y="34" width="18" height="18" rx="5" fill="#8b5cf6"/><text x="211" y="47" text-anchor="middle">A</text>
+                  <rect x="196" y="66" width="92" height="30" rx="9" fill="#181821" stroke="#fff" stroke-opacity=".12"/><rect x="202" y="72" width="18" height="18" rx="5" fill="#ec4899"/><text x="211" y="85" text-anchor="middle">B</text>
+                  <rect x="196" y="104" width="92" height="30" rx="9" fill="rgba(34,197,94,.15)" stroke="#22c55e" stroke-width="2"/><rect x="202" y="110" width="18" height="18" rx="5" fill="#3b82f6"/><text x="211" y="123" text-anchor="middle">C</text>
+                  <rect x="196" y="142" width="92" height="30" rx="9" fill="#181821" stroke="#fff" stroke-opacity=".12"/><rect x="202" y="148" width="18" height="18" rx="5" fill="#f59e0b"/><text x="211" y="161" text-anchor="middle">D</text>
+                </g>
+                <g fill="#fff" fill-opacity=".14"><rect x="228" y="40" width="46" height="6" rx="3"/><rect x="228" y="78" width="38" height="6" rx="3"/><rect x="228" y="116" width="50" height="6" rx="3"/><rect x="228" y="154" width="34" height="6" rx="3"/></g>
+                <rect x="34" y="116" width="150" height="6" rx="3" fill="#181821"/><rect x="34" y="116" width="96" height="6" rx="3" fill="url(#tvQ)"/>
+                <g font-family="Geist, system-ui, sans-serif" font-size="11" font-weight="600" fill="#9c9cad"><text x="34" y="146">+912</text><text x="80" y="146" fill="#22c55e">correct</text></g>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>Quiz Battle</h3><span class="badge-new">New</span></div>
+              <p>Ten trivia questions, fifteen seconds each. Games, science, movies, sports and more. The faster you answer, the more points you get.</p>
+              <div class="tags"><span class="tag">2–8 players</span><span class="tag">Trivia</span><span class="tag">Mobile</span></div>
+              <div class="card-cta">Play Quiz Battle <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+
+          <a class="game-card" href="connect4.html" data-tags="duel turn">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <defs>
+                  <radialGradient id="c4Bg" cx="50%" cy="100%" r="80%"><stop offset="0" stop-color="#172a6b"/><stop offset="1" stop-color="#0b0b11"/></radialGradient>
+                  <linearGradient id="c4Board" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b4fd8"/><stop offset="1" stop-color="#1d3aa8"/></linearGradient>
+                  <radialGradient id="c4R" cx="35%" cy="30%"><stop offset="0" stop-color="#ff9a7e"/><stop offset=".55" stop-color="#ff5b3a"/><stop offset="1" stop-color="#d4381a"/></radialGradient>
+                  <radialGradient id="c4Y" cx="35%" cy="30%"><stop offset="0" stop-color="#fff1a6"/><stop offset=".55" stop-color="#facc15"/><stop offset="1" stop-color="#d19e05"/></radialGradient>
+                </defs>
+                <rect width="320" height="180" fill="url(#c4Bg)"/>
+                <rect x="68" y="34" width="184" height="160" rx="16" fill="url(#c4Board)"/>
+                <g fill="#07070a">
+                  <circle cx="94" cy="58" r="10"/><circle cx="120" cy="58" r="10"/><circle cx="146" cy="58" r="10"/><circle cx="172" cy="58" r="10"/><circle cx="198" cy="58" r="10"/><circle cx="224" cy="58" r="10"/>
+                  <circle cx="94" cy="84" r="10"/><circle cx="120" cy="84" r="10"/><circle cx="146" cy="84" r="10"/><circle cx="198" cy="84" r="10"/><circle cx="224" cy="84" r="10"/>
+                  <circle cx="94" cy="110" r="10"/><circle cx="146" cy="110" r="10"/><circle cx="224" cy="110" r="10"/>
+                  <circle cx="94" cy="136" r="10"/><circle cx="224" cy="136" r="10"/>
+                </g>
+                <g fill="url(#c4R)"><circle cx="120" cy="110" r="10"/><circle cx="120" cy="136" r="10"/><circle cx="172" cy="110" r="10"/><circle cx="146" cy="162" r="10"/><circle cx="94" cy="162" r="10"/><circle cx="198" cy="110" r="10"/></g>
+                <g fill="url(#c4Y)"><circle cx="146" cy="136" r="10"/><circle cx="172" cy="136" r="10"/><circle cx="198" cy="136" r="10"/><circle cx="172" cy="84" r="10"/><circle cx="120" cy="162" r="10"/><circle cx="172" cy="162" r="10"/><circle cx="198" cy="162" r="10"/><circle cx="224" cy="162" r="10"/></g>
+                <circle cx="224" cy="16" r="10" fill="url(#c4R)"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>Connect 4</h3><span class="badge-new">New</span></div>
+              <p>Drop your discs and get four in a row, across, down or diagonal. Easy to learn, and it gets tense fast.</p>
+              <div class="tags"><span class="tag">1v1</span><span class="tag">Turn-based</span><span class="tag">Mobile</span></div>
+              <div class="card-cta">Play Connect 4 <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+
+          <a class="game-card" href="battleship.html" data-tags="duel turn">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <defs>
+                  <pattern id="bsGrid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#78a0dc" stroke-opacity=".14"/></pattern>
+                  <radialGradient id="bsHit"><stop offset="0" stop-color="#fff"/><stop offset=".3" stop-color="#ff5b3a"/><stop offset="1" stop-color="#ff5b3a" stop-opacity="0"/></radialGradient>
+                  <linearGradient id="bsShip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#55637a"/><stop offset="1" stop-color="#2d3748"/></linearGradient>
+                </defs>
+                <rect width="320" height="180" fill="#0b1526"/>
+                <rect width="320" height="180" fill="url(#bsGrid)"/>
+                <circle cx="250" cy="52" r="26" fill="none" stroke="#78a0dc" stroke-opacity=".25"/><circle cx="250" cy="52" r="44" fill="none" stroke="#78a0dc" stroke-opacity=".12"/>
+                <path d="M60 104H254L236 132H80Z" fill="url(#bsShip)"/>
+                <rect x="118" y="82" width="58" height="22" rx="3" fill="#4a566b"/>
+                <rect x="136" y="62" width="20" height="20" rx="3" fill="#4a566b"/>
+                <path d="M176 92H218" stroke="#4a566b" stroke-width="5" stroke-linecap="round"/>
+                <circle cx="196" cy="112" r="20" fill="url(#bsHit)"/>
+                <circle cx="100" cy="114" r="16" fill="url(#bsHit)"/>
+                <g fill="#a0bef0" fill-opacity=".5"><circle cx="270" cy="130" r="3"/><circle cx="40" cy="50" r="3"/><circle cx="290" cy="150" r="3"/><circle cx="60" cy="160" r="3"/></g>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>Battleship</h3><span class="badge-new">New</span></div>
+              <p>Hide five ships on a 10×10 grid, then take turns calling shots. Sink their whole fleet before they sink yours.</p>
+              <div class="tags"><span class="tag">1v1</span><span class="tag">Turn-based</span><span class="tag">Mobile</span></div>
+              <div class="card-cta">Play Battleship <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+
+          <a class="game-card" href="tron.html" data-tags="duel live">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <defs>
+                  <pattern id="trGrid" width="16" height="16" patternUnits="userSpaceOnUse"><path d="M16 0H0V16" fill="none" stroke="#fff" stroke-opacity=".05"/></pattern>
+                  <filter id="trGlow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="4"/></filter>
+                </defs>
+                <rect width="320" height="180" fill="#0a0a0f"/>
+                <rect width="320" height="180" fill="url(#trGrid)"/>
+                <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 96H96V40H192V72H228" stroke="#ff5b3a" stroke-width="8" filter="url(#trGlow)" opacity=".8"/>
+                  <path d="M20 96H96V40H192V72H228" stroke="#ff8a70" stroke-width="4"/>
+                  <path d="M300 84H252V144H132V100H208" stroke="#4d8dff" stroke-width="8" filter="url(#trGlow)" opacity=".8"/>
+                  <path d="M300 84H252V144H132V100H208" stroke="#8ab4ff" stroke-width="4"/>
+                </g>
+                <rect x="222" y="66" width="12" height="12" rx="3" fill="#fff"/>
+                <rect x="202" y="94" width="12" height="12" rx="3" fill="#fff"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>Light Cycles</h3><span class="badge-new">New</span></div>
+              <p>Tron-style. You leave a wall wherever you drive. Box your opponent in and make them crash first. It speeds up the longer a round goes.</p>
+              <div class="tags"><span class="tag">1v1</span><span class="tag">Real-time</span><span class="tag">Keys or swipe</span></div>
+              <div class="card-cta">Play Light Cycles <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+
+          <a class="game-card" href="arena.html" data-tags="duel live">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <defs>
+                  <pattern id="arGrid" width="16" height="16" patternUnits="userSpaceOnUse"><path d="M16 0H0V16" fill="none" stroke="#fff" stroke-opacity=".04"/></pattern>
+                  <filter id="arGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5"/></filter>
+                </defs>
+                <rect width="320" height="180" fill="#0b0b10"/>
+                <rect width="320" height="180" fill="url(#arGrid)"/>
+                <g fill="#1d1d28" stroke="#fff" stroke-opacity=".1"><rect x="92" y="34" width="14" height="56" rx="3"/><rect x="214" y="90" width="14" height="56" rx="3"/><rect x="130" y="83" width="60" height="14" rx="3"/></g>
+                <g stroke-linecap="round" stroke-width="3"><path d="M84 117L150 110" stroke="#ff5b3a" opacity=".9"/><path d="M234 60L204 64" stroke="#4d8dff" opacity=".9"/></g>
+                <circle cx="66" cy="120" r="16" fill="#ff5b3a" filter="url(#arGlow)" opacity=".7"/>
+                <circle cx="66" cy="120" r="11" fill="#ff5b3a"/>
+                <rect x="74" y="116" width="12" height="6" rx="2" fill="#d9dbe0" transform="rotate(-6 66 120)"/>
+                <circle cx="254" cy="56" r="16" fill="#4d8dff" filter="url(#arGlow)" opacity=".7"/>
+                <circle cx="254" cy="56" r="11" fill="#4d8dff"/>
+                <rect x="234" y="53" width="12" height="6" rx="2" fill="#d9dbe0" transform="rotate(8 254 56)"/>
+                <rect x="40" y="152" width="60" height="5" rx="2.5" fill="#1d1d28"/><rect x="40" y="152" width="42" height="5" rx="2.5" fill="#22c55e"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>Arena</h3></div>
+              <p>A top-down shooter. Strafe behind cover, dash through bullets, and get five eliminations before they do.</p>
+              <div class="tags"><span class="tag">1v1</span><span class="tag">Real-time</span><span class="tag">Mouse + keys</span></div>
+              <div class="card-cta">Play Arena <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+
+          <a class="game-card" href="pong.html" data-tags="duel live">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <defs><filter id="pgGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter></defs>
+                <rect width="320" height="180" fill="#09090d"/>
+                <path d="M160 0V180" stroke="#fff" stroke-opacity=".1" stroke-width="2" stroke-dasharray="7 9"/>
+                <g font-family="Geist Mono, monospace" font-weight="600" font-size="56" fill="#fff" fill-opacity=".06" text-anchor="middle"><text x="80" y="108">4</text><text x="240" y="108">3</text></g>
+                <rect x="22" y="56" width="7" height="44" rx="3.5" fill="#ff5b3a" filter="url(#pgGlow)"/>
+                <rect x="22" y="56" width="7" height="44" rx="3.5" fill="#ff5b3a"/>
+                <rect x="291" y="92" width="7" height="44" rx="3.5" fill="#4d8dff" filter="url(#pgGlow)"/>
+                <rect x="291" y="92" width="7" height="44" rx="3.5" fill="#4d8dff"/>
+                <circle cx="146" cy="96" r="3" fill="#fff" opacity=".08"/><circle cx="162" cy="99" r="3.5" fill="#fff" opacity=".16"/>
+                <circle cx="182" cy="103" r="6" fill="#fff" filter="url(#pgGlow)"/><circle cx="182" cy="103" r="5" fill="#fff"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>Pong</h3></div>
+              <p>The original paddle game. Hit the ball near the edge of your paddle to angle it. It gets faster every rally. First to 7.</p>
+              <div class="tags"><span class="tag">1v1</span><span class="tag">Real-time</span><span class="tag">Mouse · touch · keys</span></div>
+              <div class="card-cta">Play Pong <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+        </div>
+      </section>
+
+      <section class="section" id="how">
+        <div class="section-head"><div><h2>How it works</h2><p>From zero to playing in about ten seconds.</p></div></div>
+        <div class="steps3">
+          <div class="step"><div class="n">01</div><h4>Pick a game</h4><p>Choose anything above and type a name. No sign-up, nothing to install.</p></div>
+          <div class="step"><div class="n">02</div><h4>Send the invite link</h4><p>Create a room and hit "Copy invite link". Friends open it and land straight in your room.</p></div>
+          <div class="step"><div class="n">03</div><h4>Play and chat</h4><p>Chat in the room while you wait and during the game. Rematch as many times as you like.</p></div>
+        </div>
+      </section>
+
+      <footer class="hub-foot">
+        <span>© OXIDPVP</span>
+        <span>Rooms close when the host leaves.</span>
+      </footer>
     </div>
-    <div class="filters" role="group" aria-label="Filter games">
-      <button class="filter" data-f="all" aria-pressed="true">All</button>
-      <button class="filter" data-f="party" aria-pressed="false">Party (3+)</button>
-      <button class="filter" data-f="duel" aria-pressed="false">1v1</button>
-      <button class="filter" data-f="turn" aria-pressed="false">Turn-based</button>
-      <button class="filter" data-f="live" aria-pressed="false">Real-time</button>
-    </div>
-
-    <section class="cards" id="cards">
-      <a class="card" href="lastcard.html" data-tags="party turn">
-        <span class="card-num">01</span>
-        <div class="card-art">
-          <svg viewBox="0 0 320 180" aria-hidden="true">
-            <rect width="320" height="180" fill="#ff8fb1"/>
-            <g stroke="#151515" stroke-width="3" stroke-linejoin="round">
-              <g transform="translate(160 176) rotate(-22)"><rect x="-32" y="-128" width="64" height="94" fill="#e5484d"/><ellipse cx="0" cy="-81" rx="20" ry="30" fill="#fffaf0" transform="rotate(-24 0 -81)"/></g>
-              <g transform="translate(160 176) rotate(-7)"><rect x="-32" y="-132" width="64" height="94" fill="#f0b429"/><ellipse cx="0" cy="-85" rx="20" ry="30" fill="#fffaf0" transform="rotate(-24 0 -85)"/></g>
-              <g transform="translate(160 176) rotate(8)"><rect x="-32" y="-132" width="64" height="94" fill="#3e8bff"/><ellipse cx="0" cy="-85" rx="20" ry="30" fill="#fffaf0" transform="rotate(-24 0 -85)"/></g>
-              <g transform="translate(160 176) rotate(23)"><rect x="-32" y="-128" width="64" height="94" fill="#151515"/><circle cx="0" cy="-81" r="18" fill="#30a46c"/><path d="M0 -81V-99A18 18 0 0 1 18 -81Z" fill="#e5484d"/><path d="M0 -81H18A18 18 0 0 1 0 -63Z" fill="#f0b429"/><path d="M0 -81H-18A18 18 0 0 1 0 -99Z" fill="#3e8bff"/></g>
-            </g>
-          </svg>
-        </div>
-        <div class="card-body">
-          <h3>Last Card</h3>
-          <p>An UNO-style card game. Match the color or number, stack skips and +4s on your friends, and call "last card" before someone catches you.</p>
-          <div class="tags"><span class="tag solid">2–6 players</span><span class="tag">turn-based</span><span class="tag">phone ok</span></div>
-          <div class="card-cta">Play Last Card</div>
-        </div>
-      </a>
-
-      <a class="card" href="trivia.html" data-tags="party turn">
-        <span class="card-num">02</span>
-        <span class="sticker">New</span>
-        <div class="card-art">
-          <svg viewBox="0 0 320 180" aria-hidden="true">
-            <rect width="320" height="180" fill="#7fc8ff"/>
-            <g stroke="#151515" stroke-width="3" stroke-linejoin="round">
-              <path d="M40 26H196V92H92L66 114V92H40Z" fill="#fffaf0"/>
-              <rect x="176" y="72" width="54" height="30" fill="#ffd23f"/>
-              <rect x="238" y="72" width="54" height="30" fill="#ff8fb1"/>
-              <rect x="176" y="112" width="54" height="30" fill="#fffaf0"/>
-              <rect x="238" y="112" width="54" height="30" fill="#9be08a"/>
-              <path d="M170 144l10 22 6-8 10 6 4-6-10-6 8-6z" fill="#fffaf0"/>
-            </g>
-            <text x="118" y="76" text-anchor="middle" font-family="Archivo Black, Arial Black, sans-serif" font-size="46" fill="#151515">???</text>
-            <g font-family="Archivo Black, Arial Black, sans-serif" font-size="16" fill="#151515" text-anchor="middle">
-              <text x="203" y="93">A</text><text x="265" y="93">B</text><text x="203" y="133">C</text><text x="265" y="133">D</text>
-            </g>
-            <path d="M252 104l5 5 9-11" fill="none" stroke="#151515" stroke-width="4" stroke-linecap="round"/>
-          </svg>
-        </div>
-        <div class="card-body">
-          <h3>Quiz Battle</h3>
-          <p>Ten trivia questions, fifteen seconds each. Games, science, movies, sports and more. Answer faster than your friends to score more points.</p>
-          <div class="tags"><span class="tag solid">2–8 players</span><span class="tag">quiz</span><span class="tag">phone ok</span></div>
-          <div class="card-cta">Play Quiz Battle</div>
-        </div>
-      </a>
-
-      <a class="card" href="connect4.html" data-tags="duel turn">
-        <span class="card-num">03</span>
-        <span class="sticker">New</span>
-        <div class="card-art">
-          <svg viewBox="0 0 320 180" aria-hidden="true">
-            <rect width="320" height="180" fill="#ffd23f"/>
-            <rect x="72" y="30" width="176" height="150" fill="#2f5cff" stroke="#151515" stroke-width="3"/>
-            <g stroke="#151515" stroke-width="3">
-              <g fill="#f1ebdd">
-                <circle cx="96" cy="54" r="11"/><circle cx="124" cy="54" r="11"/><circle cx="152" cy="54" r="11"/><circle cx="180" cy="54" r="11"/><circle cx="208" cy="54" r="11"/><circle cx="232" cy="54" r="11"/>
-                <circle cx="96" cy="82" r="11"/><circle cx="124" cy="82" r="11"/><circle cx="152" cy="82" r="11"/><circle cx="208" cy="82" r="11"/><circle cx="232" cy="82" r="11"/>
-                <circle cx="96" cy="110" r="11"/><circle cx="152" cy="110" r="11"/><circle cx="232" cy="110" r="11"/>
-                <circle cx="96" cy="138" r="11"/><circle cx="232" cy="138" r="11"/>
-              </g>
-              <g fill="#ff4f1f">
-                <circle cx="124" cy="110" r="11"/><circle cx="124" cy="138" r="11"/><circle cx="180" cy="110" r="11"/><circle cx="152" cy="166" r="11"/><circle cx="96" cy="166" r="11"/>
-              </g>
-              <g fill="#ffd23f">
-                <circle cx="152" cy="138" r="11"/><circle cx="180" cy="138" r="11"/><circle cx="208" cy="138" r="11"/><circle cx="180" cy="82" r="11"/><circle cx="208" cy="110" r="11"/><circle cx="124" cy="166" r="11"/><circle cx="180" cy="166" r="11"/><circle cx="208" cy="166" r="11"/><circle cx="232" cy="166" r="11"/>
-              </g>
-              <circle cx="268" cy="14" r="11" fill="#ff4f1f"/>
-            </g>
-            <path d="M268 30v10" stroke="#151515" stroke-width="3" stroke-dasharray="3 4"/>
-          </svg>
-        </div>
-        <div class="card-body">
-          <h3>Connect 4</h3>
-          <p>Drop your discs and get four in a row, across, down or diagonal. Easy to learn, and it gets tense fast.</p>
-          <div class="tags"><span class="tag solid">1v1</span><span class="tag">turn-based</span><span class="tag">phone ok</span></div>
-          <div class="card-cta">Play Connect 4</div>
-        </div>
-      </a>
-
-      <a class="card" href="battleship.html" data-tags="duel turn">
-        <span class="card-num">04</span>
-        <span class="sticker">New</span>
-        <div class="card-art">
-          <svg viewBox="0 0 320 180" aria-hidden="true">
-            <defs><pattern id="sea" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#151515" stroke-opacity=".25" stroke-width="1.5"/></pattern></defs>
-            <rect width="320" height="180" fill="#d6e4f0"/>
-            <rect width="320" height="180" fill="url(#sea)"/>
-            <g stroke="#151515" stroke-width="3" stroke-linejoin="round">
-              <path d="M60 100H250L232 128H80Z" fill="#5b5b5b"/>
-              <rect x="120" y="78" width="56" height="22" fill="#8a8a8a"/>
-              <rect x="138" y="58" width="18" height="20" fill="#8a8a8a"/>
-              <path d="M176 88H216" />
-              <path d="M40 150q10-8 20 0t20 0 20 0 20 0 20 0 20 0 20 0 20 0 20 0 20 0 20 0 20 0 20 0" fill="none"/>
-            </g>
-            <g stroke="#ff4f1f" stroke-width="6" stroke-linecap="round">
-              <path d="M188 102l16 16M204 102l-16 16"/><path d="M92 104l14 14M106 104l-14 14"/>
-            </g>
-            <g fill="#151515" opacity=".5"><circle cx="270" cy="50" r="5"/><circle cx="50" cy="40" r="5"/><circle cx="250" cy="150" r="5"/></g>
-          </svg>
-        </div>
-        <div class="card-body">
-          <h3>Battleship</h3>
-          <p>Hide five ships on a 10×10 grid, then take turns calling shots. Find their fleet and sink it before they sink yours.</p>
-          <div class="tags"><span class="tag solid">1v1</span><span class="tag">turn-based</span><span class="tag">phone ok</span></div>
-          <div class="card-cta">Play Battleship</div>
-        </div>
-      </a>
-
-      <a class="card" href="tron.html" data-tags="duel live">
-        <span class="card-num">05</span>
-        <span class="sticker">New</span>
-        <div class="card-art">
-          <svg viewBox="0 0 320 180" aria-hidden="true">
-            <defs><pattern id="gp" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M12 0H0V12" fill="none" stroke="#d3cab5" stroke-width="1"/></pattern></defs>
-            <rect width="320" height="180" fill="#fffaf0"/>
-            <rect width="320" height="180" fill="url(#gp)"/>
-            <g fill="none" stroke-linecap="square" stroke-linejoin="miter">
-              <path d="M24 96H96V36H192V72H228" stroke="#151515" stroke-width="14"/>
-              <path d="M24 96H96V36H192V72H228" stroke="#ff4f1f" stroke-width="8"/>
-              <path d="M296 84H252V144H132V96H212" stroke="#151515" stroke-width="14"/>
-              <path d="M296 84H252V144H132V96H212" stroke="#2f5cff" stroke-width="8"/>
-            </g>
-            <g stroke="#151515" stroke-width="3">
-              <rect x="222" y="63" width="18" height="18" fill="#ff4f1f"/>
-              <rect x="203" y="87" width="18" height="18" fill="#2f5cff"/>
-            </g>
-          </svg>
-        </div>
-        <div class="card-body">
-          <h3>Light Cycles</h3>
-          <p>Tron-style. You leave a wall wherever you drive. Box your opponent in and make them crash first. It speeds up the longer a round goes.</p>
-          <div class="tags"><span class="tag solid">1v1</span><span class="tag">real-time</span><span class="tag">keys or swipe</span></div>
-          <div class="card-cta">Play Light Cycles</div>
-        </div>
-      </a>
-
-      <a class="card" href="arena.html" data-tags="duel live">
-        <span class="card-num">06</span>
-        <div class="card-art">
-          <svg viewBox="0 0 320 180" aria-hidden="true">
-            <rect width="320" height="180" fill="#9be08a"/>
-            <g stroke="#151515" stroke-width="3" stroke-linejoin="round">
-              <rect x="92" y="34" width="16" height="56" fill="#fffaf0"/>
-              <rect x="212" y="90" width="16" height="56" fill="#fffaf0"/>
-              <rect x="130" y="82" width="60" height="16" fill="#fffaf0"/>
-              <rect x="76" y="114" width="18" height="8" fill="#151515" transform="rotate(-6 64 120)"/>
-              <circle cx="64" cy="120" r="14" fill="#ff4f1f"/>
-              <rect x="226" y="52" width="18" height="8" fill="#151515" transform="rotate(8 256 56)"/>
-              <circle cx="256" cy="56" r="14" fill="#2f5cff"/>
-            </g>
-            <g stroke="#151515" stroke-width="4" stroke-linecap="round">
-              <path d="M108 116l24-3M146 111l22-3"/>
-              <path d="M214 62l-18 3"/>
-            </g>
-            <path d="M40 150l6-12 6 12 6-12 6 12" fill="none" stroke="#151515" stroke-width="2.5"/>
-          </svg>
-        </div>
-        <div class="card-body">
-          <h3>Arena</h3>
-          <p>A top-down shooter. Strafe behind cover, dash through bullets, and get five eliminations before they do.</p>
-          <div class="tags"><span class="tag solid">1v1</span><span class="tag">real-time</span><span class="tag">mouse + keys</span></div>
-          <div class="card-cta">Play Arena</div>
-        </div>
-      </a>
-
-      <a class="card" href="pong.html" data-tags="duel live">
-        <span class="card-num">07</span>
-        <div class="card-art">
-          <svg viewBox="0 0 320 180" aria-hidden="true">
-            <rect width="320" height="180" fill="#151515"/>
-            <path d="M160 0V180" stroke="#fffaf0" stroke-width="4" stroke-dasharray="10 10" opacity=".5"/>
-            <g font-family="Archivo Black, Arial Black, sans-serif" font-size="48" fill="#fffaf0" text-anchor="middle" opacity=".9">
-              <text x="110" y="62">4</text><text x="210" y="62">3</text>
-            </g>
-            <rect x="24" y="80" width="12" height="52" fill="#ff4f1f" stroke="#fffaf0" stroke-width="3"/>
-            <rect x="284" y="104" width="12" height="52" fill="#ffd23f" stroke="#fffaf0" stroke-width="3"/>
-            <rect x="176" y="112" width="14" height="14" fill="#fffaf0"/>
-            <g fill="#fffaf0" opacity=".35"><rect x="150" y="104" width="10" height="10"/><rect x="128" y="97" width="7" height="7"/></g>
-          </svg>
-        </div>
-        <div class="card-body">
-          <h3>Pong</h3>
-          <p>The original paddle game. Hit the ball near the edge of your paddle to angle it. It gets faster every rally. First to 7.</p>
-          <div class="tags"><span class="tag solid">1v1</span><span class="tag">real-time</span><span class="tag">mouse · touch · keys</span></div>
-          <div class="card-cta">Play Pong</div>
-        </div>
-      </a>
-    </section>
-
-    <footer class="hub-foot">
-      <span>OXIDPVP. Made for playing with people you know.</span>
-      <span>Rooms close when the host leaves.</span>
-    </footer>
   </div>
 
   <script>
     (() => {
-      const cards = [...document.querySelectorAll("#cards .card")];
+      const cards = [...document.querySelectorAll("#cards .game-card")];
       const buttons = [...document.querySelectorAll(".filter")];
       const count = document.getElementById("count");
       const apply = (f) => {
@@ -251,13 +307,22 @@
           if (on) shown++;
         }
         for (const b of buttons) b.setAttribute("aria-pressed", b.dataset.f === f);
-        count.textContent = shown + " of " + cards.length;
+        count.textContent = shown === cards.length ? `${shown} games` : `${shown} of ${cards.length} games`;
         try { localStorage.setItem("oxidpvp-filter", f); } catch {}
       };
       for (const b of buttons) b.addEventListener("click", () => apply(b.dataset.f));
       let saved = "all";
       try { saved = localStorage.getItem("oxidpvp-filter") || "all"; } catch {}
       apply(buttons.some((b) => b.dataset.f === saved) ? saved : "all");
+
+      // Hover glow follows the cursor.
+      for (const c of cards) {
+        c.addEventListener("pointermove", (e) => {
+          const r = c.getBoundingClientRect();
+          c.style.setProperty("--mx", e.clientX - r.left + "px");
+          c.style.setProperty("--my", e.clientY - r.top + "px");
+        });
+      }
     })();
   </script>
 </body>

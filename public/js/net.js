@@ -61,6 +61,177 @@
     };
   }
 
+  // ---------- Names + invite links (shared by both lobbies) ----------
+  const NAME_KEY = "oxidpvp-name";
+  const cleanName = (n) => String(n || "").replace(/\s+/g, " ").trim().slice(0, 16) || "Player";
+  const savedName = () => { try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; } };
+  // Fills a name input and returns a getter that also remembers the name for next time.
+  function nameField(input) {
+    input.value = savedName() || "Player" + Math.floor(100 + Math.random() * 900);
+    return () => {
+      const n = cleanName(input.value);
+      try { localStorage.setItem(NAME_KEY, n); } catch {}
+      return n;
+    };
+  }
+
+  // Invite links are just the game page with the room code in the hash: pong.html#AB3CD.
+  // The hash never reaches the server, so this works with plain static hosting.
+  const inviteUrl = (code) => location.origin + location.pathname + "#" + code;
+  const invitedCode = () => {
+    const m = location.hash.match(/^#([A-Za-z0-9]{5})$/);
+    return m ? m[1].toUpperCase() : null;
+  };
+  const clearInvite = () => { if (location.hash) history.replaceState(null, "", location.pathname + location.search); };
+  async function shareInvite(code, title) {
+    const url = inviteUrl(code);
+    // Phones get the native share sheet (Messages, Discord, …); desktops get the clipboard.
+    if (navigator.share && matchMedia("(pointer: coarse)").matches) {
+      try { await navigator.share({ title: `${title} on OXIDPVP`, text: `Join my ${title} room`, url }); return "shared"; }
+      catch (e) { if (e && e.name === "AbortError") return false; }
+    }
+    try { await navigator.clipboard.writeText(url); return "copied"; } catch { return false; }
+  }
+  const INVITE_HTML = `
+    <button class="btn primary full" data-act="invite" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      Copy invite link
+    </button>`;
+  const INVITED_HTML = `<div class="invited" hidden><span class="invited-dot"></span><span>You're invited to room <b></b></span></div>`;
+
+  // ---------- Chat ----------
+  // One floating chat per page. The lobbies call chat.open(sendFn) once there's someone to talk
+  // to, chat.add(...) for each message, and chat.reset() when leaving the room.
+  const CHAT_MAX = 200, CHAT_GAP_MS = 600;
+  const QUICK = ["gg", "nice!", "lol", "one more?", "brb"];
+  const cleanText = (t) => String(t || "").replace(/\s+/g, " ").trim().slice(0, CHAT_MAX);
+
+  const chat = (() => {
+    let el = null, sendFn = null, unread = 0, lastSent = 0, peekTimer = 0;
+    const $ = (s) => el.querySelector(s);
+
+    function build() {
+      el = document.createElement("div");
+      el.className = "chat";
+      el.hidden = true;
+      el.innerHTML = `
+        <div class="chat-peek" hidden></div>
+        <div class="chat-panel" role="dialog" aria-label="Chat" hidden>
+          <div class="chat-head"><span>Chat</span><button class="chat-close" type="button" aria-label="Close chat">&times;</button></div>
+          <ol class="chat-log" aria-live="polite"></ol>
+          <div class="chat-quick"></div>
+          <form class="chat-form">
+            <input maxlength="${CHAT_MAX}" placeholder="Say something…" autocomplete="off" aria-label="Chat message">
+            <button class="btn" type="submit">Send</button>
+          </form>
+        </div>
+        <button class="chat-toggle" type="button" aria-expanded="false" title="Chat (Enter)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/></svg>
+          <span>Chat</span><b class="chat-badge" hidden></b>
+        </button>`;
+      for (const q of QUICK) {
+        const b = document.createElement("button");
+        b.type = "button"; b.textContent = q;
+        b.addEventListener("click", () => submit(q));
+        $(".chat-quick").append(b);
+      }
+      $(".chat-toggle").addEventListener("click", () => toggle());
+      $(".chat-close").addEventListener("click", () => toggle(false));
+      $(".chat-peek").addEventListener("click", () => toggle(true));
+      $(".chat-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const input = $(".chat-form input");
+        if (submit(input.value)) input.value = "";
+      });
+      $(".chat-form input").addEventListener("keydown", (e) => {
+        if (e.key === "Escape") { toggle(false); e.target.blur(); }
+        e.stopPropagation(); // typing never drives the game
+      });
+      // Enter opens chat from anywhere that isn't already a text field or button.
+      addEventListener("keydown", (e) => {
+        if (el.hidden || e.key !== "Enter" || e.repeat) return;
+        const t = e.target;
+        if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "BUTTON" || t.tagName === "A")) return;
+        e.preventDefault();
+        toggle(true);
+      });
+      document.body.appendChild(el);
+    }
+
+    function isOpen() { return el && !$(".chat-panel").hidden; }
+    function toggle(force) {
+      const open = force ?? !isOpen();
+      $(".chat-panel").hidden = !open;
+      $(".chat-toggle").setAttribute("aria-expanded", open);
+      if (open) {
+        unread = 0; badge();
+        $(".chat-peek").hidden = true;
+        const log = $(".chat-log");
+        log.scrollTop = log.scrollHeight;
+        $(".chat-form input").focus();
+      } else if (document.activeElement && el.contains(document.activeElement)) document.activeElement.blur();
+    }
+    function badge() {
+      const b = $(".chat-badge");
+      b.hidden = !unread;
+      b.textContent = unread > 9 ? "9+" : unread;
+    }
+    function submit(text) {
+      text = cleanText(text);
+      if (!text || !sendFn) return false;
+      const now = Date.now();
+      if (now - lastSent < CHAT_GAP_MS) return false;
+      lastSent = now;
+      sendFn(text);
+      return true;
+    }
+
+    return {
+      open(send) {
+        if (!el) build();
+        sendFn = send;
+        el.hidden = false;
+      },
+      // { name, text, me, sys }
+      add(m) {
+        if (!el) return;
+        const text = cleanText(m.text);
+        if (!text) return;
+        const li = document.createElement("li");
+        if (m.sys) { li.className = "sys"; li.textContent = text; }
+        else {
+          if (m.me) li.className = "me";
+          const who = document.createElement("b");
+          who.textContent = m.me ? "You" : cleanText(m.name).slice(0, 16) || "Player";
+          const body = document.createElement("span");
+          body.textContent = text;
+          li.append(who, body);
+        }
+        const log = $(".chat-log");
+        const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+        log.append(li);
+        while (log.children.length > 150) log.firstChild.remove();
+        if (atBottom || m.me) log.scrollTop = log.scrollHeight;
+        if (!isOpen() && !m.me && !el.hidden) {
+          if (!m.sys) { unread++; badge(); }
+          const peek = $(".chat-peek");
+          peek.textContent = m.sys ? text : `${cleanText(m.name).slice(0, 16)}: ${text}`;
+          peek.hidden = false;
+          clearTimeout(peekTimer);
+          peekTimer = setTimeout(() => { peek.hidden = true; }, 3500);
+        }
+      },
+      reset() {
+        if (!el) return;
+        sendFn = null; unread = 0; badge();
+        el.hidden = true;
+        $(".chat-panel").hidden = true;
+        $(".chat-peek").hidden = true;
+        $(".chat-log").textContent = "";
+      },
+    };
+  })();
+
   // ---------- 1v1 lobby ----------
   function mount({ game, title, subtitle, onStart }) {
     const root = document.createElement("div");
@@ -71,17 +242,20 @@
         <h1></h1>
         <p class="sub"></p>
         <div data-view="menu">
+          ${INVITED_HTML}
+          <label class="field"><span>Your name</span><input class="name" maxlength="16" autocomplete="nickname" spellcheck="false"></label>
           <button class="btn primary full" data-act="host">Create room</button>
           <div class="or">or join</div>
           <form class="join">
-            <input maxlength="${CODE_LEN}" placeholder="CODE" autocomplete="off" spellcheck="false" aria-label="Room code">
+            <input class="code-in" maxlength="${CODE_LEN}" placeholder="CODE" autocomplete="off" spellcheck="false" aria-label="Room code">
             <button class="btn" type="submit">Join</button>
           </form>
         </div>
         <div class="wait" data-view="wait" hidden>
           <div class="label">Room code</div>
-          <button class="code" title="Click to copy"></button>
-          <p class="muted" style="font-size:13px">Send this code to your opponent. Click it to copy.</p>
+          <button class="code" title="Click to copy the code"></button>
+          ${INVITE_HTML}
+          <p class="muted hint-sm">Send the link to your opponent, or have them type the code.</p>
           <button class="btn ghost full" data-act="cancel">Cancel</button>
         </div>
         <p class="status" aria-live="polite"></p>
@@ -94,12 +268,13 @@
     const menuView = $('[data-view="menu"]');
     const waitView = $('[data-view="wait"]');
     const status = $(".status");
-    const input = $(".join input");
+    const input = $(".code-in");
     const codeBtn = $(".code");
     const netEl = document.getElementById("net");
+    const myName = nameField($(".name"));
 
-    let sock = null, opp = null, isHost = false, stopGame = null, pingTimer = null, gen = 0;
-    let handlers = [], link = null;
+    let sock = null, opp = null, oppName = "Opponent", isHost = false, stopGame = null, pingTimer = null, gen = 0;
+    let handlers = [], link = null, helloTimer = 0;
 
     const setStatus = (msg, cls = "") => { status.textContent = msg; status.className = "status " + cls; };
     const showMenu = () => { menuView.hidden = false; waitView.hidden = true; };
@@ -111,6 +286,8 @@
       if (stopGame) { try { stopGame(); } catch {} stopGame = null; }
       if (sock) { sock.close(); sock = null; }
       opp = null; handlers = []; link = null;
+      clearTimeout(helloTimer);
+      chat.reset();
       if (netEl) { netEl.className = "net"; netEl.lastChild.textContent = "offline"; }
     }
     function fail(msg) {
@@ -141,12 +318,25 @@
             setTimeout(() => sock && sock.send({ kick: m.id }), 300);
             return;
           }
+          // Hold the seat until they tell us their name, then start.
           opp = m.id;
-          sock.send({ to: opp, d: { __sys: "accept" } });
-          start();
+          setStatus("Opponent connecting…", "pulse");
+          clearTimeout(helloTimer);
+          helloTimer = setTimeout(() => {
+            if (sock && opp === m.id && !link) { sock.send({ kick: m.id }); opp = null; setStatus("Waiting for opponent…", "pulse"); }
+          }, 8000);
         } else if (m.sys === "leave") {
-          if (m.id === opp) fail("Opponent disconnected.");
-        } else if (m.from === opp && m.d) deliver(m.d);
+          if (m.id === opp && link) fail(`${oppName} disconnected.`);
+          else if (m.id === opp) { opp = null; clearTimeout(helloTimer); setStatus("Waiting for opponent…", "pulse"); }
+        } else if (m.from === opp && m.d) {
+          if (m.d.__sys === "hello") {
+            if (link) return;
+            clearTimeout(helloTimer);
+            oppName = cleanName(m.d.name);
+            sock.send({ to: opp, d: { __sys: "accept", name: myName() } });
+            start();
+          } else deliver(m.d);
+        }
       }, () => { if (my === gen) fail("Lost connection to the game server."); });
       showWait(code);
       setStatus("Waiting for opponent…", "pulse");
@@ -162,16 +352,19 @@
       catch (reason) { if (my === gen) fail(reasonText(reason)); return; }
       if (my !== gen) return r.ws.close();
       sock = wrap(r.ws, (m) => {
-        if (m.sys === "host-left") return fail("Opponent disconnected.");
+        if (m.sys === "host-left") return fail(`${oppName} left the room.`);
         const d = m.d;
         if (!d) return;
-        if (d.__sys === "accept") return start();
+        if (d.__sys === "accept") { oppName = cleanName(d.name); return start(); }
+        if (d.__sys === "chat") return chat.add({ name: oppName, text: d.text });
         if (d.__sys === "reject") return fail(d.reason);
         deliver(d);
       }, () => { if (my === gen) fail("Lost connection to the game server."); });
+      sock.send({ d: { __sys: "hello", name: myName() } });
     }
 
     function deliver(d) {
+      if (d.__sys === "chat") return chat.add({ name: oppName, text: d.text });
       if (!link) return;
       if (d.__ping !== undefined) return link.send({ __pong: d.__ping });
       if (d.__pong !== undefined) {
@@ -189,17 +382,26 @@
     function start() {
       root.hidden = true;
       setStatus("");
+      clearInvite();
       link = {
         isHost,
+        myName: myName(),
+        oppName,
         rtt: 0,
         send: (o) => { if (sock) sock.send(isHost ? { to: opp, d: o } : { d: o }); },
         onData: (fn) => handlers.push(fn),
       };
       pingTimer = setInterval(() => link && link.send({ __ping: performance.now() }), 1000);
+      chat.open((text) => {
+        if (!sock) return;
+        sock.send(isHost ? { to: opp, d: { __sys: "chat", text } } : { d: { __sys: "chat", text } });
+        chat.add({ text, me: true });
+      });
+      chat.add({ sys: true, text: `${oppName} joined. Say hi!` });
       stopGame = onStart(link) || null;
     }
 
-    $('[data-act="host"]').addEventListener("click", () => hostRoom());
+    $('[data-act="host"]').addEventListener("click", () => { clearInvite(); hostRoom(); });
     $('[data-act="cancel"]').addEventListener("click", () => { teardown(); showMenu(); setStatus(""); });
     $(".join").addEventListener("submit", (e) => {
       e.preventDefault();
@@ -207,18 +409,45 @@
       if (code.length !== CODE_LEN) return setStatus(`Codes are ${CODE_LEN} characters.`, "error");
       joinRoom(code);
     });
+    wireCodeUi(root, title, input, codeBtn, setStatus, (code) => joinRoom(code));
+    window.addEventListener("beforeunload", teardown);
+  }
+
+  // Code input cleanup, copy buttons, and the invite-link arrival flow. Shared by both lobbies.
+  function wireCodeUi(root, title, input, codeBtn, setStatus, join) {
     input.addEventListener("input", () => {
       input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
     });
     codeBtn.addEventListener("click", async () => {
-      try { await navigator.clipboard.writeText(codeBtn.textContent); setStatus("Copied! Waiting for opponent…", "pulse"); } catch {}
+      try { await navigator.clipboard.writeText(codeBtn.textContent); setStatus("Code copied.", "ok"); } catch {}
     });
-    window.addEventListener("beforeunload", teardown);
+    root.querySelector('[data-act="invite"]').addEventListener("click", async () => {
+      const r = await shareInvite(codeBtn.textContent, title);
+      if (r === "copied") setStatus("Invite link copied. Paste it to your friends.", "ok");
+      else if (r === "shared") setStatus("Invite sent.", "ok");
+      else if (r === false) setStatus("Couldn't copy. Share the code instead.", "error");
+    });
+
+    const invited = invitedCode();
+    if (!invited) return;
+    const box = root.querySelector(".invited");
+    box.hidden = false;
+    box.querySelector("b").textContent = invited;
+    input.value = invited;
+    const joinBtn = root.querySelector(".join button");
+    joinBtn.classList.add("primary");
+    joinBtn.textContent = "Join room";
+    root.querySelector('[data-act="host"]').classList.remove("primary");
+    // Returning players already picked a name, so drop them straight in.
+    if (savedName()) setTimeout(() => join(invited), 0);
+    else {
+      setStatus("Pick a name, then hit Join room.");
+      const nameIn = root.querySelector(".name");
+      setTimeout(() => { nameIn.focus(); nameIn.select(); }, 50);
+    }
   }
 
   // ---------- Multiplayer rooms (2–N players) ----------
-  const NAME_KEY = "oxidpvp-name";
-  const cleanName = (n) => String(n || "").replace(/\s+/g, " ").trim().slice(0, 16) || "Player";
 
   function mountRoom({ game, title, subtitle, min = 2, max = 6, onStart }) {
     const root = document.createElement("div");
@@ -229,6 +458,7 @@
         <h1></h1>
         <p class="sub"></p>
         <div data-view="menu">
+          ${INVITED_HTML}
           <label class="field"><span>Your name</span><input class="name" maxlength="16" autocomplete="nickname" spellcheck="false"></label>
           <button class="btn primary full" data-act="host">Create room</button>
           <div class="or">or join</div>
@@ -239,7 +469,8 @@
         </div>
         <div class="wait" data-view="room" hidden>
           <div class="label">Room code</div>
-          <button class="code" title="Click to copy"></button>
+          <button class="code" title="Click to copy the code"></button>
+          ${INVITE_HTML}
           <div class="plist-head"><span>Players</span><span class="pcount"></span></div>
           <ul class="plist"></ul>
           <button class="btn primary full" data-act="start" hidden>Start game</button>
@@ -257,13 +488,7 @@
     const status = $(".status"), nameIn = $(".name"), codeIn = $(".code-in"), codeBtn = $(".code");
     const startBtn = $('[data-act="start"]'), waitMsg = $(".wait-msg");
 
-    try { nameIn.value = localStorage.getItem(NAME_KEY) || ""; } catch {}
-    if (!nameIn.value) nameIn.value = "Player" + Math.floor(100 + Math.random() * 900);
-    const myName = () => {
-      const n = cleanName(nameIn.value);
-      try { localStorage.setItem(NAME_KEY, n); } catch {}
-      return n;
-    };
+    const myName = nameField(nameIn);
 
     let sock = null, isHost = false, myId = -1, players = [], started = false, gen = 0;
     let stopGame = null, handlers = [], leaveHandlers = [];
@@ -301,7 +526,8 @@
       if (stopGame) { try { stopGame(); } catch {} stopGame = null; }
       if (sock) { sock.close(); sock = null; }
       handlers = []; leaveHandlers = [];
-      started = false; players = []; myId = -1;
+      started = false; players = []; myId = -1; chatSeen.clear();
+      chat.reset();
     }
     function backToMenu(msg, cls = "error") {
       root.hidden = false;
@@ -310,6 +536,23 @@
       setStatus(msg, cls);
     }
     const toPlayers = (m) => { for (const p of players) if (p.id !== myId) sock.send({ to: p.id, d: m }); };
+
+    // Chat goes through the host, which stamps the sender's name and relays it to everyone.
+    const chatSeen = new Map(); // id -> last message time, to stop spam
+    function hostChat(id, text, sys = false) {
+      text = cleanText(text);
+      if (!text || !sock) return;
+      const p = players.find((x) => x.id === id);
+      if (!sys) {
+        if (!p) return;
+        const now = Date.now();
+        if (now - (chatSeen.get(id) || 0) < 400) return;
+        chatSeen.set(id, now);
+      }
+      const m = { __sys: "chat", id, name: p ? p.name : "", text, sys };
+      toPlayers(m);
+      chat.add({ ...m, me: !sys && id === myId });
+    }
 
     // --- Host ---
     async function createRoom(attempt = 0) {
@@ -334,6 +577,7 @@
       }, () => { if (my === gen) backToMenu("Lost connection to the game server."); });
       showRoom(code);
       setStatus("Share the code. Start when everyone's in.");
+      chat.open((text) => hostChat(0, text));
     }
     function onGuestData(id, d) {
       if (d.__sys === "hello") {
@@ -343,8 +587,10 @@
         players.push({ id, name: cleanName(d.name) });
         sock.send({ to: id, d: { __sys: "welcome", id } });
         broadcastLobby();
+        hostChat(0, `${cleanName(d.name)} joined`, true);
         return;
       }
+      if (d.__sys === "chat") return hostChat(id, d.text);
       if (!started || !players.some((p) => p.id === id)) return;
       for (const h of handlers) h(id, d);
     }
@@ -356,6 +602,7 @@
       const p = players.find((x) => x.id === id);
       if (!p) return;
       players = players.filter((x) => x.id !== id);
+      hostChat(0, `${p.name} left`, true);
       if (!started) broadcastLobby();
       else { for (const h of leaveHandlers) h(id); toast(p.name + " left the game"); }
     }
@@ -379,7 +626,11 @@
         const d = m.d;
         if (!d) return;
         if (d.__sys) {
-          if (d.__sys === "welcome") { myId = d.id; showRoom(code); setStatus(""); }
+          if (d.__sys === "welcome") {
+            myId = d.id; showRoom(code); setStatus(""); clearInvite();
+            chat.open((text) => sock && sock.send({ d: { __sys: "chat", text } }));
+          }
+          else if (d.__sys === "chat") chat.add({ name: d.name, text: d.text, sys: d.sys, me: !d.sys && d.id === myId });
           else if (d.__sys === "lobby") { players = d.players; renderPlayers(); }
           else if (d.__sys === "reject") backToMenu(d.reason);
           else if (d.__sys === "start" && myId >= 0) { players = d.players; begin(); }
@@ -406,7 +657,7 @@
       stopGame = onStart(room) || null;
     }
 
-    $('[data-act="host"]').addEventListener("click", () => createRoom());
+    $('[data-act="host"]').addEventListener("click", () => { clearInvite(); createRoom(); });
     startBtn.addEventListener("click", () => {
       if (!isHost || players.length < min) return;
       toPlayers({ __sys: "start", players });
@@ -419,10 +670,7 @@
       if (code.length !== CODE_LEN) return setStatus(`Codes are ${CODE_LEN} characters.`, "error");
       joinRoom(code);
     });
-    codeIn.addEventListener("input", () => { codeIn.value = codeIn.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
-    codeBtn.addEventListener("click", async () => {
-      try { await navigator.clipboard.writeText(codeBtn.textContent); setStatus("Code copied!", "ok"); } catch {}
-    });
+    wireCodeUi(root, title, codeIn, codeBtn, setStatus, (code) => joinRoom(code));
     window.addEventListener("beforeunload", teardown);
   }
 
