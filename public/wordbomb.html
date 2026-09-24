@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07070a">
+  <title>Word Bomb · OXIDPVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/games.css">
+  <link rel="stylesheet" href="css/party.css">
+</head>
+<body class="game-page">
+  <header class="topbar">
+    <a class="back" href="index.html">&larr; <span>Games</span></a>
+    <div class="tb-title">Word Bomb</div>
+    <div class="net" id="side"></div>
+  </header>
+  <main class="play wb">
+    <div class="wb-ring" id="ring">
+      <div class="wb-center">
+        <div class="wb-arrow" id="arrow" hidden></div>
+        <div class="wb-bomb" id="bomb">💣</div>
+        <div class="wb-chunk" id="chunk"></div>
+      </div>
+    </div>
+    <p class="wb-status" id="status"></p>
+    <form class="wb-me" id="form" autocomplete="off">
+      <div id="me" hidden>
+        <input id="word" maxlength="30" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="type here…" aria-label="Your word">
+        <button class="btn primary" type="submit">Enter</button>
+      </div>
+    </form>
+    <div class="wb-letters" id="letters" title="Use every letter to win back a life"></div>
+  </main>
+  <div class="overlay" id="result" hidden>
+    <div class="panel result">
+      <div class="big" id="resultTitle"></div>
+      <ul class="standings" id="standings"></ul>
+      <div class="row">
+        <a class="btn ghost" href="index.html">Leave</a>
+        <button class="btn primary" id="again">Play again</button>
+      </div>
+      <p class="muted" id="againWait" style="font-size:13px;margin-top:12px" hidden>Waiting for the host to start another game…</p>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script src="js/party.js"></script>
+  <script src="js/wordbomb-chunks.js"></script>
+  <script src="js/wordbomb.js"></script>
+</body>
+</html>

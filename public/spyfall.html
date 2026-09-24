@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07070a">
+  <title>Spyfall · OXIDPVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/games.css">
+  <link rel="stylesheet" href="css/party.css">
+</head>
+<body class="game-page">
+  <header class="topbar">
+    <a class="back" href="index.html">&larr; <span>Games</span></a>
+    <div class="tb-title">Spyfall</div>
+    <div class="net" id="side"></div>
+  </header>
+  <main class="play sp">
+    <div class="sp-grid">
+      <section class="sp-left">
+        <button class="sp-card" id="card" type="button" aria-label="Show or hide your card">
+          <div class="sp-back">Tap to see your card</div>
+          <div class="sp-face" id="cardFace"></div>
+        </button>
+        <div class="sp-timer"><span id="timer"></span></div>
+        <p class="sp-hint" id="hint"></p>
+        <div class="sp-vote" id="voteBox" hidden>
+          <div class="sp-vote-q" id="voteQ"></div>
+          <div class="sp-vote-btns" id="voteBtns">
+            <button class="btn primary" id="yes" type="button">Yes, it's them</button>
+            <button class="btn" id="no" type="button">No</button>
+          </div>
+          <p class="muted" id="voteWait"></p>
+          <p class="muted" id="voteTally"></p>
+        </div>
+        <ol class="sp-players" id="players"></ol>
+        <p class="muted sp-note" id="accuseNote"></p>
+      </section>
+      <section class="sp-right">
+        <div class="sp-right-head"><h2>Locations</h2><button class="btn sm primary" id="guessBtn" type="button" hidden>Guess the location</button></div>
+        <p class="muted sp-note" id="locHint"></p>
+        <div class="sp-locs" id="locs"></div>
+      </section>
+    </div>
+  </main>
+  <div class="overlay" id="result" hidden>
+    <div class="panel result">
+      <div class="big" id="resultTitle"></div>
+      <p class="muted" id="resultNote" style="margin-top:8px"></p>
+      <ul class="standings" id="standings"></ul>
+      <div class="row">
+        <a class="btn ghost" href="index.html">Leave</a>
+        <button class="btn primary" id="again">Play again</button>
+      </div>
+      <p class="muted" id="againWait" style="font-size:13px;margin-top:12px" hidden>Waiting for the host to start another game…</p>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script src="js/party.js"></script>
+  <script src="js/spyfall-locations.js"></script>
+  <script src="js/spyfall.js"></script>
+</body>
+</html>
