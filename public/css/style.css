@@ -708,3 +708,6 @@ body.touching .touch-ui { display: block; }
 .invite-card b { font-size: 15px; }
 .invite-card span { font-size: 13px; color: var(--muted); }
 .invite-card .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+
+/* Faster first paint: skip rendering off-screen game cards until they scroll into view. */
+.cards .game-card { content-visibility: auto; contain-intrinsic-size: auto 400px; }
