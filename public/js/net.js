@@ -18,6 +18,31 @@
     "browser-incompatible": "Your browser doesn't support WebRTC.",
   }[e.type] || "Connection error: " + (e.type || e.message || "unknown"));
 
+  // ICE servers: STUN finds a direct route between players; TURN relays the traffic when
+  // routers/firewalls block direct connections. /api/ice (worker.js) hands out short-lived
+  // Cloudflare TURN credentials; if it isn't available we fall back to public servers.
+  const FALLBACK_ICE = [
+    { urls: ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302"] },
+    { urls: ["turn:eu-0.turn.peerjs.com:3478", "turn:us-0.turn.peerjs.com:3478"], username: "peerjs", credential: "peerjsp" },
+  ];
+  let icePromise = null;
+  function getIce() {
+    if (!icePromise) {
+      icePromise = fetch("/api/ice", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => (d && Array.isArray(d.iceServers) && d.iceServers.length ? d.iceServers : FALLBACK_ICE))
+        .catch(() => FALLBACK_ICE);
+    }
+    return icePromise;
+  }
+  getIce(); // warm up while the player reads the lobby
+  async function newPeer(id) {
+    const options = { config: { iceServers: await getIce() } };
+    return id ? new Peer(id, options) : new Peer(options);
+  }
+  const CONNECT_TIMEOUT = 20000;
+  const CONNECT_FAIL = "Couldn't connect to the host. Double-check the code and try again.";
+
   function mount({ game, title, subtitle, onStart }) {
     const root = document.createElement("div");
     root.className = "overlay";
@@ -54,13 +79,14 @@
     const codeBtn = $(".code");
     const netEl = document.getElementById("net");
 
-    let peer = null, conn = null, stopGame = null, pingTimer = null;
+    let peer = null, conn = null, stopGame = null, pingTimer = null, gen = 0;
 
     const setStatus = (msg, cls = "") => { status.textContent = msg; status.className = "status " + cls; };
     const showMenu = () => { menuView.hidden = false; waitView.hidden = true; };
     const showWait = (code) => { menuView.hidden = true; waitView.hidden = false; codeBtn.textContent = code; };
 
     function teardown() {
+      gen++; // invalidates any connection attempt still in flight
       clearInterval(pingTimer);
       if (stopGame) { try { stopGame(); } catch {} stopGame = null; }
       if (peer) { try { peer.destroy(); } catch {} peer = null; }
@@ -68,16 +94,22 @@
       if (netEl) { netEl.className = "net"; netEl.lastChild.textContent = "offline"; }
     }
 
-    function hostRoom(attempt = 0) {
+    async function hostRoom(attempt = 0) {
       teardown();
+      const my = gen;
       const code = makeCode();
       setStatus("Creating room…", "pulse");
-      peer = new Peer(PREFIX + game + "-" + code);
+      const p = await newPeer(PREFIX + game + "-" + code);
+      if (my !== gen) return p.destroy();
+      peer = p;
       peer.on("open", () => { showWait(code); setStatus("Waiting for opponent…", "pulse"); });
       peer.on("connection", (c) => {
-        if (conn) { c.on("open", () => c.close()); return; } // room full
-        conn = c;
-        c.on("open", () => start(c, true));
+        // Only lock the room once a connection actually opens, so a failed attempt can't block it.
+        c.on("open", () => {
+          if (conn && conn.open) return c.close(); // room full
+          conn = c;
+          start(c, true);
+        });
       });
       peer.on("error", (e) => {
         if (e.type === "unavailable-id" && attempt < 4) return hostRoom(attempt + 1);
@@ -88,16 +120,19 @@
       });
     }
 
-    function joinRoom(code) {
+    async function joinRoom(code) {
       teardown();
+      const my = gen;
       setStatus("Connecting…", "pulse");
-      peer = new Peer();
+      const p = await newPeer();
+      if (my !== gen) return p.destroy();
+      peer = p;
       peer.on("open", () => {
         const c = peer.connect(PREFIX + game + "-" + code, { reliable: true });
         conn = c;
         const timeout = setTimeout(() => {
-          if (!c.open) { setStatus("Couldn't reach that room. Check the code.", "error"); teardown(); }
-        }, 12000);
+          if (!c.open && my === gen) { setStatus(CONNECT_FAIL, "error"); teardown(); }
+        }, CONNECT_TIMEOUT);
         c.on("open", () => { clearTimeout(timeout); start(c, false); });
       });
       peer.on("error", (e) => {
@@ -245,7 +280,9 @@
       startBtn.textContent = players.length < min ? `Need ${min - players.length} more player${min - players.length > 1 ? "s" : ""}` : `Start game (${players.length} players)`;
     }
 
+    let gen = 0;
     function teardown() {
+      gen++; // invalidates any connection attempt still in flight
       if (stopGame) { try { stopGame(); } catch {} stopGame = null; }
       if (peer) { try { peer.destroy(); } catch {} peer = null; }
       conns = new Map(); hostConn = null; handlers = []; leaveHandlers = [];
@@ -260,13 +297,16 @@
     }
 
     // --- Host ---
-    function createRoom(attempt = 0) {
+    async function createRoom(attempt = 0) {
       teardown();
+      const my = gen;
       isHost = true; myId = 0; nextId = 1;
       players = [{ id: 0, name: myName() }];
       const code = makeCode();
       setStatus("Creating room…", "pulse");
-      peer = new Peer(PREFIX + game + "-" + code);
+      const p = await newPeer(PREFIX + game + "-" + code);
+      if (my !== gen) return p.destroy();
+      peer = p;
       peer.on("open", () => { showRoom(code); setStatus("Share the code. Start when everyone's in.", ""); });
       peer.on("connection", (c) => {
         c.on("data", (d) => onHostData(c, d));
@@ -314,16 +354,19 @@
     }
 
     // --- Guest ---
-    function joinRoom(code) {
+    async function joinRoom(code) {
       teardown();
+      const my = gen;
       isHost = false;
       let rejected = false;
       setStatus("Connecting…", "pulse");
-      peer = new Peer();
+      const p = await newPeer();
+      if (my !== gen) return p.destroy();
+      peer = p;
       peer.on("open", () => {
         const c = peer.connect(PREFIX + game + "-" + code, { reliable: true });
         hostConn = c;
-        const timeout = setTimeout(() => { if (!c.open) backToMenu("Couldn't reach that room. Check the code."); }, 12000);
+        const timeout = setTimeout(() => { if (!c.open && my === gen) backToMenu(CONNECT_FAIL); }, CONNECT_TIMEOUT);
         c.on("open", () => { clearTimeout(timeout); c.send({ __sys: "hello", name: myName() }); });
         c.on("data", (d) => {
           if (d && d.__sys) {

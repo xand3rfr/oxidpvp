@@ -1,0 +1,12 @@
+{
+  // Must match the Worker's name in the Cloudflare dashboard.
+  "name": "oxidpvp",
+  "main": "worker.js",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    // Everything is a static file except /api/*, which runs worker.js.
+    "run_worker_first": ["/api/*"]
+  }
+}
