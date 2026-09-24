@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07070a">
+  <title>Poker · OXIDPVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/games.css">
+  <link rel="stylesheet" href="css/party.css">
+</head>
+<body class="game-page">
+  <header class="topbar">
+    <a class="back" href="index.html">&larr; <span>Games</span></a>
+    <div class="tb-title">Poker</div>
+    <div class="net" id="side"></div>
+  </header>
+  <main class="play pk">
+    <div class="tv-top ml-top"><span id="info"></span><span class="ml-timer" id="timer"></span></div>
+    <div class="pk-seats" id="seats"></div>
+    <section class="pk-table">
+      <div class="pk-board" id="board"></div>
+      <div class="pk-pot" id="pot"></div>
+      <div class="pk-log" id="log"></div>
+    </section>
+    <section class="pk-me">
+      <div class="pk-mine"><div class="pk-hole" id="hole"></div><span class="pk-mychips" id="myChips"></span></div>
+      <div class="pk-actions" id="actions" hidden>
+        <button class="btn ghost" id="fold" type="button">Fold</button>
+        <button class="btn" id="check" type="button">Check</button>
+        <button class="btn" id="call" type="button">Call</button>
+        <div class="pk-raise" id="raiseBox">
+          <input type="range" id="raiseAmt" aria-label="Raise amount">
+          <button class="btn ghost sm" type="button" data-pot="0.5">½ pot</button>
+          <button class="btn ghost sm" type="button" data-pot="1">Pot</button>
+          <button class="btn primary" id="raise" type="button">Raise</button>
+        </div>
+        <button class="btn danger" id="allin" type="button">All in</button>
+      </div>
+    </section>
+    <p class="tv-msg" id="status"></p>
+  </main>
+  <div class="overlay" id="result" hidden>
+    <div class="panel result">
+      <div class="big" id="resultTitle"></div>
+      <ul class="standings" id="standings"></ul>
+      <div class="row">
+        <a class="btn ghost" href="index.html">Leave</a>
+        <button class="btn primary" id="again">Play again</button>
+      </div>
+      <p class="muted" id="againWait" style="font-size:13px;margin-top:12px" hidden>Waiting for the host to start another game…</p>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script src="js/party.js"></script>
+  <script src="js/poker.js"></script>
+</body>
+</html>
