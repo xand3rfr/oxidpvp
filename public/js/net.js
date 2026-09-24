@@ -43,6 +43,7 @@
     { id: "imposter", page: "imposter", title: "Imposter", min: 3, max: 10 },
     { id: "phone", page: "telephone", title: "Telephone", min: 3, max: 8 },
     { id: "poker", page: "poker", title: "Poker", min: 2, max: 8 },
+    { id: "cup", page: "tournament", title: "Tournament", min: 3, max: 8 },
     { id: "chess", page: "chess", title: "Chess", duel: true },
     { id: "connect", page: "connect4", title: "Connect 4", duel: true },
     { id: "battleship", page: "battleship", title: "Battleship", duel: true, noSpectate: true },

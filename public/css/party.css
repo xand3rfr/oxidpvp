@@ -731,3 +731,24 @@ button.im-row { cursor: pointer; } button.im-row:hover { border-color: var(--acc
 .rx-pad.done { background: #1f2937; }
 .rx-pad.win { background: linear-gradient(135deg, #15803d, #0f766e); }
 .rx-pad.lose { background: #27272a; }
+
+/* ---------- Tournament ---------- */
+.cup-mine { width: min(560px, 100%); display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px; border-radius: 18px; border: 1px solid rgba(var(--accent-rgb), .5); background: linear-gradient(180deg, rgba(var(--accent-rgb), .16), rgba(var(--accent-rgb), .04)); text-align: center; }
+.cup-mine strong { font-size: 20px; }
+.cup-mine .row { display: flex; gap: 8px; }
+.cup-bracket { width: 100%; max-width: 1000px; display: flex; gap: 18px; overflow-x: auto; padding: 4px 4px 12px; justify-content: center; }
+.cup-col { display: flex; flex-direction: column; justify-content: space-around; gap: 12px; min-width: 190px; }
+.cup-round { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); text-align: center; }
+.cup-match { border-radius: 12px; border: 1px solid var(--line-2); background: var(--surface); overflow: hidden; }
+.cup-match.live { border-color: rgba(var(--accent-rgb), .6); }
+.cup-match.mine { box-shadow: 0 0 0 2px var(--accent); }
+.cup-p { display: flex; align-items: center; gap: 6px; padding: 8px 10px; font-size: 14px; font-weight: 500; }
+.cup-p + .cup-p { border-top: 1px solid var(--line); }
+.cup-p > span:not(.avatar) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cup-p.won { background: rgba(34,197,94,.14); font-weight: 700; }
+.cup-p.lost { opacity: .45; }
+.cup-set { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--muted); }
+.cup-set:hover { color: var(--text); border-color: var(--accent); }
+.cup-games { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.cup-games button { padding: 6px 10px; border-radius: 8px; font-size: 13px; background: var(--field); border: 1px solid var(--line-2); color: var(--muted); }
+.cup-games button.on { border-color: var(--accent); color: var(--text); background: rgba(var(--accent-rgb), .16); }
