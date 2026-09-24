@@ -25,9 +25,11 @@
   transition: box-shadow .15s, transform .15s, background .15s;
   min-width: 150px;
 }
-.opp.turn { background: var(--yellow); box-shadow: 5px 5px 0 var(--ink); transform: translate(-2px, -2px) rotate(-1deg); }
+.opp.turn { background: var(--yellow); color: var(--on); box-shadow: 5px 5px 0 var(--ink); transform: translate(-2px, -2px) rotate(-1deg); }
 .opp .avatar { width: 34px; height: 34px; font-size: 14px; }
-.opp.turn .avatar { background: var(--ink); color: var(--yellow); }
+.opp.turn .avatar { background: var(--on); color: var(--yellow); }
+.opp.turn .ocount { color: var(--on); }
+.opp.turn .mini { background: var(--on); border-color: var(--yellow); }
 .opp .meta { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
 .opp .oname { font-weight: 600; font-size: 14px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .opp .ocount { font-size: 12px; color: var(--muted); font-family: var(--mono); }
@@ -37,7 +39,7 @@
 .badge {
   position: absolute; top: -9px; right: -6px;
   font-size: 10px; font-weight: 800; letter-spacing: .08em;
-  padding: 1px 6px; background: var(--p1); color: var(--ink); border: 2px solid var(--ink); transform: rotate(4deg);
+  padding: 1px 6px; background: var(--p1); color: var(--on); border: 2px solid var(--ink); transform: rotate(4deg);
   animation: pop .3s cubic-bezier(.2,1.6,.4,1);
 }
 .badge.danger { background: var(--danger); }
@@ -76,7 +78,7 @@
 /* me */
 .me { display: flex; flex-direction: column; align-items: center; padding: 0 0 18px; min-width: 0; }
 .actions { display: flex; gap: 8px; min-height: 46px; margin-bottom: 4px; }
-.btn.call { background: var(--yellow); animation: pop .3s cubic-bezier(.2,1.6,.4,1); }
+.btn.call { background: var(--yellow); color: var(--on); animation: pop .3s cubic-bezier(.2,1.6,.4,1); }
 .btn.call:hover { background: #ffe06e; }
 .btn.catch { background: var(--danger); color: #fff; animation: pop .3s cubic-bezier(.2,1.6,.4,1), nudge 1s ease-in-out .3s infinite; }
 .hand {
@@ -114,14 +116,14 @@
 .card.c-w { --cc: #151515; }
 .card .oval {
   position: absolute; left: 13%; right: 13%; top: 20%; bottom: 20%;
-  border-radius: 50%; background: #fffaf0; border: 2px solid var(--ink); transform: rotate(-28deg);
+  border-radius: 50%; background: #fffaf0; border: 2px solid var(--on); transform: rotate(-28deg);
 }
 .card .mid {
   position: absolute; inset: 0; display: grid; place-items: center;
   font-family: var(--display); font-weight: 400; font-size: 2.5em; letter-spacing: -0.04em; color: var(--cc);
-  -webkit-text-stroke: .04em var(--ink); paint-order: stroke fill; text-shadow: .06em .06em 0 var(--ink);
+  -webkit-text-stroke: .04em var(--on); paint-order: stroke fill; text-shadow: .06em .06em 0 var(--on);
 }
-.card .corner { position: absolute; font-family: var(--display); font-weight: 400; font-size: .9em; line-height: 1; text-shadow: 1px 1px 0 var(--ink); }
+.card .corner { position: absolute; font-family: var(--display); font-weight: 400; font-size: .9em; line-height: 1; text-shadow: 1px 1px 0 var(--on); }
 .card .tl { top: .55em; left: .6em; }
 .card .br { bottom: .55em; right: .6em; transform: rotate(180deg); }
 .card svg { width: 1em; height: 1em; display: block; }
@@ -129,7 +131,7 @@
 .card .wheel {
   width: 2.5em; height: 2.5em; border-radius: 50%;
   background: conic-gradient(var(--c-r) 0 25%, var(--c-y) 0 50%, var(--c-g) 0 75%, var(--c-b) 0);
-  box-shadow: 0 0 0 .1em var(--ink), 0 0 0 .2em #fff;
+  box-shadow: 0 0 0 .1em var(--on), 0 0 0 .2em #fff;
   display: grid; place-items: center; transform: rotate(-20deg);
 }
 .card .wheel b { transform: rotate(20deg); font-size: .45em; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
@@ -140,7 +142,7 @@
 .card.back {
   background:
     repeating-linear-gradient(135deg, rgba(255,255,255,.08) 0 5px, transparent 5px 10px),
-    var(--ink);
+    #0a0a09;
 }
 .card.back::before { border-color: rgba(255,255,255,.3); }
 .card.back .logo {
@@ -159,8 +161,8 @@
 
 /* results */
 .standings { list-style: none; display: flex; flex-direction: column; gap: 6px; margin: 16px 0 22px; text-align: left; }
-.standings li { display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: #fff; border: 2px solid var(--ink); }
-.standings li.win { background: var(--yellow); box-shadow: 3px 3px 0 var(--ink); }
+.standings li { display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: var(--surface-2); border: 2px solid var(--ink); }
+.standings li.win { background: var(--yellow); color: var(--on); box-shadow: 3px 3px 0 var(--ink); }
 .standings .pname { flex: 1; font-weight: 600; }
 .standings .n { font-family: var(--mono); font-size: 13px; color: var(--muted); }
 
@@ -191,4 +193,4 @@
   .center { gap: 10px; }
 }
 .card.c-w .mid { color: #fff; text-shadow: none; -webkit-text-stroke: 0; }
-.card .mid svg { filter: drop-shadow(.05em .05em 0 var(--ink)); }
+.card .mid svg { filter: drop-shadow(.05em .05em 0 var(--on)); }

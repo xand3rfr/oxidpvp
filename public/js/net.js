@@ -61,6 +61,139 @@
     };
   }
 
+  // ---------- Chat ----------
+  // One floating chat per page. The lobbies call chat.open(sendFn) once there's someone to talk
+  // to, chat.add(...) for each message, and chat.reset() when leaving the room.
+  const CHAT_MAX = 200, CHAT_GAP_MS = 600;
+  const QUICK = ["gg", "nice!", "lol", "one more?", "brb"];
+  const cleanText = (t) => String(t || "").replace(/\s+/g, " ").trim().slice(0, CHAT_MAX);
+
+  const chat = (() => {
+    let el = null, sendFn = null, unread = 0, lastSent = 0, peekTimer = 0;
+    const $ = (s) => el.querySelector(s);
+
+    function build() {
+      el = document.createElement("div");
+      el.className = "chat";
+      el.hidden = true;
+      el.innerHTML = `
+        <div class="chat-peek" hidden></div>
+        <div class="chat-panel" role="dialog" aria-label="Chat" hidden>
+          <div class="chat-head"><span>Chat</span><button class="chat-close" type="button" aria-label="Close chat">&times;</button></div>
+          <ol class="chat-log" aria-live="polite"></ol>
+          <div class="chat-quick"></div>
+          <form class="chat-form">
+            <input maxlength="${CHAT_MAX}" placeholder="Say something…" autocomplete="off" aria-label="Chat message">
+            <button class="btn" type="submit">Send</button>
+          </form>
+        </div>
+        <button class="chat-toggle" type="button" aria-expanded="false" title="Chat (Enter)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/></svg>
+          <span>Chat</span><b class="chat-badge" hidden></b>
+        </button>`;
+      for (const q of QUICK) {
+        const b = document.createElement("button");
+        b.type = "button"; b.textContent = q;
+        b.addEventListener("click", () => submit(q));
+        $(".chat-quick").append(b);
+      }
+      $(".chat-toggle").addEventListener("click", () => toggle());
+      $(".chat-close").addEventListener("click", () => toggle(false));
+      $(".chat-peek").addEventListener("click", () => toggle(true));
+      $(".chat-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const input = $(".chat-form input");
+        if (submit(input.value)) input.value = "";
+      });
+      $(".chat-form input").addEventListener("keydown", (e) => {
+        if (e.key === "Escape") { toggle(false); e.target.blur(); }
+        e.stopPropagation(); // typing never drives the game
+      });
+      // Enter opens chat from anywhere that isn't already a text field or button.
+      addEventListener("keydown", (e) => {
+        if (el.hidden || e.key !== "Enter" || e.repeat) return;
+        const t = e.target;
+        if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "BUTTON" || t.tagName === "A")) return;
+        e.preventDefault();
+        toggle(true);
+      });
+      document.body.appendChild(el);
+    }
+
+    function isOpen() { return el && !$(".chat-panel").hidden; }
+    function toggle(force) {
+      const open = force ?? !isOpen();
+      $(".chat-panel").hidden = !open;
+      $(".chat-toggle").setAttribute("aria-expanded", open);
+      if (open) {
+        unread = 0; badge();
+        $(".chat-peek").hidden = true;
+        const log = $(".chat-log");
+        log.scrollTop = log.scrollHeight;
+        $(".chat-form input").focus();
+      } else if (document.activeElement && el.contains(document.activeElement)) document.activeElement.blur();
+    }
+    function badge() {
+      const b = $(".chat-badge");
+      b.hidden = !unread;
+      b.textContent = unread > 9 ? "9+" : unread;
+    }
+    function submit(text) {
+      text = cleanText(text);
+      if (!text || !sendFn) return false;
+      const now = Date.now();
+      if (now - lastSent < CHAT_GAP_MS) return false;
+      lastSent = now;
+      sendFn(text);
+      return true;
+    }
+
+    return {
+      open(send) {
+        if (!el) build();
+        sendFn = send;
+        el.hidden = false;
+      },
+      // { name, text, me, sys }
+      add(m) {
+        if (!el) return;
+        const text = cleanText(m.text);
+        if (!text) return;
+        const li = document.createElement("li");
+        if (m.sys) { li.className = "sys"; li.textContent = text; }
+        else {
+          if (m.me) li.className = "me";
+          const who = document.createElement("b");
+          who.textContent = m.me ? "You" : cleanText(m.name).slice(0, 16) || "Player";
+          const body = document.createElement("span");
+          body.textContent = text;
+          li.append(who, body);
+        }
+        const log = $(".chat-log");
+        const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+        log.append(li);
+        while (log.children.length > 150) log.firstChild.remove();
+        if (atBottom || m.me) log.scrollTop = log.scrollHeight;
+        if (!isOpen() && !m.me && !el.hidden) {
+          if (!m.sys) { unread++; badge(); }
+          const peek = $(".chat-peek");
+          peek.textContent = m.sys ? text : `${cleanText(m.name).slice(0, 16)}: ${text}`;
+          peek.hidden = false;
+          clearTimeout(peekTimer);
+          peekTimer = setTimeout(() => { peek.hidden = true; }, 3500);
+        }
+      },
+      reset() {
+        if (!el) return;
+        sendFn = null; unread = 0; badge();
+        el.hidden = true;
+        $(".chat-panel").hidden = true;
+        $(".chat-peek").hidden = true;
+        $(".chat-log").textContent = "";
+      },
+    };
+  })();
+
   // ---------- 1v1 lobby ----------
   function mount({ game, title, subtitle, onStart }) {
     const root = document.createElement("div");
@@ -111,6 +244,7 @@
       if (stopGame) { try { stopGame(); } catch {} stopGame = null; }
       if (sock) { sock.close(); sock = null; }
       opp = null; handlers = []; link = null;
+      chat.reset();
       if (netEl) { netEl.className = "net"; netEl.lastChild.textContent = "offline"; }
     }
     function fail(msg) {
@@ -166,12 +300,14 @@
         const d = m.d;
         if (!d) return;
         if (d.__sys === "accept") return start();
+        if (d.__sys === "chat") return chat.add({ name: "Opponent", text: d.text });
         if (d.__sys === "reject") return fail(d.reason);
         deliver(d);
       }, () => { if (my === gen) fail("Lost connection to the game server."); });
     }
 
     function deliver(d) {
+      if (d.__sys === "chat") return chat.add({ name: "Opponent", text: d.text });
       if (!link) return;
       if (d.__ping !== undefined) return link.send({ __pong: d.__ping });
       if (d.__pong !== undefined) {
@@ -196,6 +332,12 @@
         onData: (fn) => handlers.push(fn),
       };
       pingTimer = setInterval(() => link && link.send({ __ping: performance.now() }), 1000);
+      chat.open((text) => {
+        if (!sock) return;
+        sock.send(isHost ? { to: opp, d: { __sys: "chat", text } } : { d: { __sys: "chat", text } });
+        chat.add({ text, me: true });
+      });
+      chat.add({ sys: true, text: "Opponent connected. Say hi!" });
       stopGame = onStart(link) || null;
     }
 
@@ -301,7 +443,8 @@
       if (stopGame) { try { stopGame(); } catch {} stopGame = null; }
       if (sock) { sock.close(); sock = null; }
       handlers = []; leaveHandlers = [];
-      started = false; players = []; myId = -1;
+      started = false; players = []; myId = -1; chatSeen.clear();
+      chat.reset();
     }
     function backToMenu(msg, cls = "error") {
       root.hidden = false;
@@ -310,6 +453,23 @@
       setStatus(msg, cls);
     }
     const toPlayers = (m) => { for (const p of players) if (p.id !== myId) sock.send({ to: p.id, d: m }); };
+
+    // Chat goes through the host, which stamps the sender's name and relays it to everyone.
+    const chatSeen = new Map(); // id -> last message time, to stop spam
+    function hostChat(id, text, sys = false) {
+      text = cleanText(text);
+      if (!text || !sock) return;
+      const p = players.find((x) => x.id === id);
+      if (!sys) {
+        if (!p) return;
+        const now = Date.now();
+        if (now - (chatSeen.get(id) || 0) < 400) return;
+        chatSeen.set(id, now);
+      }
+      const m = { __sys: "chat", id, name: p ? p.name : "", text, sys };
+      toPlayers(m);
+      chat.add({ ...m, me: !sys && id === myId });
+    }
 
     // --- Host ---
     async function createRoom(attempt = 0) {
@@ -334,6 +494,7 @@
       }, () => { if (my === gen) backToMenu("Lost connection to the game server."); });
       showRoom(code);
       setStatus("Share the code. Start when everyone's in.");
+      chat.open((text) => hostChat(0, text));
     }
     function onGuestData(id, d) {
       if (d.__sys === "hello") {
@@ -343,8 +504,10 @@
         players.push({ id, name: cleanName(d.name) });
         sock.send({ to: id, d: { __sys: "welcome", id } });
         broadcastLobby();
+        hostChat(0, `${cleanName(d.name)} joined`, true);
         return;
       }
+      if (d.__sys === "chat") return hostChat(id, d.text);
       if (!started || !players.some((p) => p.id === id)) return;
       for (const h of handlers) h(id, d);
     }
@@ -356,6 +519,7 @@
       const p = players.find((x) => x.id === id);
       if (!p) return;
       players = players.filter((x) => x.id !== id);
+      hostChat(0, `${p.name} left`, true);
       if (!started) broadcastLobby();
       else { for (const h of leaveHandlers) h(id); toast(p.name + " left the game"); }
     }
@@ -379,7 +543,11 @@
         const d = m.d;
         if (!d) return;
         if (d.__sys) {
-          if (d.__sys === "welcome") { myId = d.id; showRoom(code); setStatus(""); }
+          if (d.__sys === "welcome") {
+            myId = d.id; showRoom(code); setStatus("");
+            chat.open((text) => sock && sock.send({ d: { __sys: "chat", text } }));
+          }
+          else if (d.__sys === "chat") chat.add({ name: d.name, text: d.text, sys: d.sys, me: !d.sys && d.id === myId });
           else if (d.__sys === "lobby") { players = d.players; renderPlayers(); }
           else if (d.__sys === "reject") backToMenu(d.reason);
           else if (d.__sys === "start" && myId >= 0) { players = d.players; begin(); }

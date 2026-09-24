@@ -5,8 +5,8 @@
   const GW = 64, GH = 40, CELL = 20, W = GW * CELL, H = GH * CELL;
   const WIN = 5, COUNTDOWN = 3, ROUND_PAUSE = 2.2;
   const TICK_START = 82, TICK_MIN = 48, TICK_ACCEL_EVERY = 22; // ms, speeds up over a round
-  const COLORS = ["#ff4f1f", "#2f5cff"];
-  const INK = "#151515", PAPER = "#fffaf0";
+  const COLORS = ["#ff4f1f", "#4d74ff"];
+  const INK = "#0a0a09", LINE = "#efe7d6", FLOOR = "#141311";
   const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
   const SPAWN = [[8, GH / 2, 1], [GW - 9, GH / 2 - 1, 3]];
 
@@ -78,7 +78,7 @@
   function burst(x, y, color, n) {
     for (let k = 0; k < n; k++) {
       const a = Math.random() * Math.PI * 2, s = 120 + Math.random() * 360;
-      particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.5 + Math.random() * 0.4, color: k % 3 ? color : INK, sz: 4 + Math.random() * 6 });
+      particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.5 + Math.random() * 0.4, color: k % 3 ? color : LINE, sz: 4 + Math.random() * 6 });
     }
   }
 
@@ -168,17 +168,17 @@
       ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
       shake = Math.max(0, shake - dt * 40);
     }
-    ctx.fillStyle = PAPER;
+    ctx.fillStyle = FLOOR;
     ctx.fillRect(-20, -20, W + 40, H + 40);
 
     // graph-paper grid
     ctx.lineWidth = 1;
-    ctx.strokeStyle = "#e6dfcf";
+    ctx.strokeStyle = "#1f1d1a";
     ctx.beginPath();
     for (let x = 1; x < GW; x++) { ctx.moveTo(x * CELL + 0.5, 0); ctx.lineTo(x * CELL + 0.5, H); }
     for (let y = 1; y < GH; y++) { ctx.moveTo(0, y * CELL + 0.5); ctx.lineTo(W, y * CELL + 0.5); }
     ctx.stroke();
-    ctx.strokeStyle = "#d3cab5";
+    ctx.strokeStyle = "#2c2924";
     ctx.beginPath();
     for (let x = 8; x < GW; x += 8) { ctx.moveTo(x * CELL, 0); ctx.lineTo(x * CELL, H); }
     for (let y = 8; y < GH; y += 8) { ctx.moveTo(0, y * CELL); ctx.lineTo(W, y * CELL); }
@@ -214,7 +214,7 @@
         }
       }
       for (const c of crashes) {
-        ctx.strokeStyle = INK; ctx.lineWidth = 5; ctx.lineCap = "round";
+        ctx.strokeStyle = LINE; ctx.lineWidth = 5; ctx.lineCap = "round";
         ctx.beginPath();
         ctx.moveTo(c.x - 14, c.y - 14); ctx.lineTo(c.x + 14, c.y + 14);
         ctx.moveTo(c.x + 14, c.y - 14); ctx.lineTo(c.x - 14, c.y + 14);
@@ -238,7 +238,7 @@
       ctx.fillRect(p.x - p.sz / 2, p.y - p.sz / 2, p.sz, p.sz);
     }
     ctx.globalAlpha = 1;
-    ctx.strokeStyle = INK; ctx.lineWidth = 6;
+    ctx.strokeStyle = LINE; ctx.lineWidth = 6;
     ctx.strokeRect(0, 0, W, H);
   }
   function label(t, x, y, color) {
