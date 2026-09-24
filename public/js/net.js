@@ -2,87 +2,121 @@
 // (worker.js, one Durable Object per room code). The room relays messages between the host
 // and the guests; the host's browser runs the game.
 //
-// Lobby.mount({ game, title, subtitle, onStart(link) -> stopFn })          1v1 games
-//   link = { isHost, send(obj), onData(fn), rtt }
-// Room.mount({ game, title, subtitle, min, max, onStart(room) -> stopFn }) 2–N player games
-//   room = { isHost, myId, players:[{id,name}], send(msg) (guest→host),
-//            sendTo(id,msg), broadcast(msg) (host→guests), onData(fn(fromId,msg)), onLeave(fn(id)) }
+// Lobby.mount({ game, title, subtitle, spectate = true, onStart(link) -> stopFn })   1v1 games
+//   link = { isHost, spectator, myName, oppName, names: [hostName, guestName], rtt,
+//            send(obj), onData(fn), onRejoin(fn) }
+//   Extra people who join a 1v1 room watch as spectators: they see the guest's view and their
+//   link.send does nothing.
+// Room.mount({ game, title, subtitle, min, max, lobbyExtra(el), onStart(room) -> stopFn })   2–N
+//   room = { isHost, myId, players:[{id,name,av}], send(msg) (guest→host),
+//            sendTo(id,msg), broadcast(msg) (host→guests), onData(fn(fromId,msg)),
+//            onLeave(fn(id)), onRejoin(fn(id)) }
 //   Guests always see messages as coming from id 0 (the host).
+// onRejoin fires on the host when a player reconnects (or reloads the page); games should
+// resend whatever that player needs to redraw the current state.
 (() => {
   const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I
   const CODE_LEN = 5;
   const KEEPALIVE_MS = 25000;
+  const RECONNECT_MS = 25000;  // how long a dropped client keeps trying to get back in
+  const GRACE_MS = 20000;      // how long the host holds a dropped player's seat
+  const HELLO_MS = 8000;
 
-  const makeCode = () =>
-    Array.from({ length: CODE_LEN }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join("");
+  // Every game on the site. min/max = players; duel games seat two and let the rest watch.
+  const GAMES = [
+    { id: "lastcard", page: "lastcard", title: "Last Card", min: 2, max: 6 },
+    { id: "trivia", page: "trivia", title: "Quiz Battle", min: 2, max: 8 },
+    { id: "draw", page: "draw", title: "Draw & Guess", min: 2, max: 8 },
+    { id: "dice", page: "dice", title: "Liar's Dice", min: 2, max: 6 },
+    { id: "bomb", page: "wordbomb", title: "Word Bomb", min: 2, max: 8 },
+    { id: "spy", page: "spyfall", title: "Spyfall", min: 3, max: 8 },
+    { id: "codewords", page: "codewords", title: "Codewords", min: 4, max: 10 },
+    { id: "typing", page: "typing", title: "Type Race", min: 2, max: 8 },
+    { id: "rps", page: "rps", title: "RPS Tournament", min: 2, max: 8 },
+    { id: "snake", page: "snake", title: "Snake Battle", min: 2, max: 4 },
+    { id: "chess", page: "chess", title: "Chess", duel: true },
+    { id: "connect", page: "connect4", title: "Connect 4", duel: true },
+    { id: "battleship", page: "battleship", title: "Battleship", duel: true, noSpectate: true },
+    { id: "tron", page: "tron", title: "Light Cycles", duel: true },
+    { id: "arena", page: "arena", title: "Arena", duel: true },
+    { id: "pong", page: "pong", title: "Pong", duel: true },
+  ];
+  const gameById = (id) => GAMES.find((g) => g.id === id);
+  const pageFor = (id, hash) => { const g = gameById(id); return g ? `${g.page}.html${hash ? "#" + hash : ""}` : "index.html"; };
+  const fits = (g, n) => (g.duel ? n >= 2 && (n === 2 || !g.noSpectate) : n >= g.min && n <= g.max);
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const makeCode = () => Array.from({ length: CODE_LEN }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join("");
+  const randomId = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("");
 
   const REASONS = {
     "not-found": "No room with that code. Double-check it.",
     "full": "That room is full.",
     "exists": "Room code collision, try again.",
+    "gone": "The room closed.",
     "network": "Couldn't reach the game server. Check your connection.",
   };
   const reasonText = (r) => REASONS[r] || REASONS.network;
 
-  // Connects to a room. Resolves with { ws, id } once the server welcomes us,
-  // rejects with a reason ("not-found", "full", "exists", "network").
-  function openSocket(game, code, role) {
-    return new Promise((resolve, reject) => {
-      const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      let ws, settled = false;
-      const finish = (fn, v) => { if (!settled) { settled = true; clearTimeout(timer); fn(v); } };
-      try { ws = new WebSocket(`${proto}//${location.host}/api/room/${game}/${code}?role=${role}`); }
-      catch { return reject("network"); }
-      const timer = setTimeout(() => { try { ws.close(); } catch {} finish(reject, "network"); }, 10000);
-      ws.onmessage = (e) => {
-        let m;
-        try { m = JSON.parse(e.data); } catch { return; }
-        if (m.sys === "welcome") finish(resolve, { ws, id: m.id });
-        else { finish(reject, m.reason); try { ws.close(); } catch {} }
-      };
-      ws.onerror = ws.onclose = () => finish(reject, "network");
-    });
-  }
-
-  // Takes over a welcomed socket: JSON in/out, keepalive, and a close callback.
-  function wrap(ws, onMsg, onClose) {
-    const keep = setInterval(() => { if (ws.readyState === 1) ws.send("ping"); }, KEEPALIVE_MS);
-    ws.onmessage = (e) => {
-      if (e.data === "pong") return;
-      let m;
-      try { m = JSON.parse(e.data); } catch { return; }
-      onMsg(m);
-    };
-    ws.onerror = null;
-    ws.onclose = () => { clearInterval(keep); onClose(); };
-    return {
-      send: (o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); },
-      close: () => { clearInterval(keep); ws.onclose = null; try { ws.close(); } catch {} },
-    };
-  }
-
-  // ---------- Names + invite links (shared by both lobbies) ----------
-  const NAME_KEY = "oxidpvp-name";
-  const cleanName = (n) => String(n || "").replace(/\s+/g, " ").trim().slice(0, 16) || "Player";
-  const savedName = () => { try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; } };
-  // Fills a name input and returns a getter that also remembers the name for next time.
-  function nameField(input) {
-    input.value = savedName() || "Player" + Math.floor(100 + Math.random() * 900);
-    return () => {
-      const n = cleanName(input.value);
-      try { localStorage.setItem(NAME_KEY, n); } catch {}
-      return n;
-    };
-  }
-
-  // Invite links are just the game page with the room code in the hash: pong.html#AB3CD.
-  // The hash never reaches the server, so this works with plain static hosting.
-  const inviteUrl = (code) => location.origin + location.pathname + "#" + code;
-  const invitedCode = () => {
-    const m = location.hash.match(/^#([A-Za-z0-9]{5})$/);
-    return m ? m[1].toUpperCase() : null;
+  // ---------- Storage ----------
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} },
   };
-  const clearInvite = () => { if (location.hash) history.replaceState(null, "", location.pathname + location.search); };
+  const sess = {
+    get(k) { try { return JSON.parse(sessionStorage.getItem(k)); } catch { return null; } },
+    set(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch {} },
+    del(k) { try { sessionStorage.removeItem(k); } catch {} },
+  };
+  const tokenFor = (code) => {
+    let t = sess.get("oxid-tok-" + code);
+    if (!t) { t = randomId(); sess.set("oxid-tok-" + code, t); }
+    return t;
+  };
+
+  // ---------- Identity: name + avatar ----------
+  const NAME_KEY = "oxidpvp-name", AV_KEY = "oxidpvp-avatar";
+  const AVATARS = ["😎", "🤖", "👻", "🐸", "🦊", "🐱", "🐼", "🦄", "🐙", "👽", "🔥", "⚡", "🍕", "🎮", "💀", "🌵", "🐧", "🦈", "🍩", "👑"];
+  const AV_COLORS = ["#8b5cf6", "#ec4899", "#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#14b8a6", "#64748b"];
+  const cleanName = (n) => String(n || "").replace(/\s+/g, " ").trim().slice(0, 16) || "Player";
+  const savedName = () => store.get(NAME_KEY) || "";
+  const cleanAv = (a) => ({
+    e: a && AVATARS.includes(a.e) ? a.e : AVATARS[0],
+    c: a && a.c >= 0 && a.c < AV_COLORS.length ? a.c | 0 : 0,
+  });
+  function myAvatar() {
+    try { const a = JSON.parse(store.get(AV_KEY)); if (a) return cleanAv(a); } catch {}
+    const a = { e: AVATARS[Math.floor(Math.random() * AVATARS.length)], c: Math.floor(Math.random() * AV_COLORS.length) };
+    store.set(AV_KEY, JSON.stringify(a));
+    return a;
+  }
+  // <span class="avatar"> for a player; falls back to their initial if they have no avatar.
+  function avatarEl(p, cls = "") {
+    const el = document.createElement("span");
+    el.className = "avatar " + cls;
+    if (p && p.av) {
+      const a = cleanAv(p.av);
+      el.textContent = a.e;
+      el.style.background = AV_COLORS[a.c];
+      el.classList.add("emoji");
+    } else el.textContent = ((p && p.name) || "?")[0].toUpperCase();
+    return el;
+  }
+
+  // ---------- Invite links + arrival ----------
+  // Links carry the room in the hash: game.html#CODE (invite), #join=CODE / #host=CODE (switch game).
+  const inviteUrl = (code) => location.origin + location.pathname.replace(/\.html$/, "") + "#" + code;
+  function arrival(game) {
+    const h = location.hash.slice(1);
+    let m;
+    if ((m = h.match(/^([A-Za-z0-9]{5})$/))) return { kind: "invite", code: m[1].toUpperCase() };
+    if ((m = h.match(/^join=([A-Z0-9]{5})$/))) return { kind: "join", code: m[1] };
+    if ((m = h.match(/^host=([A-Z0-9]{5})$/))) return { kind: "host", code: m[1] };
+    const s = sess.get("oxid-session");
+    if (s && s.game === game && s.code) return { kind: "resume", code: s.code };
+    return null;
+  }
+  const clearHash = () => { if (location.hash) history.replaceState(null, "", location.pathname + location.search); };
   async function shareInvite(code, title) {
     const url = inviteUrl(code);
     // Phones get the native share sheet (Messages, Discord, …); desktops get the clipboard.
@@ -92,30 +126,216 @@
     }
     try { await navigator.clipboard.writeText(url); return "copied"; } catch { return false; }
   }
-  const INVITE_HTML = `
-    <button class="btn primary full" data-act="invite" type="button">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-      Copy invite link
-    </button>`;
-  const INVITED_HTML = `<div class="invited" hidden><span class="invited-dot"></span><span>You're invited to room <b></b></span></div>`;
+  // Home page: find which game a code belongs to and go there.
+  async function joinByCode(code) {
+    code = String(code || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (code.length !== CODE_LEN) return { error: `Codes are ${CODE_LEN} characters.` };
+    try {
+      const r = await fetch(`/api/lookup/${code}`, { cache: "no-store" });
+      if (r.status === 404) return { error: REASONS["not-found"] };
+      const { game } = await r.json();
+      if (!gameById(game)) return { error: REASONS["not-found"] };
+      location.href = pageFor(game, code);
+      return { ok: true };
+    } catch { return { error: REASONS.network }; }
+  }
 
-  // ---------- Chat ----------
-  // One floating chat per page. The lobbies call chat.open(sendFn) once there's someone to talk
-  // to, chat.add(...) for each message, and chat.reset() when leaving the room.
+  // ---------- Sockets ----------
+  // Opens a socket and waits for the server's welcome. Rejects with a reason string.
+  function openSocket(game, code, role, token, resume) {
+    return new Promise((resolve, reject) => {
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      let ws, settled = false;
+      const finish = (fn, v) => { if (!settled) { settled = true; clearTimeout(timer); fn(v); } };
+      const q = `role=${role}&token=${encodeURIComponent(token)}${resume ? "&resume=1" : ""}`;
+      try { ws = new WebSocket(`${proto}//${location.host}/api/room/${game}/${code}?${q}`); }
+      catch { return reject("network"); }
+      const timer = setTimeout(() => { try { ws.close(); } catch {} finish(reject, "network"); }, 10000);
+      ws.onmessage = (e) => {
+        let m;
+        try { m = JSON.parse(e.data); } catch { return; }
+        if (m.sys === "welcome") finish(resolve, { ws, welcome: m });
+        else {
+          if (m.reason === "wrong-game" && m.game && gameById(m.game)) { location.href = pageFor(m.game, code); return; }
+          finish(reject, m.reason);
+          try { ws.close(); } catch {}
+        }
+      };
+      ws.onerror = ws.onclose = () => finish(reject, "network");
+    });
+  }
+
+  // A room connection that quietly reconnects when the network blips.
+  // h = { msg(m), drop(), back(welcome), dead(reason) }
+  async function connect(game, code, role, h) {
+    const token = tokenFor(code);
+    const first = await openSocket(game, code, role, token, false);
+    const conn = { id: first.welcome.id, welcome: first.welcome, closed: false };
+    let ws = null, keep = 0;
+
+    function attach(sock) {
+      ws = sock;
+      clearInterval(keep);
+      keep = setInterval(() => { if (ws.readyState === 1) ws.send("ping"); }, KEEPALIVE_MS);
+      ws.onmessage = (e) => {
+        if (e.data === "pong") return;
+        let m;
+        try { m = JSON.parse(e.data); } catch { return; }
+        h.msg(m);
+      };
+      ws.onerror = null;
+      ws.onclose = () => { clearInterval(keep); if (!conn.closed) reconnect(); };
+    }
+    async function reconnect() {
+      h.drop && h.drop();
+      const until = Date.now() + RECONNECT_MS;
+      while (!conn.closed && Date.now() < until) {
+        await sleep(1200);
+        if (conn.closed) return;
+        try {
+          const r = await openSocket(game, code, role, token, role === "host");
+          if (conn.closed) { r.ws.close(); return; }
+          attach(r.ws);
+          conn.id = r.welcome.id;
+          h.back && h.back(r.welcome);
+          return;
+        } catch (reason) {
+          if (reason === "not-found" || reason === "gone" || reason === "exists") break;
+        }
+      }
+      if (!conn.closed) { conn.closed = true; h.dead && h.dead(); }
+    }
+    conn.send = (o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
+    // bye = tell the room we left on purpose (vs. a dropped connection that may come back)
+    conn.close = (bye = true) => {
+      if (conn.closed) return;
+      conn.closed = true;
+      clearInterval(keep);
+      if (ws) {
+        if (bye && ws.readyState === 1) { try { ws.send(JSON.stringify({ bye: true })); } catch {} }
+        ws.onclose = null;
+        try { ws.close(); } catch {}
+      }
+    };
+    attach(first.ws);
+    return conn;
+  }
+
+  // ---------- Sounds ----------
+  const MUTE_KEY = "oxidpvp-muted";
+  const TONES = {
+    click: [[700, 0.04, "square", 0.03]],
+    pop: [[420, 0.07, "sine", 0.12]],
+    turn: [[523, 0.09, "sine", 0.12], [784, 0.14, "sine", 0.12, 0.08]],
+    good: [[660, 0.08, "triangle", 0.14], [990, 0.14, "triangle", 0.14, 0.07]],
+    bad: [[220, 0.14, "sawtooth", 0.06], [160, 0.22, "sawtooth", 0.06, 0.1]],
+    win: [[523, 0.1, "triangle", 0.14], [659, 0.1, "triangle", 0.14, 0.1], [784, 0.1, "triangle", 0.14, 0.2], [1047, 0.3, "triangle", 0.14, 0.3]],
+    lose: [[392, 0.16, "triangle", 0.12], [330, 0.16, "triangle", 0.12, 0.16], [262, 0.34, "triangle", 0.12, 0.32]],
+    tick: [[1200, 0.03, "square", 0.025]],
+    msg: [[880, 0.05, "sine", 0.06], [1320, 0.07, "sine", 0.05, 0.05]],
+    start: [[392, 0.08, "square", 0.05], [523, 0.08, "square", 0.05, 0.1], [784, 0.16, "square", 0.05, 0.2]],
+    boom: "noise",
+  };
+  const sfx = (() => {
+    let ac = null, muted = store.get(MUTE_KEY) === "1";
+    const ctx = () => {
+      if (!ac) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; ac = new C(); }
+      if (ac.state === "suspended") ac.resume();
+      return ac;
+    };
+    addEventListener("pointerdown", () => { try { ctx(); } catch {} }, { once: true });
+    function play(name) {
+      if (muted || !TONES[name]) return;
+      try {
+        const a = ctx();
+        if (!a) return;
+        const now = a.currentTime;
+        if (TONES[name] === "noise") {
+          const buf = a.createBuffer(1, a.sampleRate * 0.5, a.sampleRate), d = buf.getChannelData(0);
+          for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2.5);
+          const src = a.createBufferSource(), g = a.createGain(), f = a.createBiquadFilter();
+          f.type = "lowpass"; f.frequency.value = 900;
+          src.buffer = buf; g.gain.value = 0.35;
+          src.connect(f).connect(g).connect(a.destination);
+          src.start(now);
+          return;
+        }
+        for (const [freq, dur, type, vol, delay = 0] of TONES[name]) {
+          const o = a.createOscillator(), g = a.createGain(), t = now + delay;
+          o.type = type; o.frequency.value = freq;
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(vol, t + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+          o.connect(g).connect(a.destination);
+          o.start(t); o.stop(t + dur + 0.03);
+        }
+      } catch {}
+    }
+    return {
+      play,
+      get muted() { return muted; },
+      toggle() { muted = !muted; store.set(MUTE_KEY, muted ? "1" : "0"); if (!muted) play("pop"); return muted; },
+    };
+  })();
+
+  // ---------- Local win stats ----------
+  const STATS_KEY = "oxidpvp-stats";
+  const readStats = () => { try { return JSON.parse(store.get(STATS_KEY)) || {}; } catch { return {}; } };
+  function record(game, result) {
+    const s = readStats();
+    const g = s[game] || (s[game] = { w: 0, l: 0, d: 0 });
+    if (result === "win") g.w++; else if (result === "loss") g.l++; else g.d++;
+    store.set(STATS_KEY, JSON.stringify(s));
+  }
+
+  // ---------- Toasts + connection banner ----------
+  function toast(msg, ms = 2200) {
+    for (const old of document.querySelectorAll(".toast")) old.remove();
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), ms);
+  }
+  let bannerEl = null;
+  function banner(text) {
+    if (!text) { if (bannerEl) bannerEl.hidden = true; return; }
+    if (!bannerEl) {
+      bannerEl = document.createElement("div");
+      bannerEl.className = "conn-banner";
+      bannerEl.setAttribute("role", "status");
+      document.body.appendChild(bannerEl);
+    }
+    bannerEl.textContent = text;
+    bannerEl.hidden = false;
+  }
+
+  // ---------- Dock: mute, reactions, switch game, chat ----------
   const CHAT_MAX = 200, CHAT_GAP_MS = 600;
   const QUICK = ["gg", "nice!", "lol", "one more?", "brb"];
+  const REACTIONS = ["😂", "🔥", "💀", "👏", "😭", "😡", "🤯", "👀"];
   const cleanText = (t) => String(t || "").replace(/\s+/g, " ").trim().slice(0, CHAT_MAX);
+  const ICON = {
+    chat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>',
+    on: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    off: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zM17 9l5 6M22 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    swap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h13l-3-3M20 16H7l3 3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  };
 
-  const chat = (() => {
-    let el = null, sendFn = null, unread = 0, lastSent = 0, peekTimer = 0;
+  const dock = (() => {
+    let el = null, sendFn = null, reactFn = null, switchCtx = null, unread = 0, lastSent = 0, peekTimer = 0;
     const $ = (s) => el.querySelector(s);
 
     function build() {
       el = document.createElement("div");
-      el.className = "chat";
-      el.hidden = true;
+      el.className = "dock";
       el.innerHTML = `
         <div class="chat-peek" hidden></div>
+        <div class="dock-pop react-pop" hidden></div>
+        <div class="dock-pop switch-pop" role="dialog" aria-label="Switch game" hidden>
+          <div class="chat-head"><span>Switch everyone to…</span><button class="chat-close" type="button" aria-label="Close">&times;</button></div>
+          <div class="switch-list"></div>
+        </div>
         <div class="chat-panel" role="dialog" aria-label="Chat" hidden>
           <div class="chat-head"><span>Chat</span><button class="chat-close" type="button" aria-label="Close chat">&times;</button></div>
           <ol class="chat-log" aria-live="polite"></ol>
@@ -125,18 +345,33 @@
             <button class="btn" type="submit">Send</button>
           </form>
         </div>
-        <button class="chat-toggle" type="button" aria-expanded="false" title="Chat (Enter)">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/></svg>
-          <span>Chat</span><b class="chat-badge" hidden></b>
-        </button>`;
+        <div class="dock-row">
+          <button class="dock-btn mute" type="button"></button>
+          <button class="dock-btn react-btn" type="button" title="React" aria-label="React" hidden>😀</button>
+          <button class="dock-btn switch-btn" type="button" title="Switch game" hidden>${ICON.swap}<span>Switch game</span></button>
+          <button class="chat-toggle" type="button" aria-expanded="false" title="Chat (Enter)" hidden>${ICON.chat}<span>Chat</span><b class="chat-badge" hidden></b></button>
+        </div>`;
       for (const q of QUICK) {
         const b = document.createElement("button");
         b.type = "button"; b.textContent = q;
         b.addEventListener("click", () => submit(q));
         $(".chat-quick").append(b);
       }
+      for (const e of REACTIONS) {
+        const b = document.createElement("button");
+        b.type = "button"; b.textContent = e; b.setAttribute("aria-label", "React " + e);
+        b.addEventListener("click", () => { if (reactFn) reactFn(e); pop(null); });
+        $(".react-pop").append(b);
+      }
+      const muteBtn = $(".mute");
+      const paintMute = () => { muteBtn.innerHTML = sfx.muted ? ICON.off : ICON.on; muteBtn.title = sfx.muted ? "Sound off" : "Sound on"; muteBtn.setAttribute("aria-label", muteBtn.title); };
+      paintMute();
+      muteBtn.addEventListener("click", () => { sfx.toggle(); paintMute(); });
       $(".chat-toggle").addEventListener("click", () => toggle());
-      $(".chat-close").addEventListener("click", () => toggle(false));
+      $(".chat-panel .chat-close").addEventListener("click", () => toggle(false));
+      $(".switch-pop .chat-close").addEventListener("click", () => pop(null));
+      $(".react-btn").addEventListener("click", () => pop($(".react-pop").hidden ? "react" : null));
+      $(".switch-btn").addEventListener("click", () => { if ($(".switch-pop").hidden) { renderSwitch(); pop("switch"); } else pop(null); });
       $(".chat-peek").addEventListener("click", () => toggle(true));
       $(".chat-form").addEventListener("submit", (e) => {
         e.preventDefault();
@@ -149,21 +384,28 @@
       });
       // Enter opens chat from anywhere that isn't already a text field or button.
       addEventListener("keydown", (e) => {
-        if (el.hidden || e.key !== "Enter" || e.repeat) return;
+        if (!sendFn || e.key !== "Enter" || e.repeat) return;
         const t = e.target;
-        if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "BUTTON" || t.tagName === "A")) return;
+        if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "BUTTON" || t.tagName === "A" || t.isContentEditable)) return;
         e.preventDefault();
         toggle(true);
       });
       document.body.appendChild(el);
     }
+    const ensure = () => { if (!el) build(); };
 
+    function pop(which) {
+      $(".react-pop").hidden = which !== "react";
+      $(".switch-pop").hidden = which !== "switch";
+      if (which) toggle(false);
+    }
     function isOpen() { return el && !$(".chat-panel").hidden; }
     function toggle(force) {
       const open = force ?? !isOpen();
       $(".chat-panel").hidden = !open;
       $(".chat-toggle").setAttribute("aria-expanded", open);
       if (open) {
+        $(".react-pop").hidden = $(".switch-pop").hidden = true;
         unread = 0; badge();
         $(".chat-peek").hidden = true;
         const log = $(".chat-log");
@@ -185,24 +427,48 @@
       sendFn(text);
       return true;
     }
+    function renderSwitch() {
+      const list = $(".switch-list");
+      list.textContent = "";
+      if (!switchCtx) return;
+      const n = switchCtx.count();
+      for (const g of GAMES) {
+        if (g.id === switchCtx.game) continue;
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "switch-item";
+        const ok = fits(g, n);
+        b.disabled = !ok;
+        const t = document.createElement("b"); t.textContent = g.title;
+        const s = document.createElement("span");
+        s.textContent = g.duel ? (n > 2 ? (g.noSpectate ? "2 players only" : `1v1 + ${n - 2} watching`) : "1v1") : `${g.min}–${g.max} players`;
+        b.append(t, s);
+        b.addEventListener("click", () => { pop(null); switchCtx.go(g); });
+        list.append(b);
+      }
+    }
 
     return {
-      open(send) {
-        if (!el) build();
-        sendFn = send;
-        el.hidden = false;
+      // Always-available bits (mute) show as soon as a game page mounts a lobby.
+      init() { ensure(); },
+      enter({ send, react }) {
+        ensure();
+        sendFn = send; reactFn = react;
+        $(".chat-toggle").hidden = false;
+        $(".react-btn").hidden = false;
       },
-      // { name, text, me, sys }
+      setSwitch(ctx) { ensure(); switchCtx = ctx; $(".switch-btn").hidden = !ctx; if (!ctx) $(".switch-pop").hidden = true; },
       add(m) {
-        if (!el) return;
+        if (!el || !sendFn) return;
         const text = cleanText(m.text);
         if (!text) return;
         const li = document.createElement("li");
         if (m.sys) { li.className = "sys"; li.textContent = text; }
         else {
           if (m.me) li.className = "me";
+          if (m.av) li.append(avatarEl(m, "xs"));
           const who = document.createElement("b");
-          who.textContent = m.me ? "You" : cleanText(m.name).slice(0, 16) || "Player";
+          who.textContent = m.me ? "You" : cleanName(m.name);
           const body = document.createElement("span");
           body.textContent = text;
           li.append(who, body);
@@ -212,38 +478,95 @@
         log.append(li);
         while (log.children.length > 150) log.firstChild.remove();
         if (atBottom || m.me) log.scrollTop = log.scrollHeight;
-        if (!isOpen() && !m.me && !el.hidden) {
-          if (!m.sys) { unread++; badge(); }
+        if (!isOpen() && !m.me) {
+          if (!m.sys) { unread++; badge(); sfx.play("msg"); }
           const peek = $(".chat-peek");
-          peek.textContent = m.sys ? text : `${cleanText(m.name).slice(0, 16)}: ${text}`;
+          peek.textContent = m.sys ? text : `${cleanName(m.name)}: ${text}`;
           peek.hidden = false;
           clearTimeout(peekTimer);
           peekTimer = setTimeout(() => { peek.hidden = true; }, 3500);
         }
       },
-      reset() {
+      leave() {
         if (!el) return;
-        sendFn = null; unread = 0; badge();
-        el.hidden = true;
-        $(".chat-panel").hidden = true;
-        $(".chat-peek").hidden = true;
+        sendFn = reactFn = switchCtx = null; unread = 0; badge();
+        for (const s of [".chat-toggle", ".react-btn", ".switch-btn", ".chat-panel", ".chat-peek", ".react-pop", ".switch-pop"]) $(s).hidden = true;
         $(".chat-log").textContent = "";
       },
     };
   })();
 
-  // ---------- 1v1 lobby ----------
-  function mount({ game, title, subtitle, onStart }) {
+  function floatReaction(m) {
+    const el = document.createElement("div");
+    el.className = "react-float";
+    el.style.left = 20 + Math.random() * 60 + "%";
+    const e = document.createElement("span"); e.textContent = m.e;
+    const n = document.createElement("small"); n.textContent = m.me ? "You" : cleanName(m.name);
+    el.append(e, n);
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2600);
+  }
+
+  // Chat + reactions for a room. Guests send to the host; the host stamps names and relays.
+  function social({ isHost, myId, people, toGuests, toHost }) {
+    const seen = new Map();
+    function show(m) {
+      if (m.__sys === "chat") dock.add({ ...m, me: !m.sys && m.id === myId() });
+      else if (m.__sys === "react") { floatReaction({ ...m, me: m.id === myId() }); if (m.id !== myId()) sfx.play("pop"); }
+    }
+    function relay(m) {
+      if (m.__sys === "chat" && !m.text) return;
+      if (!m.sys) {
+        const now = Date.now();
+        if (now - (seen.get(m.id) || 0) < 350) return;
+        seen.set(m.id, now);
+      }
+      toGuests(m);
+      show(m);
+    }
+    const person = (id) => people().find((p) => p.id === id);
+    return {
+      show,
+      fromGuest(id, d) {
+        const p = person(id);
+        if (!p) return false;
+        if (d.__sys === "chat") { relay({ __sys: "chat", id, name: p.name, av: p.av, text: cleanText(d.text) }); return true; }
+        if (d.__sys === "react" && REACTIONS.includes(d.e)) { relay({ __sys: "react", id, name: p.name, e: d.e }); return true; }
+        return false;
+      },
+      say(text) {
+        if (isHost()) { const p = person(myId()); relay({ __sys: "chat", id: myId(), name: p ? p.name : "", av: p && p.av, text: cleanText(text) }); }
+        else toHost({ __sys: "chat", text });
+      },
+      react(e) {
+        if (isHost()) { const p = person(myId()); relay({ __sys: "react", id: myId(), name: p ? p.name : "", e }); }
+        else toHost({ __sys: "react", e });
+      },
+      system(text) { if (isHost()) relay({ __sys: "chat", sys: true, text }); },
+    };
+  }
+
+  // ---------- Lobby panel (shared markup for both kinds of room) ----------
+  function shell({ game, title, subtitle, onHost, onJoin, onStart, onLeave }) {
     const root = document.createElement("div");
-    root.className = "overlay";
+    root.className = "overlay lobby";
     root.innerHTML = `
       <div class="panel">
         <a class="back" href="index.html">&larr; All games</a>
         <h1></h1>
         <p class="sub"></p>
         <div data-view="menu">
-          ${INVITED_HTML}
-          <label class="field"><span>Your name</span><input class="name" maxlength="16" autocomplete="nickname" spellcheck="false"></label>
+          <div class="invited" hidden><span class="invited-dot"></span><span>You're invited to room <b></b></span></div>
+          <div class="field"><span>You</span>
+            <div class="profile">
+              <button class="av-btn" type="button" title="Change avatar" aria-label="Change avatar"></button>
+              <input class="name" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Your name">
+            </div>
+          </div>
+          <div class="av-picker" hidden>
+            <div class="av-grid"></div>
+            <div class="av-colors"></div>
+          </div>
           <button class="btn primary full" data-act="host">Create room</button>
           <div class="or">or join</div>
           <form class="join">
@@ -251,123 +574,405 @@
             <button class="btn" type="submit">Join</button>
           </form>
         </div>
-        <div class="wait" data-view="wait" hidden>
+        <div class="wait" data-view="room" hidden>
           <div class="label">Room code</div>
           <button class="code" title="Click to copy the code"></button>
-          ${INVITE_HTML}
-          <p class="muted hint-sm">Send the link to your opponent, or have them type the code.</p>
-          <button class="btn ghost full" data-act="cancel">Cancel</button>
+          <button class="btn primary full" data-act="invite" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+            Copy invite link
+          </button>
+          <div class="plist-head"><span>Players</span><span class="pcount"></span></div>
+          <ul class="plist"></ul>
+          <div class="lobby-extra"></div>
+          <button class="btn primary full" data-act="start" hidden>Start game</button>
+          <p class="muted wait-msg" hidden></p>
+          <button class="btn ghost full" data-act="leave">Leave room</button>
         </div>
         <p class="status" aria-live="polite"></p>
       </div>`;
     root.querySelector("h1").textContent = title;
     root.querySelector(".sub").textContent = subtitle;
     document.body.appendChild(root);
-
     const $ = (s) => root.querySelector(s);
-    const menuView = $('[data-view="menu"]');
-    const waitView = $('[data-view="wait"]');
+
+    // profile
+    const nameIn = $(".name"), avBtn = $(".av-btn");
+    nameIn.value = savedName() || "Player" + Math.floor(100 + Math.random() * 900);
+    let av = myAvatar();
+    const paintAv = () => { avBtn.textContent = av.e; avBtn.style.background = AV_COLORS[av.c]; };
+    paintAv();
+    for (const e of AVATARS) {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = e;
+      b.addEventListener("click", () => { av = { ...av, e }; store.set(AV_KEY, JSON.stringify(av)); paintAv(); paintPicker(); });
+      $(".av-grid").append(b);
+    }
+    AV_COLORS.forEach((c, i) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.style.background = c; b.setAttribute("aria-label", "Color " + (i + 1));
+      b.addEventListener("click", () => { av = { ...av, c: i }; store.set(AV_KEY, JSON.stringify(av)); paintAv(); paintPicker(); });
+      $(".av-colors").append(b);
+    });
+    const paintPicker = () => {
+      [...$(".av-grid").children].forEach((b) => b.classList.toggle("on", b.textContent === av.e));
+      [...$(".av-colors").children].forEach((b, i) => b.classList.toggle("on", i === av.c));
+    };
+    paintPicker();
+    avBtn.addEventListener("click", () => { $(".av-picker").hidden = !$(".av-picker").hidden; });
+    const profile = () => {
+      const n = cleanName(nameIn.value);
+      store.set(NAME_KEY, n);
+      return { name: n, av };
+    };
+
     const status = $(".status");
-    const input = $(".code-in");
-    const codeBtn = $(".code");
-    const netEl = document.getElementById("net");
-    const myName = nameField($(".name"));
-
-    let sock = null, opp = null, oppName = "Opponent", isHost = false, stopGame = null, pingTimer = null, gen = 0;
-    let handlers = [], link = null, helloTimer = 0;
-
     const setStatus = (msg, cls = "") => { status.textContent = msg; status.className = "status " + cls; };
-    const showMenu = () => { menuView.hidden = false; waitView.hidden = true; };
-    const showWait = (code) => { menuView.hidden = true; waitView.hidden = false; codeBtn.textContent = code; };
+    const codeIn = $(".code-in"), codeBtn = $(".code");
+    codeIn.addEventListener("input", () => { codeIn.value = codeIn.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
+    codeBtn.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(codeBtn.textContent); setStatus("Code copied.", "ok"); } catch {}
+    });
+    $('[data-act="invite"]').addEventListener("click", async () => {
+      const r = await shareInvite(codeBtn.textContent, title);
+      if (r === "copied") setStatus("Invite link copied. Paste it to your friends.", "ok");
+      else if (r === "shared") setStatus("Invite sent.", "ok");
+      else if (r === false) setStatus("Couldn't copy. Share the code instead.", "error");
+    });
+    $('[data-act="host"]').addEventListener("click", () => { clearHash(); onHost(); });
+    $(".join").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const code = codeIn.value.trim().toUpperCase();
+      if (code.length !== CODE_LEN) return setStatus(`Codes are ${CODE_LEN} characters.`, "error");
+      onJoin(code, {});
+    });
+    $('[data-act="start"]').addEventListener("click", () => onStart && onStart());
+    $('[data-act="leave"]').addEventListener("click", () => onLeave());
 
-    function teardown() {
+    const api = {
+      root, $, setStatus, profile,
+      showMenu() { $('[data-view="menu"]').hidden = false; $('[data-view="room"]').hidden = true; root.hidden = false; },
+      showRoom(code, { isHost, party }) {
+        $('[data-view="menu"]').hidden = true; $('[data-view="room"]').hidden = false; root.hidden = false;
+        codeBtn.textContent = code;
+        $('[data-act="start"]').hidden = !(isHost && party);
+        const wait = $(".wait-msg");
+        wait.hidden = party && isHost;
+        wait.textContent = party ? "Waiting for the host to start…" : "Waiting for an opponent. Anyone else who joins can watch.";
+        $(".lobby-extra").hidden = !isHost;
+      },
+      people(list, { max, min, isHost, party, labels = {} }) {
+        const ul = $(".plist");
+        ul.textContent = "";
+        for (const p of list) {
+          const li = document.createElement("li");
+          li.append(avatarEl(p));
+          const nm = document.createElement("span");
+          nm.className = "pname"; nm.textContent = p.name;
+          li.append(nm);
+          for (const tag of [p.id === 0 && "Host", labels[p.id], p.me && "You"]) {
+            if (!tag) continue;
+            const t = document.createElement("span");
+            t.className = "ptag" + (tag === "You" ? " you" : "");
+            t.textContent = tag;
+            li.append(t);
+          }
+          ul.append(li);
+        }
+        $(".pcount").textContent = party ? `${list.length} / ${max}` : "";
+        const sb = $('[data-act="start"]');
+        if (party && isHost) {
+          sb.disabled = list.length < min;
+          sb.textContent = list.length < min ? `Need ${min - list.length} more player${min - list.length > 1 ? "s" : ""}` : `Start game (${list.length} players)`;
+        }
+      },
+      hide() { root.hidden = true; },
+      extra: () => $(".lobby-extra"),
+    };
+
+    // Arrivals: invite links, switch-game hops, and reloads that should rejoin.
+    const a = arrival(game);
+    clearHash();
+    if (a) {
+      if (a.kind === "host") setTimeout(() => onHost(a.code), 0);
+      else if (a.kind === "join") setTimeout(() => onJoin(a.code, { retry: true }), 0);
+      else if (a.kind === "resume") setTimeout(() => onJoin(a.code, { resume: true }), 0);
+      else {
+        const box = $(".invited");
+        box.hidden = false;
+        box.querySelector("b").textContent = a.code;
+        codeIn.value = a.code;
+        const joinBtn = $(".join button");
+        joinBtn.classList.add("primary");
+        joinBtn.textContent = "Join room";
+        $('[data-act="host"]').classList.remove("primary");
+        // Returning players already picked a name, so drop them straight in.
+        if (savedName()) setTimeout(() => onJoin(a.code, {}), 0);
+        else {
+          setStatus("Pick a name, then hit Join room.");
+          setTimeout(() => { nameIn.focus(); nameIn.select(); }, 50);
+        }
+      }
+    }
+    dock.init();
+    return api;
+  }
+
+  // Joining can race the host on a switch-game hop, so optionally retry "not found" for a bit.
+  async function connectGuest(game, code, h, retry) {
+    const until = Date.now() + (retry ? 15000 : 0);
+    for (;;) {
+      try { return await connect(game, code, "join", h); }
+      catch (reason) {
+        if (reason === "not-found" && Date.now() < until) { await sleep(900); continue; }
+        throw reason;
+      }
+    }
+  }
+
+  // Leaving via a link counts as leaving on purpose; a reload does not (so it can rejoin).
+  function onPurposefulExit(fn) {
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest && e.target.closest("a[href]");
+      if (a && !a.target && !a.getAttribute("href").startsWith("#")) fn();
+    }, true);
+  }
+
+  // =====================================================================
+  // 1v1 lobby
+  // =====================================================================
+  function mount({ game, title, subtitle, onStart, spectate = true }) {
+    const netEl = document.getElementById("net");
+    let conn = null, isHost = false, gen = 0, code = null, started = false;
+    let me = null, hostP = null, opp = null, specs = new Map(), spectator = false;
+    let link = null, stopGame = null, handlers = [], rejoinHandlers = [];
+    let pingTimer = 0, graceTimer = 0, moving = false;
+    const helloTimers = new Map();
+    const peopleList = () => [hostP, opp, ...specs.values()].filter(Boolean);
+
+    const ui = shell({
+      game, title, subtitle,
+      onHost: (fixed) => hostRoom(fixed),
+      onJoin: (c, o) => joinRoom(c, o),
+      onLeave: () => { teardown(true); ui.showMenu(); ui.setStatus(""); },
+    });
+
+    const talk = social({
+      isHost: () => isHost,
+      myId: () => (isHost ? 0 : conn ? conn.id : -1),
+      people: peopleList,
+      toGuests: (m) => conn && conn.send({ to: "all", d: m }),
+      toHost: (m) => conn && conn.send({ d: m }),
+    });
+
+    function renderPeople() {
+      const myId = isHost ? 0 : conn ? conn.id : -1;
+      const labels = {};
+      if (opp) labels[opp.id] = "Player";
+      for (const id of specs.keys()) labels[id] = "Watching";
+      ui.people(peopleList().map((p) => ({ ...p, me: p.id === myId })), { labels });
+    }
+    function broadcastPeople() {
+      if (isHost && conn) conn.send({ to: "all", d: { __sys: "people", host: hostP, opp, specs: [...specs.values()] } });
+      renderPeople();
+    }
+
+    function teardown(bye) {
       gen++; // invalidates any connection attempt still in flight
-      clearInterval(pingTimer);
+      clearInterval(pingTimer); clearTimeout(graceTimer);
+      for (const t of helloTimers.values()) clearTimeout(t);
+      helloTimers.clear();
       if (stopGame) { try { stopGame(); } catch {} stopGame = null; }
-      if (sock) { sock.close(); sock = null; }
-      opp = null; handlers = []; link = null;
-      clearTimeout(helloTimer);
-      chat.reset();
+      if (conn) { conn.close(bye); conn = null; }
+      if (bye) sess.del("oxid-session");
+      opp = hostP = null; specs = new Map(); started = false; spectator = false;
+      handlers = []; rejoinHandlers = []; link = null;
+      dock.leave(); banner(null);
+      document.body.classList.remove("spectating");
       if (netEl) { netEl.className = "net"; netEl.lastChild.textContent = "offline"; }
     }
     function fail(msg) {
-      root.hidden = false;
-      teardown();
-      showMenu();
-      setStatus(msg, "error");
+      teardown(true);
+      ui.showMenu();
+      ui.setStatus(msg, "error");
+      sfx.play("bad");
     }
 
-    async function hostRoom(attempt = 0) {
-      teardown();
+    function enterDock() {
+      dock.enter({ send: (t) => talk.say(t), react: (e) => talk.react(e) });
+      dock.setSwitch(isHost ? { game, count: () => peopleList().length, go: moveTo } : null);
+    }
+    function moveTo(g) {
+      const next = makeCode();
+      moving = true;
+      conn.send({ to: "all", d: { __sys: "move", game: g.id, code: next } });
+      setTimeout(() => { teardown(true); location.href = pageFor(g.id, "host=" + next); }, 150);
+    }
+    function follow(d) {
+      if (!gameById(d.game) || !/^[A-Z0-9]{5}$/.test(d.code)) return;
+      moving = true;
+      teardown(false);
+      location.href = pageFor(d.game, "join=" + d.code);
+    }
+
+    // ---------- Host ----------
+    async function hostRoom(fixed, attempt = 0) {
+      teardown(true);
       const my = gen;
       isHost = true;
-      const code = makeCode();
-      setStatus("Creating room…", "pulse");
-      let r;
-      try { r = await openSocket(game, code, "host"); }
-      catch (reason) {
+      me = { id: 0, ...ui.profile() };
+      hostP = me;
+      code = fixed || makeCode();
+      ui.setStatus("Creating room…", "pulse");
+      let c;
+      try {
+        c = await connect(game, code, "host", {
+          msg: (m) => onHostMsg(m),
+          drop: () => banner("Connection lost. Reconnecting…"),
+          back: (w) => {
+            banner(null);
+            const roster = w.roster || [];
+            if (opp && !roster.includes(opp.id)) oppDropped(false);
+            for (const id of [...specs.keys()]) if (!roster.includes(id)) specs.delete(id);
+            broadcastPeople();
+          },
+          dead: () => fail("Lost connection to the game server."),
+        });
+      } catch (reason) {
         if (my !== gen) return;
-        if (reason === "exists" && attempt < 4) return hostRoom(attempt + 1);
+        if (reason === "exists" && attempt < 4) return hostRoom(null, attempt + 1);
         return fail(reasonText(reason));
       }
-      if (my !== gen) return r.ws.close();
-      sock = wrap(r.ws, (m) => {
-        if (m.sys === "join") {
-          if (opp != null) { // room full: tell them, then have the server drop them
-            sock.send({ to: m.id, d: { __sys: "reject", reason: "That room is full." } });
-            setTimeout(() => sock && sock.send({ kick: m.id }), 300);
-            return;
-          }
-          // Hold the seat until they tell us their name, then start.
-          opp = m.id;
-          setStatus("Opponent connecting…", "pulse");
-          clearTimeout(helloTimer);
-          helloTimer = setTimeout(() => {
-            if (sock && opp === m.id && !link) { sock.send({ kick: m.id }); opp = null; setStatus("Waiting for opponent…", "pulse"); }
-          }, 8000);
-        } else if (m.sys === "leave") {
-          if (m.id === opp && link) fail(`${oppName} disconnected.`);
-          else if (m.id === opp) { opp = null; clearTimeout(helloTimer); setStatus("Waiting for opponent…", "pulse"); }
-        } else if (m.from === opp && m.d) {
-          if (m.d.__sys === "hello") {
-            if (link) return;
-            clearTimeout(helloTimer);
-            oppName = cleanName(m.d.name);
-            sock.send({ to: opp, d: { __sys: "accept", name: myName() } });
-            start();
-          } else deliver(m.d);
+      if (my !== gen) return c.close();
+      conn = c;
+      hostP = me;
+      ui.showRoom(code, { isHost: true, party: false });
+      renderPeople();
+      ui.setStatus("");
+      enterDock();
+    }
+    function onHostMsg(m) {
+      if (m.sys === "join" || m.sys === "rejoin") {
+        clearTimeout(helloTimers.get(m.id));
+        helloTimers.set(m.id, setTimeout(() => { if (conn && !isKnown(m.id)) conn.send({ kick: m.id }); }, HELLO_MS));
+      } else if (m.sys === "leave") {
+        clearTimeout(helloTimers.get(m.id));
+        if (opp && m.id === opp.id) oppDropped(m.final);
+        else if (specs.has(m.id)) {
+          const p = specs.get(m.id);
+          specs.delete(m.id);
+          if (m.final) talk.system(`${p.name} stopped watching`);
+          broadcastPeople();
         }
-      }, () => { if (my === gen) fail("Lost connection to the game server."); });
-      showWait(code);
-      setStatus("Waiting for opponent…", "pulse");
+      } else if (m.from != null && m.d) onGuestData(m.from, m.d);
+    }
+    const isKnown = (id) => (opp && opp.id === id) || specs.has(id);
+    function onGuestData(id, d) {
+      if (d.__sys === "hello") {
+        clearTimeout(helloTimers.get(id));
+        const p = { id, name: cleanName(d.name), av: cleanAv(d.av) };
+        if (opp && opp.id === id) { // our opponent reconnected (or reloaded)
+          opp = p;
+          clearTimeout(graceTimer); banner(null);
+          accept(id, "player");
+          broadcastPeople();
+          for (const h of rejoinHandlers) h(id);
+          return;
+        }
+        if (specs.has(id)) { specs.set(id, p); accept(id, "spectator"); broadcastPeople(); return; }
+        if (!opp && !started) {
+          opp = p;
+          accept(id, "player");
+          talk.system(`${p.name} joined`);
+          start();
+        } else if (spectate) {
+          specs.set(id, p);
+          accept(id, "spectator");
+          broadcastPeople();
+          talk.system(`${p.name} is watching`);
+          for (const h of rejoinHandlers) h(id);
+        } else reject(id, "That room is full.");
+        return;
+      }
+      if (d.__sys) { talk.fromGuest(id, d); return; }
+      if (opp && id === opp.id) deliver(d);
+    }
+    function accept(id, role) {
+      conn.send({ to: id, d: { __sys: "accept", role, host: hostP, opp, specs: [...specs.values()] } });
+    }
+    function reject(id, reason) {
+      conn.send({ to: id, d: { __sys: "reject", reason } });
+      setTimeout(() => conn && conn.send({ kick: id }), 400);
+    }
+    function oppDropped(final) {
+      if (!opp) return;
+      const name = opp.name;
+      if (final) return fail(`${name} left the game.`);
+      banner(`${name} lost connection. Waiting for them…`);
+      clearTimeout(graceTimer);
+      graceTimer = setTimeout(() => fail(`${name} disconnected.`), GRACE_MS);
     }
 
-    async function joinRoom(code) {
-      teardown();
+    // ---------- Guest ----------
+    async function joinRoom(c, { retry, resume } = {}) {
+      teardown(true);
       const my = gen;
       isHost = false;
-      setStatus("Connecting…", "pulse");
-      let r;
-      try { r = await openSocket(game, code, "join"); }
-      catch (reason) { if (my === gen) fail(reasonText(reason)); return; }
-      if (my !== gen) return r.ws.close();
-      sock = wrap(r.ws, (m) => {
-        if (m.sys === "host-left") return fail(`${oppName} left the room.`);
-        const d = m.d;
-        if (!d) return;
-        if (d.__sys === "accept") { oppName = cleanName(d.name); return start(); }
-        if (d.__sys === "chat") return chat.add({ name: oppName, text: d.text });
-        if (d.__sys === "reject") return fail(d.reason);
-        deliver(d);
-      }, () => { if (my === gen) fail("Lost connection to the game server."); });
-      sock.send({ d: { __sys: "hello", name: myName() } });
+      me = ui.profile();
+      code = c;
+      ui.setStatus(resume ? "Rejoining…" : "Connecting…", "pulse");
+      let cn;
+      try {
+        cn = await connectGuest(game, c, {
+          msg: (m) => onGuestMsg(m),
+          drop: () => banner("Connection lost. Reconnecting…"),
+          back: () => { banner(null); hello(); },
+          dead: () => fail("Lost connection to the game server."),
+        }, retry);
+      } catch (reason) {
+        if (my !== gen) return;
+        sess.del("oxid-session");
+        if (resume) { ui.setStatus(""); return; }
+        return fail(reasonText(reason));
+      }
+      if (my !== gen) return cn.close();
+      conn = cn;
+      sess.set("oxid-session", { game, code: c });
+      if (cn.welcome.hostAway) banner("The host lost connection. Waiting for them…");
+      ui.showRoom(c, { isHost: false, party: false });
+      ui.setStatus("Joining…", "pulse");
+      hello();
+    }
+    const hello = () => conn && conn.send({ d: { __sys: "hello", name: me.name, av: me.av } });
+    function onGuestMsg(m) {
+      if (m.sys === "host-left") return fail("The host left the room.");
+      if (m.sys === "host-away") return banner("The host lost connection. Waiting for them…");
+      if (m.sys === "host-back") return banner(null);
+      const d = m.d;
+      if (!d) return;
+      if (d.__sys === "accept") {
+        hostP = d.host; opp = d.opp;
+        specs = new Map((d.specs || []).map((p) => [p.id, p]));
+        spectator = d.role === "spectator";
+        if (!started) start();
+        return;
+      }
+      if (d.__sys === "people") { hostP = d.host; opp = d.opp; specs = new Map((d.specs || []).map((p) => [p.id, p])); renderPeople(); return; }
+      if (d.__sys === "reject") return fail(d.reason);
+      if (d.__sys === "move") return follow(d);
+      if (d.__sys === "chat" || d.__sys === "react") return talk.show(d);
+      deliver(d);
     }
 
+    // ---------- Both ----------
     function deliver(d) {
-      if (d.__sys === "chat") return chat.add({ name: oppName, text: d.text });
       if (!link) return;
-      if (d.__ping !== undefined) return link.send({ __pong: d.__ping });
+      if (d.__ping !== undefined) {
+        // answer only the other player, never the spectators
+        if (!spectator && conn) conn.send(isHost ? { to: opp && opp.id, d: { __pong: d.__ping } } : { d: { __pong: d.__ping } });
+        return;
+      }
       if (d.__pong !== undefined) {
+        if (spectator) return;
         link.rtt = performance.now() - d.__pong;
         if (netEl) {
           const ms = Math.round(link.rtt);
@@ -380,298 +985,272 @@
     }
 
     function start() {
-      root.hidden = true;
-      setStatus("");
-      clearInvite();
+      started = true;
+      ui.hide();
+      ui.setStatus("");
+      const oppP = isHost ? opp : hostP;
+      const guestP = opp || { name: "Guest" };
       link = {
-        isHost,
-        myName: myName(),
-        oppName,
+        isHost, spectator,
+        myName: spectator ? guestP.name : me.name,
+        oppName: oppP ? oppP.name : "Opponent",
+        names: [hostP ? hostP.name : "Host", guestP.name],
         rtt: 0,
-        send: (o) => { if (sock) sock.send(isHost ? { to: opp, d: o } : { d: o }); },
+        send: (o) => {
+          if (!conn || spectator) return;
+          if (isHost) conn.send({ to: opp ? [opp.id, ...specs.keys()] : "all", d: o });
+          else conn.send({ d: o });
+        },
         onData: (fn) => handlers.push(fn),
+        onRejoin: (fn) => rejoinHandlers.push(fn),
       };
-      pingTimer = setInterval(() => link && link.send({ __ping: performance.now() }), 1000);
-      chat.open((text) => {
-        if (!sock) return;
-        sock.send(isHost ? { to: opp, d: { __sys: "chat", text } } : { d: { __sys: "chat", text } });
-        chat.add({ text, me: true });
-      });
-      chat.add({ sys: true, text: `${oppName} joined. Say hi!` });
+      if (!spectator) pingTimer = setInterval(() => link && link.send({ __ping: performance.now() }), 1000);
+      enterDock();
+      if (spectator) {
+        document.body.classList.add("spectating");
+        if (netEl) { netEl.className = "net"; netEl.lastChild.textContent = "watching"; }
+        banner(null);
+        toast(`Watching ${hostP.name} vs ${guestP.name}`, 3000);
+      }
+      renderPeople();
+      sfx.play("start");
       stopGame = onStart(link) || null;
     }
 
-    $('[data-act="host"]').addEventListener("click", () => { clearInvite(); hostRoom(); });
-    $('[data-act="cancel"]').addEventListener("click", () => { teardown(); showMenu(); setStatus(""); });
-    $(".join").addEventListener("submit", (e) => {
-      e.preventDefault();
-      const code = input.value.trim().toUpperCase();
-      if (code.length !== CODE_LEN) return setStatus(`Codes are ${CODE_LEN} characters.`, "error");
-      joinRoom(code);
-    });
-    wireCodeUi(root, title, input, codeBtn, setStatus, (code) => joinRoom(code));
-    window.addEventListener("beforeunload", teardown);
+    onPurposefulExit(() => { if (conn && !moving) conn.close(true); });
+    addEventListener("pagehide", () => { if (conn && !moving) conn.close(isHost); });
   }
 
-  // Code input cleanup, copy buttons, and the invite-link arrival flow. Shared by both lobbies.
-  function wireCodeUi(root, title, input, codeBtn, setStatus, join) {
-    input.addEventListener("input", () => {
-      input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  // =====================================================================
+  // Multiplayer rooms (2–N players)
+  // =====================================================================
+  function mountRoom({ game, title, subtitle, min = 2, max = 6, lobbyExtra, onStart }) {
+    let conn = null, isHost = false, myId = -1, players = [], started = false, gen = 0, code = null, moving = false;
+    let stopGame = null, handlers = [], leaveHandlers = [], rejoinHandlers = [];
+    const graceTimers = new Map(), helloTimers = new Map();
+
+    const ui = shell({
+      game, title, subtitle,
+      onHost: (fixed) => createRoom(fixed),
+      onJoin: (c, o) => joinRoom(c, o),
+      onStart: () => {
+        if (!isHost || players.length < min || started) return;
+        toPlayers({ __sys: "start", players });
+        begin();
+      },
+      onLeave: () => { teardown(true); ui.showMenu(); ui.setStatus(""); },
     });
-    codeBtn.addEventListener("click", async () => {
-      try { await navigator.clipboard.writeText(codeBtn.textContent); setStatus("Code copied.", "ok"); } catch {}
+    if (lobbyExtra) lobbyExtra(ui.extra());
+
+    const talk = social({
+      isHost: () => isHost,
+      myId: () => myId,
+      people: () => players,
+      toGuests: (m) => toPlayers(m),
+      toHost: (m) => conn && conn.send({ d: m }),
     });
-    root.querySelector('[data-act="invite"]').addEventListener("click", async () => {
-      const r = await shareInvite(codeBtn.textContent, title);
-      if (r === "copied") setStatus("Invite link copied. Paste it to your friends.", "ok");
-      else if (r === "shared") setStatus("Invite sent.", "ok");
-      else if (r === false) setStatus("Couldn't copy. Share the code instead.", "error");
-    });
-
-    const invited = invitedCode();
-    if (!invited) return;
-    const box = root.querySelector(".invited");
-    box.hidden = false;
-    box.querySelector("b").textContent = invited;
-    input.value = invited;
-    const joinBtn = root.querySelector(".join button");
-    joinBtn.classList.add("primary");
-    joinBtn.textContent = "Join room";
-    root.querySelector('[data-act="host"]').classList.remove("primary");
-    // Returning players already picked a name, so drop them straight in.
-    if (savedName()) setTimeout(() => join(invited), 0);
-    else {
-      setStatus("Pick a name, then hit Join room.");
-      const nameIn = root.querySelector(".name");
-      setTimeout(() => { nameIn.focus(); nameIn.select(); }, 50);
-    }
-  }
-
-  // ---------- Multiplayer rooms (2–N players) ----------
-
-  function mountRoom({ game, title, subtitle, min = 2, max = 6, onStart }) {
-    const root = document.createElement("div");
-    root.className = "overlay";
-    root.innerHTML = `
-      <div class="panel">
-        <a class="back" href="index.html">&larr; All games</a>
-        <h1></h1>
-        <p class="sub"></p>
-        <div data-view="menu">
-          ${INVITED_HTML}
-          <label class="field"><span>Your name</span><input class="name" maxlength="16" autocomplete="nickname" spellcheck="false"></label>
-          <button class="btn primary full" data-act="host">Create room</button>
-          <div class="or">or join</div>
-          <form class="join">
-            <input class="code-in" maxlength="${CODE_LEN}" placeholder="CODE" autocomplete="off" spellcheck="false" aria-label="Room code">
-            <button class="btn" type="submit">Join</button>
-          </form>
-        </div>
-        <div class="wait" data-view="room" hidden>
-          <div class="label">Room code</div>
-          <button class="code" title="Click to copy the code"></button>
-          ${INVITE_HTML}
-          <div class="plist-head"><span>Players</span><span class="pcount"></span></div>
-          <ul class="plist"></ul>
-          <button class="btn primary full" data-act="start" hidden>Start game</button>
-          <p class="muted wait-msg" style="font-size:13px;margin-top:14px" hidden>Waiting for the host to start…</p>
-          <button class="btn ghost full" data-act="leave" style="margin-top:10px">Leave room</button>
-        </div>
-        <p class="status" aria-live="polite"></p>
-      </div>`;
-    root.querySelector("h1").textContent = title;
-    root.querySelector(".sub").textContent = subtitle;
-    document.body.appendChild(root);
-
-    const $ = (s) => root.querySelector(s);
-    const menuView = $('[data-view="menu"]'), roomView = $('[data-view="room"]');
-    const status = $(".status"), nameIn = $(".name"), codeIn = $(".code-in"), codeBtn = $(".code");
-    const startBtn = $('[data-act="start"]'), waitMsg = $(".wait-msg");
-
-    const myName = nameField(nameIn);
-
-    let sock = null, isHost = false, myId = -1, players = [], started = false, gen = 0;
-    let stopGame = null, handlers = [], leaveHandlers = [];
-
-    const setStatus = (msg, cls = "") => { status.textContent = msg; status.className = "status " + cls; };
-    const showMenu = () => { menuView.hidden = false; roomView.hidden = true; };
-    const showRoom = (code) => {
-      menuView.hidden = true; roomView.hidden = false;
-      codeBtn.textContent = code;
-      startBtn.hidden = !isHost; waitMsg.hidden = isHost;
-      renderPlayers();
+    const toPlayers = (m) => {
+      const ids = players.filter((p) => p.id !== myId).map((p) => p.id);
+      if (conn && ids.length) conn.send({ to: ids, d: m });
     };
 
-    function renderPlayers() {
-      const list = $(".plist");
-      list.textContent = "";
-      for (const p of players) {
-        const li = document.createElement("li");
-        const av = document.createElement("span");
-        av.className = "avatar"; av.textContent = p.name[0].toUpperCase();
-        const nm = document.createElement("span");
-        nm.className = "pname"; nm.textContent = p.name;
-        li.append(av, nm);
-        if (p.id === 0) { const t = document.createElement("span"); t.className = "ptag"; t.textContent = "Host"; li.append(t); }
-        if (p.id === myId) { const t = document.createElement("span"); t.className = "ptag you"; t.textContent = "You"; li.append(t); }
-        list.append(li);
-      }
-      $(".pcount").textContent = players.length + " / " + max;
-      startBtn.disabled = players.length < min;
-      startBtn.textContent = players.length < min ? `Need ${min - players.length} more player${min - players.length > 1 ? "s" : ""}` : `Start game (${players.length} players)`;
-    }
+    function render() { ui.people(players.map((p) => ({ ...p, me: p.id === myId })), { min, max, isHost, party: true }); }
 
-    function teardown() {
+    function teardown(bye) {
       gen++; // invalidates any connection attempt still in flight
+      for (const t of [...graceTimers.values(), ...helloTimers.values()]) clearTimeout(t);
+      graceTimers.clear(); helloTimers.clear();
       if (stopGame) { try { stopGame(); } catch {} stopGame = null; }
-      if (sock) { sock.close(); sock = null; }
-      handlers = []; leaveHandlers = [];
-      started = false; players = []; myId = -1; chatSeen.clear();
-      chat.reset();
+      if (conn) { conn.close(bye); conn = null; }
+      if (bye) sess.del("oxid-session");
+      handlers = []; leaveHandlers = []; rejoinHandlers = [];
+      started = false; players = []; myId = -1;
+      dock.leave(); banner(null);
     }
     function backToMenu(msg, cls = "error") {
-      root.hidden = false;
-      teardown();
-      showMenu();
-      setStatus(msg, cls);
+      teardown(true);
+      ui.showMenu();
+      ui.setStatus(msg, cls);
+      if (cls === "error") sfx.play("bad");
     }
-    const toPlayers = (m) => { for (const p of players) if (p.id !== myId) sock.send({ to: p.id, d: m }); };
-
-    // Chat goes through the host, which stamps the sender's name and relays it to everyone.
-    const chatSeen = new Map(); // id -> last message time, to stop spam
-    function hostChat(id, text, sys = false) {
-      text = cleanText(text);
-      if (!text || !sock) return;
-      const p = players.find((x) => x.id === id);
-      if (!sys) {
-        if (!p) return;
-        const now = Date.now();
-        if (now - (chatSeen.get(id) || 0) < 400) return;
-        chatSeen.set(id, now);
-      }
-      const m = { __sys: "chat", id, name: p ? p.name : "", text, sys };
-      toPlayers(m);
-      chat.add({ ...m, me: !sys && id === myId });
+    function enterDock() {
+      dock.enter({ send: (t) => talk.say(t), react: (e) => talk.react(e) });
+      dock.setSwitch(isHost ? { game, count: () => players.length, go: moveTo } : null);
+    }
+    function moveTo(g) {
+      const next = makeCode();
+      moving = true;
+      toPlayers({ __sys: "move", game: g.id, code: next });
+      setTimeout(() => { teardown(true); location.href = pageFor(g.id, "host=" + next); }, 150);
     }
 
     // --- Host ---
-    async function createRoom(attempt = 0) {
-      teardown();
+    async function createRoom(fixed, attempt = 0) {
+      teardown(true);
       const my = gen;
       isHost = true;
-      const code = makeCode();
-      setStatus("Creating room…", "pulse");
-      let r;
-      try { r = await openSocket(game, code, "host"); }
-      catch (reason) {
+      code = fixed || makeCode();
+      ui.setStatus("Creating room…", "pulse");
+      let c;
+      try {
+        c = await connect(game, code, "host", {
+          msg: (m) => {
+            if (m.sys === "join" || m.sys === "rejoin") {
+              clearTimeout(helloTimers.get(m.id));
+              helloTimers.set(m.id, setTimeout(() => { if (conn && !players.some((p) => p.id === m.id)) conn.send({ kick: m.id }); }, HELLO_MS));
+            } else if (m.sys === "leave") playerDropped(m.id, m.final);
+            else if (m.from != null && m.d) onGuestData(m.from, m.d);
+          },
+          drop: () => banner("Connection lost. Reconnecting…"),
+          back: (w) => {
+            banner(null);
+            const roster = w.roster || [];
+            for (const p of players) if (p.id !== 0 && !roster.includes(p.id)) playerDropped(p.id, false);
+          },
+          dead: () => backToMenu("Lost connection to the game server."),
+        });
+      } catch (reason) {
         if (my !== gen) return;
-        if (reason === "exists" && attempt < 4) return createRoom(attempt + 1);
+        if (reason === "exists" && attempt < 4) return createRoom(null, attempt + 1);
         return backToMenu(reasonText(reason));
       }
-      if (my !== gen) return r.ws.close();
+      if (my !== gen) return c.close();
+      conn = c;
       myId = 0;
-      players = [{ id: 0, name: myName() }];
-      sock = wrap(r.ws, (m) => {
-        if (m.sys === "leave") return dropPlayer(m.id);
-        if (m.from != null && m.d) onGuestData(m.from, m.d);
-      }, () => { if (my === gen) backToMenu("Lost connection to the game server."); });
-      showRoom(code);
-      setStatus("Share the code. Start when everyone's in.");
-      chat.open((text) => hostChat(0, text));
+      players = [{ id: 0, ...ui.profile() }];
+      ui.showRoom(code, { isHost: true, party: true });
+      render();
+      ui.setStatus("Share the link. Start when everyone's in.");
+      enterDock();
     }
     function onGuestData(id, d) {
       if (d.__sys === "hello") {
+        clearTimeout(helloTimers.get(id));
+        const known = players.find((p) => p.id === id);
+        if (known) { // came back after a drop or a reload
+          known.name = cleanName(d.name); known.av = cleanAv(d.av);
+          if (graceTimers.has(id)) { clearTimeout(graceTimers.get(id)); graceTimers.delete(id); talk.system(`${known.name} is back`); }
+          conn.send({ to: id, d: { __sys: "welcome", id } });
+          if (started) {
+            conn.send({ to: id, d: { __sys: "start", players } });
+            for (const h of rejoinHandlers) h(id);
+          } else broadcastLobby();
+          return;
+        }
         if (started) return reject(id, "That game already started.");
         if (players.length >= max) return reject(id, "Room is full.");
-        if (players.some((p) => p.id === id)) return;
-        players.push({ id, name: cleanName(d.name) });
-        sock.send({ to: id, d: { __sys: "welcome", id } });
+        const p = { id, name: cleanName(d.name), av: cleanAv(d.av) };
+        players.push(p);
+        conn.send({ to: id, d: { __sys: "welcome", id } });
         broadcastLobby();
-        hostChat(0, `${cleanName(d.name)} joined`, true);
+        talk.system(`${p.name} joined`);
+        sfx.play("pop");
         return;
       }
-      if (d.__sys === "chat") return hostChat(id, d.text);
+      if (d.__sys) { talk.fromGuest(id, d); return; }
       if (!started || !players.some((p) => p.id === id)) return;
       for (const h of handlers) h(id, d);
     }
     function reject(id, reason) {
-      sock.send({ to: id, d: { __sys: "reject", reason } });
-      setTimeout(() => sock && sock.send({ kick: id }), 400);
+      conn.send({ to: id, d: { __sys: "reject", reason } });
+      setTimeout(() => conn && conn.send({ kick: id }), 400);
     }
-    function dropPlayer(id) {
+    function playerDropped(id, final) {
+      clearTimeout(helloTimers.get(id));
+      const p = players.find((x) => x.id === id);
+      if (!p) return;
+      if (!started || final) return removePlayer(id);
+      if (graceTimers.has(id)) return;
+      talk.system(`${p.name} lost connection…`);
+      graceTimers.set(id, setTimeout(() => { graceTimers.delete(id); removePlayer(id); }, GRACE_MS));
+    }
+    function removePlayer(id) {
       const p = players.find((x) => x.id === id);
       if (!p) return;
       players = players.filter((x) => x.id !== id);
-      hostChat(0, `${p.name} left`, true);
+      talk.system(`${p.name} left`);
       if (!started) broadcastLobby();
       else { for (const h of leaveHandlers) h(id); toast(p.name + " left the game"); }
     }
     function broadcastLobby() {
       toPlayers({ __sys: "lobby", players });
-      renderPlayers();
+      render();
     }
 
     // --- Guest ---
-    async function joinRoom(code) {
-      teardown();
+    async function joinRoom(c, { retry, resume } = {}) {
+      teardown(true);
       const my = gen;
       isHost = false;
-      setStatus("Connecting…", "pulse");
-      let r;
-      try { r = await openSocket(game, code, "join"); }
-      catch (reason) { if (my === gen) backToMenu(reasonText(reason)); return; }
-      if (my !== gen) return r.ws.close();
-      sock = wrap(r.ws, (m) => {
-        if (m.sys === "host-left") return backToMenu("The host left the room.");
-        const d = m.d;
-        if (!d) return;
-        if (d.__sys) {
-          if (d.__sys === "welcome") {
-            myId = d.id; showRoom(code); setStatus(""); clearInvite();
-            chat.open((text) => sock && sock.send({ d: { __sys: "chat", text } }));
-          }
-          else if (d.__sys === "chat") chat.add({ name: d.name, text: d.text, sys: d.sys, me: !d.sys && d.id === myId });
-          else if (d.__sys === "lobby") { players = d.players; renderPlayers(); }
-          else if (d.__sys === "reject") backToMenu(d.reason);
-          else if (d.__sys === "start" && myId >= 0) { players = d.players; begin(); }
-          return;
-        }
-        if (started) for (const h of handlers) h(0, d);
-      }, () => { if (my === gen) backToMenu("Lost connection to the game server."); });
-      sock.send({ d: { __sys: "hello", name: myName() } });
+      code = c;
+      const me = ui.profile();
+      ui.setStatus(resume ? "Rejoining…" : "Connecting…", "pulse");
+      const hello = () => conn && conn.send({ d: { __sys: "hello", name: me.name, av: me.av } });
+      let cn;
+      try {
+        cn = await connectGuest(game, c, {
+          msg: (m) => {
+            if (m.sys === "host-left") return backToMenu("The host left the room.");
+            if (m.sys === "host-away") return banner("The host lost connection. Waiting for them…");
+            if (m.sys === "host-back") return banner(null);
+            const d = m.d;
+            if (!d) return;
+            if (d.__sys) {
+              if (d.__sys === "welcome") {
+                myId = d.id;
+                if (!started) { ui.showRoom(c, { isHost: false, party: true }); ui.setStatus(""); enterDock(); }
+              } else if (d.__sys === "chat" || d.__sys === "react") talk.show(d);
+              else if (d.__sys === "lobby") { players = d.players; render(); }
+              else if (d.__sys === "reject") backToMenu(d.reason);
+              else if (d.__sys === "move") {
+                if (!gameById(d.game) || !/^[A-Z0-9]{5}$/.test(d.code)) return;
+                moving = true; teardown(false);
+                location.href = pageFor(d.game, "join=" + d.code);
+              } else if (d.__sys === "start" && myId >= 0) {
+                players = d.players;
+                if (!started) begin();
+              }
+              return;
+            }
+            if (started) for (const h of handlers) h(0, d);
+          },
+          drop: () => banner("Connection lost. Reconnecting…"),
+          back: () => { banner(null); hello(); },
+          dead: () => backToMenu("Lost connection to the game server."),
+        }, retry);
+      } catch (reason) {
+        if (my !== gen) return;
+        sess.del("oxid-session");
+        if (resume) { ui.setStatus(""); return; }
+        return backToMenu(reasonText(reason));
+      }
+      if (my !== gen) return cn.close();
+      conn = cn;
+      sess.set("oxid-session", { game, code: c });
+      if (cn.welcome.hostAway) banner("The host lost connection. Waiting for them…");
+      hello();
     }
 
     function begin() {
       started = true;
-      root.hidden = true;
-      setStatus("");
+      ui.hide();
+      ui.setStatus("");
       const room = {
         isHost, myId,
         players: players.map((p) => ({ ...p })),
-        send: (m) => { if (sock) sock.send({ d: m }); },
-        sendTo: (id, m) => { if (sock) sock.send({ to: id, d: m }); },
-        broadcast: (m) => { if (sock) toPlayers(m); },
+        send: (m) => { if (conn) conn.send({ d: m }); },
+        sendTo: (id, m) => { if (conn) conn.send({ to: id, d: m }); },
+        broadcast: (m) => toPlayers(m),
         onData: (fn) => handlers.push(fn),
         onLeave: (fn) => leaveHandlers.push(fn),
+        onRejoin: (fn) => rejoinHandlers.push(fn),
       };
+      sfx.play("start");
       stopGame = onStart(room) || null;
     }
 
-    $('[data-act="host"]').addEventListener("click", () => { clearInvite(); createRoom(); });
-    startBtn.addEventListener("click", () => {
-      if (!isHost || players.length < min) return;
-      toPlayers({ __sys: "start", players });
-      begin();
-    });
-    $('[data-act="leave"]').addEventListener("click", () => { teardown(); showMenu(); setStatus(""); });
-    $(".join").addEventListener("submit", (e) => {
-      e.preventDefault();
-      const code = codeIn.value.trim().toUpperCase();
-      if (code.length !== CODE_LEN) return setStatus(`Codes are ${CODE_LEN} characters.`, "error");
-      joinRoom(code);
-    });
-    wireCodeUi(root, title, codeIn, codeBtn, setStatus, (code) => joinRoom(code));
-    window.addEventListener("beforeunload", teardown);
+    onPurposefulExit(() => { if (conn && !moving) conn.close(true); });
+    addEventListener("pagehide", () => { if (conn && !moving) conn.close(isHost); });
   }
 
   // ---------- Shared helpers for games ----------
@@ -692,15 +1271,6 @@
     window.addEventListener("resize", resize);
     resize();
     return resize;
-  }
-
-  function toast(msg, ms = 2200) {
-    for (const old of document.querySelectorAll(".toast")) old.remove();
-    const t = document.createElement("div");
-    t.className = "toast";
-    t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(() => t.remove(), ms);
   }
 
   // Game loop that keeps running when the tab is hidden, minimized or covered. Browsers pause or
@@ -724,7 +1294,18 @@
     return () => { running = false; cancelAnimationFrame(rafId); worker.terminate(); };
   }
 
+  const shuffle = (a) => {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
   window.Lobby = { mount };
   window.Room = { mount: mountRoom };
-  window.GameUtil = { fitCanvas, toast, loop };
+  window.GameUtil = {
+    fitCanvas, toast, loop, shuffle, avatar: avatarEl, cleanName,
+    sfx: (n) => sfx.play(n), record, stats: readStats, games: GAMES, joinByCode,
+  };
 })();

@@ -67,10 +67,15 @@
           crashes.push({ x: cx, y: cy, i });
           burst(cx, cy, COLORS[i], 26);
           shake = 10;
+          GameUtil.sfx("boom");
         } else V.trails[i].push(m.h[i]);
       }
     } else if (m.t === "e") {
       V.phase = "over"; V.rw = m.rw; V.sc = m.sc; V.w = m.w;
+      if (!link.spectator) GameUtil.sfx(m.rw === 2 ? "bad" : m.rw === me ? "good" : "bad");
+      updateHud();
+    } else if (m.t === "full") { // late spectator or a reloaded player catching up
+      Object.assign(V, m.v, { phaseEnds: performance.now() + (m.v.left || 0), tickAt: performance.now() });
       updateHud();
     }
   }
@@ -224,11 +229,13 @@
 
       if (V.phase === "count" && link) {
         const [x, y] = V.trails[me][0];
-        label("YOU", (x + 0.5) * CELL, (y + 0.5) * CELL - 30, COLORS[me]);
+        if (!link.spectator) label("YOU", (x + 0.5) * CELL, (y + 0.5) * CELL - 30, COLORS[me]);
         const left = Math.max(0, V.phaseEnds - now) / 1000;
+        if (Math.ceil(left) !== lastCount) { lastCount = Math.ceil(left); GameUtil.sfx(lastCount ? "tick" : "start"); }
         banner(left > 0 ? String(Math.ceil(left)) : "GO", 120);
       } else if (V.phase === "over" && link) {
-        const txt = V.rw === 2 ? "DOUBLE CRASH" : V.rw === me ? "ROUND TO YOU" : "YOU CRASHED";
+        const names = [link.isHost ? link.myName : link.oppName, link.isHost ? link.oppName : link.myName];
+        const txt = V.rw === 2 ? "DOUBLE CRASH" : link.spectator ? `ROUND TO ${names[V.rw].toUpperCase()}` : V.rw === me ? "ROUND TO YOU" : "YOU CRASHED";
         banner(txt, 64);
       }
     }
@@ -259,15 +266,23 @@
   }
 
   // ---------- HUD ----------
+  let lastCount = -1, recorded = false;
   function updateHud() {
     if (!V) return;
+    if (V.w < 0) recorded = false;
+    else if (!recorded && link && !link.spectator) {
+      recorded = true;
+      GameUtil.sfx(V.w === me ? "win" : "lose");
+      GameUtil.record("tron", V.w === me ? "win" : "loss");
+    }
     $("s0").textContent = V.sc[me];
     $("s1").textContent = V.sc[1 - me];
     if (V.w >= 0) {
       setTimeout(() => {
         if (!V || V.w < 0) return;
         const won = V.w === me;
-        $("resultTitle").textContent = won ? "Victory" : "Defeat";
+        $("resultTitle").textContent = link.spectator ? `${link.names[V.w]} wins` : won ? "Victory" : "Defeat";
+        rematchBtn.hidden = link.spectator;
         $("resultScore").textContent = V.sc[me] + " – " + V.sc[1 - me];
         rematchBtn.disabled = false;
         rematchBtn.textContent = "Rematch";
@@ -302,7 +317,12 @@
     onStart(l) {
       link = l;
       me = l.isHost ? 0 : 1;
+      $("name0").textContent = l.spectator ? l.myName : "You";
       $("name1").textContent = l.oppName;
+      if (l.isHost) l.onRejoin(() => {
+        const { trails, dir, alive, sc, phase, n, w, rw, tickMs } = V;
+        l.send({ t: "full", v: { trails, dir, alive, sc, phase, n, w, rw, tickMs, left: Math.max(0, V.phaseEnds - performance.now()) } });
+      });
       V = blankView();
       $("sw0").style.background = COLORS[me];
       $("sw1").style.background = COLORS[1 - me];
@@ -315,7 +335,7 @@
       if (l.isHost) newMatch();
       last = performance.now();
       stopLoop = GameUtil.loop(frame);
-      GameUtil.toast(l.isHost ? "Connected. You're orange, on the left." : "Connected. You're blue, on the right.");
+      if (!l.spectator) GameUtil.toast(l.isHost ? "Connected. You're orange, on the left." : "Connected. You're blue, on the right.");
       return () => {
         stopLoop();
         link = null; S = null; V = null;

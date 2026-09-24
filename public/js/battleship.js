@@ -77,6 +77,7 @@
       return {
         t: "v", n: S.n, phase: S.phase, ready: [!!S.fleets[i], !!S.fleets[o]],
         myTurn: S.phase === "battle" && S.turn === i,
+        fleet: S.fleets[i],
         myShots: S.shots[i], theirShots: S.shots[o], sunk, mySunk,
         reveal: S.phase === "over" ? S.fleets[o] : null,
         won: S.phase === "over" ? S.winner === i : null,
@@ -273,8 +274,13 @@
     prevV = V;
     V = v;
     sentFleet = v.ready[0];
+    if (v.fleet) fleet = v.fleet.map((x) => ({ ...x })); // the host's copy wins (e.g. after a reload)
     $("ready").disabled = false;
     if (prevV && prevV.n === v.n) {
+      const shot = v.myShots.length > prevV.myShots.length ? v.myShots[v.myShots.length - 1] : v.theirShots.length > prevV.theirShots.length ? v.theirShots[v.theirShots.length - 1] : null;
+      if (v.sunk.length > prevV.sunk.length || v.mySunk.filter(Boolean).length > prevV.mySunk.filter(Boolean).length) GameUtil.sfx("boom");
+      else if (shot) GameUtil.sfx(shot.hit ? "good" : "click");
+      if (v.myTurn && !prevV.myTurn && v.phase === "battle") setTimeout(() => GameUtil.sfx("turn"), 300);
       // announce sinkings
       if (v.sunk.length > prevV.sunk.length) GameUtil.toast("You sunk their " + NAMES[v.sunk[v.sunk.length - 1].k] + "!");
       const lost = v.mySunk.findIndex((b, k) => b && !prevV.mySunk[k]);
@@ -283,6 +289,7 @@
     }
     render();
     if (v.phase === "over" && (!prevV || prevV.phase !== "over")) {
+      if (prevV) { GameUtil.sfx(v.won ? "win" : "lose"); GameUtil.record("battleship", v.won ? "win" : "loss"); }
       setTimeout(() => {
         if (!V || V.phase !== "over") return;
         $("resultTitle").textContent = V.won ? "Victory" : "Sunk";
@@ -311,6 +318,7 @@
     game: "battleship",
     title: "Battleship",
     subtitle: "Hide your fleet, then take turns calling shots. Sink all five ships to win.",
+    spectate: false,
     onStart(l) {
       link = l;
       V = null; prevV = null; sentFleet = false; drag = null;
@@ -323,6 +331,7 @@
           else if (d.t === "fire") { if (game.fire(1, d.x | 0, d.y | 0)) publish(); else l.send(game.view(1)); }
           else if (d.t === "rm") { game.rematch(); publish(); }
         });
+        l.onRejoin(() => l.send(game.view(1)));
         publish();
       } else {
         l.onData((d) => {

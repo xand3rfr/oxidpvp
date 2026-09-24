@@ -57,14 +57,18 @@
     }
   }
   function applyEvent(e) {
-    if (e.k === "p") { burst(e.x, e.y, COLORS[e.i], 14, 320); flash[e.i] = 1; }
+    if (e.k === "p") { burst(e.x, e.y, COLORS[e.i], 14, 320); flash[e.i] = 1; GameUtil.sfx("click"); }
     else if (e.k === "w") burst(e.x, e.y, "#9aa0aa", 5, 160);
-    else if (e.k === "g") { burst(e.x, e.y, COLORS[e.i], 40, 520); shake = 12; trail = []; }
+    else if (e.k === "g") {
+      burst(e.x, e.y, COLORS[e.i], 40, 520); shake = 12; trail = [];
+      GameUtil.sfx(link && link.spectator ? "pop" : e.i === myIdx ? "good" : "bad");
+    }
   }
   function emit(e) { outEvents.push(e); applyEvent(e); }
 
   // ---------- Local paddle ----------
   function stepPaddle(dt) {
+    if (link && link.spectator) { if (snap && snap.oy != null) myY += (snap.oy - myY) * Math.min(1, dt * 25); return; }
     if (useKeys) {
       const dir = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
       target = clamp(myY + dir * KEY_SPEED * dt, PH / 2, H - PH / 2);
@@ -132,7 +136,7 @@
   function sendSnapshot() {
     const b = S.ball;
     link.send({
-      t: "s", y: Math.round(myY * 10) / 10,
+      t: "s", y: Math.round(myY * 10) / 10, oy: Math.round(oppY * 10) / 10,
       b: [Math.round(b.x * 10) / 10, Math.round(b.y * 10) / 10, Math.round(b.vx), Math.round(b.vy)],
       sc: S.sc, st: Math.max(0, Math.round(S.serveT * 100) / 100), w: S.win, e: outEvents,
     });
@@ -215,7 +219,7 @@
     if (link) {
       ctx.fillStyle = "rgba(255,255,255,0.35)";
       ctx.font = "600 12px Geist, system-ui, sans-serif";
-      ctx.fillText("YOU", paddleX(myIdx) + PW / 2, myY - PH / 2 - 16);
+      if (!link.spectator) ctx.fillText("YOU", paddleX(myIdx) + PW / 2, myY - PH / 2 - 16);
     }
 
     // ball + trail
@@ -264,8 +268,10 @@
     $("s0").textContent = sc[0];
     $("s1").textContent = sc[1];
     if (w >= 0) {
-      const won = w === myIdx;
-      $("resultTitle").textContent = won ? "Victory" : "Defeat";
+      const won = w === myIdx, spec = link && link.spectator;
+      if (link && !spec) { GameUtil.sfx(won ? "win" : "lose"); GameUtil.record("pong", won ? "win" : "loss"); }
+      $("resultTitle").textContent = spec ? `${(w === 0 ? link.names[0] : link.names[1])} wins` : won ? "Victory" : "Defeat";
+      rematchBtn.hidden = !!spec;
       $("resultTitle").style.color = won ? COLORS[myIdx] : "#ecedef";
       $("resultScore").textContent = sc[myIdx] + " – " + sc[oppIdx];
       rematchBtn.disabled = false;
@@ -311,8 +317,9 @@
       link = l;
       myIdx = l.isHost ? 0 : 1;
       oppIdx = 1 - myIdx;
-      $("name0").textContent = myIdx === 0 ? "You" : l.oppName;
-      $("name1").textContent = myIdx === 1 ? "You" : l.oppName;
+      $("name0").textContent = l.names[0];
+      $("name1").textContent = l.names[1];
+      if (!l.spectator) $(myIdx === 0 ? "name0" : "name1").textContent = "You";
       S = l.isHost ? newState() : null;
       snap = null; outEvents = []; particles = []; trail = []; hudKey = "";
       myY = oppY = oppDispY = target = H / 2;
@@ -331,7 +338,7 @@
       running = true;
       last = performance.now();
       stopLoop = GameUtil.loop(frame);
-      GameUtil.toast(l.isHost ? "Connected. You're on the left." : "Connected. You're on the right.");
+      if (!l.spectator) GameUtil.toast(l.isHost ? "Connected. You're on the left." : "Connected. You're on the right.");
 
       return () => {
         running = false;

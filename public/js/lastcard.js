@@ -40,7 +40,7 @@
 
   function createEngine(roomPlayers, hostId, emit) {
     const G = {
-      players: roomPlayers.map((p) => ({ id: p.id, name: p.name, hand: [], called: false })),
+      players: roomPlayers.map((p) => ({ id: p.id, name: p.name, av: p.av, hand: [], called: false })),
       deck: [], discard: [], color: "r", turn: 0, dir: 1,
       drew: false, drawnId: null, vulnerable: null, winner: null,
       log: "", fx: null, turnEnds: 0, seq: 0, round: 0,
@@ -231,7 +231,7 @@
       return {
         t: "st", seq: G.seq, me: pid,
         hand: p ? p.hand : [],
-        players: G.players.map((x) => ({ id: x.id, name: x.name, n: x.hand.length, called: x.called })),
+        players: G.players.map((x) => ({ id: x.id, name: x.name, av: x.av, n: x.hand.length, called: x.called })),
         top: top(), under: G.discard.slice(-4, -1),
         color: G.color, turn: cur ? cur.id : null, dir: G.dir, deck: G.deck.length,
         drew: !!(cur && cur.id === pid && G.drew), drawnId: cur && cur.id === pid ? G.drawnId : null,
@@ -294,7 +294,19 @@
   function onView(v) {
     if (v.seq <= lastSeq) return;
     lastSeq = v.seq;
+    const prev = V;
     V = v;
+    if (prev) {
+      if (v.top && prev.top && v.top.id !== prev.top.id) GameUtil.sfx("pop");
+      else if (v.fx && v.fx.k === "draw") GameUtil.sfx("click");
+      if (v.fx && v.fx.k === "call") GameUtil.sfx("good");
+      if (v.fx && v.fx.k === "catch") GameUtil.sfx(v.fx.pid === v.me ? "bad" : "good");
+      if (v.turn === v.me && prev.turn !== v.me && v.winner == null) setTimeout(() => GameUtil.sfx("turn"), 200);
+      if (v.winner != null && prev.winner == null) {
+        GameUtil.sfx(v.winner === v.me ? "win" : "lose");
+        GameUtil.record("lastcard", v.winner === v.me ? "win" : "loss");
+      }
+    }
     turnEndsLocal = performance.now() + v.left;
     if (v.fx && v.fx.k === "call" && v.fx.pid !== v.me) GameUtil.toast(`${nameOf(v.fx.pid)}: LAST CARD!`);
     if (v.fx && v.fx.k === "catch") GameUtil.toast(v.fx.pid === v.me ? `${nameOf(v.fx.by)} caught you! +2 cards` : `${nameOf(v.fx.by)} caught ${nameOf(v.fx.pid)}!`);
@@ -317,7 +329,7 @@
       meta.append(h("span", "oname", p.name), h("span", "ocount", p.n + (p.n === 1 ? " card" : " cards")));
       const fan = h("div", "fan");
       for (let i = 0; i < Math.min(p.n, 8); i++) fan.append(h("i", "mini"));
-      box.append(h("div", "avatar", p.name[0].toUpperCase()), meta, fan);
+      box.append(GameUtil.avatar(p), meta, fan);
       if (p.n === 1 && p.called) box.append(h("span", "badge", "LAST"));
       else if (p.id === V.vulnerable) box.append(h("span", "badge danger", "1 LEFT"));
       opps.append(box);
@@ -394,7 +406,7 @@
       list.textContent = "";
       [...V.players].sort((a, b) => a.n - b.n).forEach((p) => {
         const li = h("li", p.id === V.winner ? "win" : "");
-        li.append(h("span", "avatar", p.name[0].toUpperCase()), h("span", "pname", p.name + (p.id === me ? " (you)" : "")),
+        li.append(GameUtil.avatar(p), h("span", "pname", p.name + (p.id === me ? " (you)" : "")),
           h("span", "n", p.n === 0 ? "out" : p.n + " left"));
         list.append(li);
       });
@@ -475,6 +487,7 @@
         });
         r.onData((from, m) => engine.act(from, m));
         r.onLeave((id) => engine.leave(id));
+        r.onRejoin((id) => { engine.G.seq++; r.sendTo(id, engine.view(id)); });
         engine.newRound();
         engine.G.seq++;
         // first deal: small delay so guests have their handlers attached

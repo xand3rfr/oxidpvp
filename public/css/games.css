@@ -115,10 +115,7 @@
 .tv-opt.dim { opacity: .4; }
 .tv-opt.right { opacity: 1; border-color: var(--green); background: rgba(34,197,94,.12); box-shadow: 0 0 0 2px var(--green), 0 0 30px -10px var(--green); }
 .tv-opt .who { margin-left: auto; display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
-.tv-opt .who span {
-  font-size: 10px; font-weight: 700; width: 22px; height: 22px; border-radius: 50%;
-  display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, #7c3aed, #4d8dff);
-}
+.tv-opt .who .avatar { width: 24px; height: 24px; font-size: 12px; }
 .tv-msg { font-size: 14px; font-weight: 600; text-align: center; min-height: 22px; }
 .tv-msg.good { color: var(--green); }
 .tv-msg.bad { color: var(--danger); }
@@ -148,3 +145,23 @@
   .tv-q { padding: 18px; min-height: 90px; }
   .bs-wrap { gap: 18px; }
 }
+
+/* ---------- Lobby settings (host) ---------- */
+.set-head { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; margin: 4px 0 8px; }
+.seg { display: flex; gap: 4px; padding: 4px; border-radius: 10px; background: var(--field); border: 1px solid var(--line-2); margin-bottom: 14px; }
+.seg button { flex: 1; height: 32px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.seg button.on { background: var(--surface-3); color: var(--text); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; transition: opacity .2s; }
+.chips.off { opacity: .35; pointer-events: none; }
+.chip { font-size: 12px; font-weight: 500; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--muted); background: var(--surface-2); }
+.chip.on { color: #fff; border-color: rgba(139,92,246,.6); background: rgba(139,92,246,.22); }
+.custom-q { border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; background: var(--field); }
+.custom-q summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+.custom-q summary span { color: var(--accent-hi); }
+.custom-q textarea {
+  width: 100%; margin-top: 10px; padding: 10px; border-radius: 8px; resize: vertical;
+  background: var(--bg); border: 1px solid var(--line-2); color: var(--text); font: 13px/1.4 var(--mono); outline: none;
+}
+.custom-q textarea:focus { border-color: var(--accent); }
+.check { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; }
