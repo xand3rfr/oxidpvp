@@ -566,3 +566,12 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 @media (max-width: 520px) { .lb-row { grid-template-columns: 34px 1fr 40px 40px 0 56px; } .lb-row span:nth-child(5) { display: none; } }
 .open-rooms a { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #86efac; }
 .open-rooms i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse 1.4s ease-in-out infinite; }
+
+/* Sam corner: a tiny dot in the bottom-left of the home page. */
+.sam-corner { position: fixed; left: 10px; bottom: 10px; z-index: 50; display: flex; align-items: center; gap: 8px; }
+.sam-dot { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%; background: var(--line-3); cursor: pointer; opacity: .6; transition: opacity .2s, transform .2s; }
+.sam-dot:hover, .sam-dot:focus-visible { opacity: 1; transform: scale(1.4); background: var(--accent); }
+.sam-dot::before { content: ""; position: absolute; inset: -6px; } /* easier to tap */
+.sam-dot { position: relative; }
+.sam-msg { font: 500 12px/1 var(--mono); color: var(--text); background: var(--surface); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 10px; opacity: 0; transform: translateX(-4px); pointer-events: none; transition: opacity .2s, transform .2s; white-space: nowrap; }
+.sam-msg.on { opacity: 1; transform: none; }

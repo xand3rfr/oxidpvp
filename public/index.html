@@ -888,5 +888,20 @@
       }
     })();
   </script>
+  <div class="sam-corner">
+    <button class="sam-dot" id="samDot" type="button" aria-label="?"></button>
+    <span class="sam-msg" id="samMsg" role="status">Samuel Hines was here</span>
+  </div>
+  <script>
+    (() => {
+      const dot = document.getElementById("samDot"), msg = document.getElementById("samMsg");
+      let t;
+      dot.addEventListener("click", () => {
+        msg.classList.add("on");
+        clearTimeout(t);
+        t = setTimeout(() => msg.classList.remove("on"), 3000);
+      });
+    })();
+  </script>
 </body>
 </html>
