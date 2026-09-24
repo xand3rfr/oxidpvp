@@ -14,6 +14,8 @@
 //   Directory   - public rooms that hosts chose to list (GET /api/rooms)
 //   Leaderboard - wins/losses per name per game, reported by players in a live room
 //                 (GET /api/leaderboard?game=<id>|all)
+//   Presence    - who's online, for the friends list, and invites between friends
+//                 (WebSocket /api/presence?id=<friend code>&key=<secret>)
 import { DurableObject } from "cloudflare:workers";
 
 const MAX_SOCKETS = 12;         // host + guests + spectators (games enforce their own limits)
@@ -45,6 +47,12 @@ export default {
       const game = (url.searchParams.get("game") || "all").slice(0, 16);
       if (!/^[a-z0-9]+$/.test(game)) return json({ error: "bad-game" }, 400);
       return env.BOARD.get(env.BOARD.idFromName("board")).fetch(new Request("https://board/top?game=" + game));
+    }
+    if (url.pathname === "/api/presence") {
+      if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected WebSocket", { status: 426 });
+      const origin = request.headers.get("Origin");
+      if (origin && new URL(origin).host !== url.host) return new Response("Forbidden", { status: 403 });
+      return env.PRESENCE.get(env.PRESENCE.idFromName("presence")).fetch(request);
     }
     if (url.pathname.startsWith("/api/")) return new Response("Not found", { status: 404 });
     return env.ASSETS.fetch(request);
@@ -315,4 +323,81 @@ export class Leaderboard extends DurableObject {
       : this.sql.exec(`SELECT name, w, l, d FROM scores WHERE game = ? ORDER BY w DESC, l ASC LIMIT 50`, game).toArray();
     return json({ game, rows });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Presence: every open OXIDPVP tab keeps one socket here, tagged with its friend code.
+// A friend code is public (you share it); the key is a secret only that browser knows, so
+// nobody else can pretend to be you. Friends lists live in each browser; this object only
+// answers "which of these codes are online, and what are they playing?" and relays invites.
+// ---------------------------------------------------------------------------
+const FID_RE = /^[A-Z0-9]{6}$/, KEY_RE = /^[a-z0-9]{16,40}$/;
+
+export class Presence extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+    const id = url.searchParams.get("id") || "", key = url.searchParams.get("key") || "";
+    const [client, server] = Object.values(new WebSocketPair());
+    const done = () => new Response(null, { status: 101, webSocket: client });
+    if (!FID_RE.test(id) || !KEY_RE.test(key)) {
+      server.accept();
+      server.close(4000, "bad-id");
+      return done();
+    }
+    const saved = await this.ctx.storage.get("k:" + id);
+    if (saved && saved !== key) {
+      server.accept();
+      server.close(4003, "bad-key");
+      return done();
+    }
+    if (!saved) await this.ctx.storage.put("k:" + id, key);
+    // Cap tabs per code so one browser can't pile up sockets.
+    const mine = this.ctx.getWebSockets(id);
+    if (mine.length >= 6) mine[0].close(4001, "too many tabs");
+    this.ctx.acceptWebSocket(server, [id]);
+    server.serializeAttachment({ id, name: "", game: null, lastInv: 0 });
+    return done();
+  }
+
+  webSocketMessage(ws, raw) {
+    if (typeof raw !== "string" || raw.length > 2000) return;
+    let m;
+    try { m = JSON.parse(raw); } catch { return; }
+    const a = ws.deserializeAttachment();
+    if (m.t === "hi") {
+      a.name = cleanName(m.name);
+      ws.serializeAttachment(a);
+    } else if (m.t === "where") {
+      a.game = typeof m.game === "string" && /^[a-z0-9]{1,16}$/.test(m.game) ? m.game : null;
+      ws.serializeAttachment(a);
+    } else if (m.t === "q" && Array.isArray(m.ids)) {
+      const list = m.ids.slice(0, 60).filter((x) => FID_RE.test(x)).map((fid) => {
+        const socks = this.ctx.getWebSockets(fid).map((s) => s.deserializeAttachment()).filter(Boolean);
+        if (!socks.length) return { id: fid, on: false };
+        const playing = socks.find((x) => x.game);
+        return { id: fid, on: true, name: (playing || socks[0]).name, game: playing ? playing.game : null };
+      });
+      trySend(ws, JSON.stringify({ t: "on", list }));
+    } else if (m.t === "inv" && FID_RE.test(m.to) && m.to !== a.id) {
+      const now = Date.now();
+      if (now - a.lastInv < 2000) return;
+      a.lastInv = now;
+      ws.serializeAttachment(a);
+      if (typeof m.game !== "string" || !/^[a-z0-9]{1,16}$/.test(m.game) || !CODE_RE.test(m.code || "")) return;
+      const out = JSON.stringify({ t: "inv", from: a.id, name: a.name || "A friend", game: m.game, code: m.code });
+      let n = 0;
+      for (const s of this.ctx.getWebSockets(m.to)) { trySend(s, out); n++; }
+      trySend(ws, JSON.stringify({ t: "sent", to: m.to, ok: n > 0 }));
+    }
+  }
+
+  webSocketClose(ws, code) {
+    try { ws.close(code === 1005 ? 1000 : code, "bye"); } catch {}
+  }
+  webSocketError() {}
 }

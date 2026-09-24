@@ -390,6 +390,8 @@
     store.set(META_KEY, JSON.stringify(meta));
     checkAchievements();
     if (reportTo && !reportTo.conn.closed) reportTo.conn.send({ rec: { r: result, name: reportTo.name } });
+    // Let other OXIDPVP tabs know (a tournament tab uses this to fill in the bracket).
+    try { new BroadcastChannel("oxidpvp").postMessage({ t: "result", game, result, code: reportTo && reportTo.code }); } catch {}
   }
 
   // ---------- Achievements ----------
@@ -540,6 +542,159 @@
     mVol.addEventListener("input", () => music.setVolume(mVol.value / 100));
   }
 
+  // ---------- Friends + presence ----------
+  // Each browser gets a public friend code and a secret key. Friends are saved locally; the
+  // Presence server only says which codes are online, what they're playing, and relays invites.
+  const FID_KEY = "oxidpvp-fid", FRIENDS_KEY = "oxidpvp-friends";
+  const identity = (() => {
+    let v = null;
+    try { v = JSON.parse(store.get(FID_KEY)); } catch {}
+    if (!v || !/^[A-Z0-9]{6}$/.test(v.id) || !/^[a-z0-9]{16,40}$/.test(v.key)) {
+      const rnd = (chars, n) => { const a = new Uint32Array(n); crypto.getRandomValues(a); return [...a].map((x) => chars[x % chars.length]).join(""); };
+      v = { id: rnd(ALPHABET, 6), key: rnd("abcdefghijklmnopqrstuvwxyz0123456789", 24) };
+      store.set(FID_KEY, JSON.stringify(v));
+    }
+    return v;
+  })();
+  const readFriends = () => { try { return (JSON.parse(store.get(FRIENDS_KEY)) || []).filter((f) => f && /^[A-Z0-9]{6}$/.test(f.id)); } catch { return []; } };
+  const saveFriends = (l) => store.set(FRIENDS_KEY, JSON.stringify(l.slice(0, 50)));
+  const presence = (() => {
+    let ws = null, retry = 1000, pingT = 0, status = new Map(), listeners = new Set(), sentCb = null;
+    function connect() {
+      if (!("WebSocket" in window)) return;
+      try { ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/presence?id=${identity.id}&key=${identity.key}`); } catch { return; }
+      ws.onopen = () => { retry = 1000; hello(); where(); query(); clearInterval(pingT); pingT = setInterval(() => { try { ws.send("ping"); } catch {} }, 25000); };
+      ws.onmessage = (e) => {
+        if (e.data === "pong") return;
+        let m; try { m = JSON.parse(e.data); } catch { return; }
+        if (m.t === "on") {
+          const fr = readFriends();
+          for (const x of m.list) {
+            status.set(x.id, x);
+            const f = fr.find((y) => y.id === x.id);
+            if (f && x.name && f.name !== x.name) f.name = x.name;
+          }
+          saveFriends(fr);
+          for (const f of listeners) f();
+        } else if (m.t === "inv") showInvite(m);
+        else if (m.t === "sent" && sentCb) sentCb(m);
+      };
+      ws.onclose = (e) => {
+        clearInterval(pingT); ws = null;
+        if (e.code === 4003 || e.code === 4000) return; // bad key: don't hammer the server
+        setTimeout(connect, retry); retry = Math.min(30000, retry * 2);
+      };
+    }
+    const send = (m) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); };
+    const hello = () => send({ t: "hi", name: savedName() || "Player" });
+    function where() { send({ t: "where", game: reportTo && !reportTo.conn.closed ? reportTo.game : null }); }
+    function query() { const ids = readFriends().map((f) => f.id); if (ids.length) send({ t: "q", ids }); }
+    setTimeout(connect, 400);
+    return {
+      where, query, hello, status,
+      invite(to, cb) { if (!reportTo) return false; sentCb = cb; send({ t: "inv", to, game: reportTo.game, code: reportTo.code }); return true; },
+      onChange(f) { listeners.add(f); return () => listeners.delete(f); },
+    };
+  })();
+  nameListeners.push(() => presence.hello());
+
+  function showInvite(m) {
+    const g = GAMES.find((x) => x.id === m.game);
+    if (!g) return;
+    document.querySelector(".invite-card")?.remove();
+    const el = document.createElement("div");
+    el.className = "invite-card";
+    el.innerHTML = `<b></b><span></span><div class="row"><button class="btn ghost" type="button">Not now</button><a class="btn primary">Join</a></div>`;
+    el.querySelector("b").textContent = `${m.name} invited you`;
+    el.querySelector("span").textContent = `to play ${g.title}`;
+    el.querySelector("a").href = `${g.page}.html#${m.code}`;
+    el.querySelector("button").addEventListener("click", () => el.remove());
+    document.body.append(el);
+    sfx.play("turn");
+    setTimeout(() => el.remove(), 30000);
+  }
+
+  function openFriends() {
+    document.querySelector(".settings-overlay")?.remove();
+    const ov = document.createElement("div");
+    ov.className = "overlay settings-overlay";
+    ov.innerHTML = `
+      <div class="panel settings friends" role="dialog" aria-label="Friends">
+        <div class="set-top"><h2>Friends</h2><button class="chat-close" type="button" aria-label="Close">&times;</button></div>
+        <section><h3>Your friend code</h3>
+          <div class="fr-me"><code class="fr-code"></code><button class="btn" type="button" data-copy>Copy</button></div>
+          <p class="set-note">Give this code to friends so they can add you. Anyone with it can see when you're online and what you're playing.</p>
+        </section>
+        <section><h3>Add a friend</h3>
+          <form class="fr-add"><input class="set-name" maxlength="6" placeholder="Their code" aria-label="Friend code" autocomplete="off"><button class="btn primary" type="submit">Add</button></form>
+        </section>
+        <section><h3 class="fr-head">Friends</h3><div class="fr-list"></div></section>
+      </div>`;
+    document.body.append(ov);
+    const q = (sel) => ov.querySelector(sel);
+    let off = () => {}, poll = 0;
+    const close = () => { off(); clearInterval(poll); ov.remove(); removeEventListener("keydown", esc, true); };
+    const esc = (e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
+    addEventListener("keydown", esc, true);
+    q(".chat-close").addEventListener("click", close);
+    ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
+    q(".fr-code").textContent = identity.id;
+    q("[data-copy]").addEventListener("click", async () => { try { await navigator.clipboard.writeText(identity.id); toast("Friend code copied"); } catch { toast("Your code: " + identity.id); } });
+    const input = q(".fr-add input");
+    input.addEventListener("input", () => { input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
+    input.addEventListener("keydown", (e) => e.stopPropagation());
+    q(".fr-add").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const id = input.value.trim();
+      if (!/^[A-Z0-9]{6}$/.test(id)) return toast("Friend codes are 6 letters and numbers");
+      if (id === identity.id) return toast("That's your own code!");
+      const fr = readFriends();
+      if (fr.some((f) => f.id === id)) return toast("Already on your list");
+      fr.unshift({ id, name: "" });
+      saveFriends(fr);
+      input.value = "";
+      presence.query();
+      render();
+      sfx.play("good");
+    });
+    function render() {
+      const list = q(".fr-list"), fr = readFriends();
+      list.textContent = "";
+      const online = fr.filter((f) => (presence.status.get(f.id) || {}).on).length;
+      q(".fr-head").textContent = fr.length ? `Friends · ${online} online` : "Friends";
+      if (!fr.length) { list.innerHTML = `<p class="set-note">No friends yet. Add someone's code above.</p>`; return; }
+      const inRoom = reportTo && !reportTo.conn.closed;
+      fr.sort((a, b) => ((presence.status.get(b.id) || {}).on ? 1 : 0) - ((presence.status.get(a.id) || {}).on ? 1 : 0));
+      for (const f of fr) {
+        const st = presence.status.get(f.id) || {};
+        const g = st.game && GAMES.find((x) => x.id === st.game);
+        const row = document.createElement("div");
+        row.className = "fr-row" + (st.on ? " on" : "");
+        row.innerHTML = `<i class="fr-dot"></i><div class="fr-who"><b></b><small></small></div>`;
+        row.querySelector("b").textContent = f.name || f.id;
+        row.querySelector("small").textContent = st.on ? (g ? `Playing ${g.title}` : "Online") : `Offline · ${f.id}`;
+        if (inRoom && st.on) {
+          const inv = document.createElement("button");
+          inv.className = "btn primary sm"; inv.type = "button"; inv.textContent = "Invite";
+          inv.addEventListener("click", () => {
+            inv.disabled = true;
+            presence.invite(f.id, (m) => { inv.textContent = m.ok ? "Sent!" : "Offline"; });
+          });
+          row.append(inv);
+        }
+        const rm = document.createElement("button");
+        rm.className = "chat-close"; rm.type = "button"; rm.title = "Remove"; rm.innerHTML = "&times;";
+        rm.addEventListener("click", () => { saveFriends(readFriends().filter((x) => x.id !== f.id)); render(); });
+        row.append(rm);
+        list.append(row);
+      }
+    }
+    off = presence.onChange(render);
+    presence.query();
+    poll = setInterval(() => presence.query(), 10000);
+    render();
+  }
+
   // ---------- Public room listing (host only) ----------
   const PUB_KEY = "oxidpvp-public";
   function lister(conn, info) {
@@ -586,6 +741,7 @@
     chat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>',
     on: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     off: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zM17 9l5 6M22 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    friends: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c1.8.7 3 2.4 3.5 5.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
     gear: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2.1 1.2M17.7 15.3l2.1 1.2M4.2 16.5l2.1-1.2M17.7 8.7l2.1-1.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
     swap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h13l-3-3M20 16H7l3 3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   };
@@ -614,6 +770,7 @@
           </form>
         </div>
         <div class="dock-row">
+          <button class="dock-btn friends-btn" type="button" title="Friends" aria-label="Friends">${ICON.friends}</button>
           <button class="dock-btn gear" type="button" title="Settings" aria-label="Settings">${ICON.gear}</button>
           <button class="dock-btn mute" type="button"></button>
           <button class="dock-btn react-btn" type="button" title="React" aria-label="React" hidden>😀</button>
@@ -637,6 +794,7 @@
       paintMute();
       muteBtn.addEventListener("click", () => { sfx.toggle(); paintMute(); });
       $(".gear").addEventListener("click", () => openSettings());
+      $(".friends-btn").addEventListener("click", () => openFriends());
       $(".chat-toggle").addEventListener("click", () => toggle());
       $(".chat-panel .chat-close").addEventListener("click", () => toggle(false));
       $(".switch-pop .chat-close").addEventListener("click", () => pop(null));
@@ -1062,7 +1220,7 @@
       helloTimers.clear();
       if (stopGame) { try { stopGame(); } catch {} stopGame = null; }
       pub.stop(); ui.pubToggle(false);
-      if (reportTo && reportTo.conn === conn) reportTo = null;
+      if (reportTo && reportTo.conn === conn) { reportTo = null; presence.where(); }
       if (conn) { conn.close(bye); conn = null; }
       if (bye) sess.del("oxid-session");
       opp = hostP = null; specs = new Map(); started = false; spectator = false;
@@ -1126,7 +1284,7 @@
       if (my !== gen) return c.close();
       conn = c;
       hostP = me;
-      reportTo = { conn: c, name: me.name };
+      reportTo = { conn: c, name: me.name, game, code }; presence.where();
       ui.showRoom(code, { isHost: true, party: false });
       renderPeople();
       ui.setStatus("");
@@ -1220,7 +1378,7 @@
       }
       if (my !== gen) return cn.close();
       conn = cn;
-      reportTo = { conn: cn, name: me.name };
+      reportTo = { conn: cn, name: me.name, game, code }; presence.where();
       sess.set("oxid-session", { game, code: c });
       if (cn.welcome.hostAway) banner("The host lost connection. Waiting for them…");
       ui.showRoom(c, { isHost: false, party: false });
@@ -1349,7 +1507,7 @@
       graceTimers.clear(); helloTimers.clear();
       if (stopGame) { try { stopGame(); } catch {} stopGame = null; }
       pub.stop(); ui.pubToggle(false);
-      if (reportTo && reportTo.conn === conn) reportTo = null;
+      if (reportTo && reportTo.conn === conn) { reportTo = null; presence.where(); }
       if (conn) { conn.close(bye); conn = null; }
       if (bye) sess.del("oxid-session");
       handlers = []; leaveHandlers = []; rejoinHandlers = [];
@@ -1407,7 +1565,7 @@
       conn = c;
       myId = 0;
       players = [{ id: 0, ...ui.profile() }];
-      reportTo = { conn: c, name: players[0].name };
+      reportTo = { conn: c, name: players[0].name, game, code }; presence.where();
       ui.showRoom(code, { isHost: true, party: true });
       render();
       ui.setStatus("Share the link. Start when everyone's in.");
@@ -1520,7 +1678,7 @@
       }
       if (my !== gen) return cn.close();
       conn = cn;
-      reportTo = { conn: cn, name: myName };
+      reportTo = { conn: cn, name: myName, game, code }; presence.where();
       sess.set("oxid-session", { game, code: c });
       if (cn.welcome.hostAway) banner("The host lost connection. Waiting for them…");
       hello();
@@ -1668,7 +1826,7 @@
   window.Lobby = { mount };
   window.Room = { mount: mountRoom };
   window.GameUtil = {
-    fitCanvas, toast, loop, shuffle, touchControls, isTouch: () => touchMode, openSettings, achieve: unlock, achievements,
+    fitCanvas, toast, loop, shuffle, touchControls, isTouch: () => touchMode, openSettings, openFriends, achieve: unlock, achievements, friendCode: () => identity.id,
     meta: readMeta, onNameChange: (f) => nameListeners.push(f), myName: savedName, myAvatar, avatar: avatarEl, cleanName,
     sfx: (n) => sfx.play(n), record, stats: readStats, games: GAMES, joinByCode, pageFor, gameById,
   };

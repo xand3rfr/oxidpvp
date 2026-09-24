@@ -690,3 +690,21 @@ body.touching .touch-ui { display: block; }
 .dw-stats span { font-size: 11px; }
 :root[data-theme="light"] .toast, :root[data-theme="light"] .dock-btn, :root[data-theme="light"] .chat-toggle, :root[data-theme="light"] .chat-peek { background: rgba(255, 255, 255, .94); }
 :root[data-theme="light"] .dock-pop, :root[data-theme="light"] .chat-panel { background: rgba(255, 255, 255, .98); }
+
+/* ---------- Friends ---------- */
+.fr-me { display: flex; align-items: center; gap: 10px; }
+.fr-code { font: 700 26px var(--mono); letter-spacing: .18em; padding: 6px 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line-2); }
+.fr-add { display: flex; gap: 8px; }
+.fr-add input { text-transform: uppercase; font-family: var(--mono); letter-spacing: .12em; }
+.fr-list { display: flex; flex-direction: column; gap: 6px; }
+.fr-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); }
+.fr-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); flex: none; }
+.fr-row.on .fr-dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.fr-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fr-who b { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-who small { font-size: 12px; color: var(--muted); }
+.btn.sm { height: 32px; padding: 0 12px; font-size: 12px; }
+.invite-card { position: fixed; top: 76px; right: 16px; z-index: 70; width: min(320px, calc(100vw - 32px)); padding: 14px 16px; border-radius: 16px; background: var(--surface); border: 1px solid rgba(var(--accent-rgb), .5); box-shadow: var(--shadow-lg), 0 0 40px -12px var(--accent-glow); display: flex; flex-direction: column; gap: 4px; animation: rise .25s ease; }
+.invite-card b { font-size: 15px; }
+.invite-card span { font-size: 13px; color: var(--muted); }
+.invite-card .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
