@@ -30,16 +30,22 @@
     <div class="wrap">
       <section class="hero">
         <div>
-          <span class="eyebrow"><b>New</b>Quiz Battle, Connect 4, Battleship &amp; Light Cycles</span>
+          <span class="eyebrow"><b>New</b>9 new games, reactions, spectating &amp; more</span>
           <h1>Play with friends.<br><span class="grad-text">Right in your browser.</span></h1>
           <p class="hero-lead">Pick a game, send your friends a link, and you're playing. No downloads, no accounts, and chat built in.</p>
           <div class="hero-cta">
             <a class="btn primary lg" href="#games">Browse games</a>
             <a class="btn lg" href="#how">How it works</a>
           </div>
+          <form class="code-join" id="codeJoin" autocomplete="off">
+            <label for="codeIn">Got a code?</label>
+            <input id="codeIn" maxlength="5" placeholder="ABCDE" spellcheck="false" autocapitalize="characters">
+            <button class="btn" type="submit">Join</button>
+          </form>
+          <p class="code-err" id="codeErr" aria-live="polite"></p>
           <div class="hero-meta">
-            <div><b>7</b><span>games</span></div>
-            <div><b>2–8</b><span>players</span></div>
+            <div><b>16</b><span>games</span></div>
+            <div><b>2–10</b><span>players</span></div>
             <div><b>0</b><span>downloads</span></div>
           </div>
         </div>
@@ -65,7 +71,7 @@
         <div class="section-head">
           <div>
             <h2>Games</h2>
-            <p id="count">7 games</p>
+            <p id="count">16 games</p>
           </div>
           <div class="filters" role="group" aria-label="Filter games">
             <button class="filter" data-f="all" aria-pressed="true">All</button>
@@ -77,7 +83,7 @@
         </div>
 
         <div class="cards" id="cards">
-          <a class="game-card" href="lastcard.html" data-tags="party turn">
+          <a class="game-card" href="lastcard.html" data-game="lastcard" data-tags="party turn">
             <div class="card-art">
               <svg viewBox="0 0 320 180" aria-hidden="true">
                 <defs>
@@ -111,7 +117,7 @@
             </div>
           </a>
 
-          <a class="game-card" href="trivia.html" data-tags="party turn">
+          <a class="game-card" href="trivia.html" data-game="trivia" data-tags="party turn">
             <div class="card-art">
               <svg viewBox="0 0 320 180" aria-hidden="true">
                 <defs>
@@ -133,14 +139,239 @@
               </svg>
             </div>
             <div class="card-body">
-              <div class="card-title"><h3>Quiz Battle</h3><span class="badge-new">New</span></div>
+              <div class="card-title"><h3>Quiz Battle</h3></div>
               <p>Ten trivia questions, fifteen seconds each. Games, science, movies, sports and more. The faster you answer, the more points you get.</p>
               <div class="tags"><span class="tag">2–8 players</span><span class="tag">Trivia</span><span class="tag">Mobile</span></div>
               <div class="card-cta">Play Quiz Battle <span class="arrow">&rarr;</span></div>
             </div>
           </a>
 
-          <a class="game-card" href="connect4.html" data-tags="duel turn">
+          <a class="game-card" href="draw.html" data-game="draw" data-tags="party turn">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <defs><radialGradient id="dgBg" cx="70%" cy="20%" r="90%"><stop offset="0" stop-color="#3b1a4f"/><stop offset="1" stop-color="#0c0b11"/></radialGradient></defs>
+                <rect width="320" height="180" fill="url(#dgBg)"/>
+                <rect x="34" y="26" width="170" height="128" rx="10" fill="#fff"/>
+                <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M70 128V92l34-26 34 26v36z" stroke="#111" stroke-width="4"/>
+                  <path d="M96 128v-20h16v20" stroke="#ef4444" stroke-width="4"/>
+                  <circle cx="170" cy="56" r="13" stroke="#f59e0b" stroke-width="4"/>
+                  <path d="M54 136h130" stroke="#22c55e" stroke-width="4"/>
+                </g>
+                <g transform="translate(196 104) rotate(35)"><rect x="-6" y="-44" width="12" height="52" rx="2" fill="#facc15"/><path d="M-6 8h12l-6 12z" fill="#f5d0a9"/><rect x="-6" y="-50" width="12" height="8" rx="2" fill="#f472b6"/></g>
+                <g font-family="Geist, system-ui, sans-serif" font-size="12" font-weight="600">
+                  <rect x="222" y="40" width="80" height="24" rx="12" fill="#181821" stroke="#fff" stroke-opacity=".12"/><text x="236" y="56" fill="#9c9cad">a barn?</text>
+                  <rect x="222" y="72" width="80" height="24" rx="12" fill="rgba(34,197,94,.18)" stroke="#22c55e"/><text x="234" y="88" fill="#86efac">house! ✓</text>
+                </g>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>Draw &amp; Guess</h3><span class="badge-new">New</span></div>
+              <p>One person draws a secret word and everyone else races to guess it. Faster guesses score more, and so does a good drawer.</p>
+              <div class="tags"><span class="tag">2–8 players</span><span class="tag">Drawing</span><span class="tag">Mobile</span></div>
+              <div class="card-cta">Play Draw &amp; Guess <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+
+          <a class="game-card" href="wordbomb.html" data-game="bomb" data-tags="party turn">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <defs>
+                  <radialGradient id="wbBg" cx="50%" cy="50%" r="70%"><stop offset="0" stop-color="#3a1a14"/><stop offset="1" stop-color="#0c0b11"/></radialGradient>
+                  <radialGradient id="wbBomb" cx="35%" cy="30%"><stop offset="0" stop-color="#4b4b5a"/><stop offset="1" stop-color="#111118"/></radialGradient>
+                  <filter id="wbGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5"/></filter>
+                </defs>
+                <rect width="320" height="180" fill="url(#wbBg)"/>
+                <circle cx="150" cy="100" r="46" fill="url(#wbBomb)"/>
+                <rect x="140" y="46" width="20" height="14" rx="3" fill="#2a2a36"/>
+                <path d="M150 46c4-14 18-18 28-12" fill="none" stroke="#a8a29e" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="180" cy="33" r="9" fill="#facc15" filter="url(#wbGlow)"/><circle cx="180" cy="33" r="4" fill="#fff"/>
+                <rect x="112" y="88" width="76" height="30" rx="9" fill="#8b5cf6"/>
+                <text x="150" y="109" text-anchor="middle" font-family="Geist Mono, monospace" font-weight="600" font-size="18" fill="#fff" letter-spacing="3">ING</text>
+                <g font-family="Geist Mono, monospace" font-weight="600" font-size="13">
+                  <text x="224" y="72" fill="#facc15">SINGER</text>
+                  <text x="224" y="98" fill="#86efac">KING ✓</text>
+                  <text x="34" y="150" fill="#fca5a5">♥ ♥ ♡</text>
+                </g>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>Word Bomb</h3><span class="badge-new">New</span></div>
+              <p>The bomb goes around the circle. Type a real word containing the letters before it blows up in your hands. Last one standing wins.</p>
+              <div class="tags"><span class="tag">2–8 players</span><span class="tag">Words</span><span class="tag">Keyboard</span></div>
+              <div class="card-cta">Play Word Bomb <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+
+          <a class="game-card" href="dice.html" data-game="dice" data-tags="party turn">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <defs>
+                  <radialGradient id="ldBg" cx="50%" cy="60%" r="70%"><stop offset="0" stop-color="#123325"/><stop offset="1" stop-color="#0b0b10"/></radialGradient>
+                  <linearGradient id="ldDie" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#d4d4de"/></linearGradient>
+                  <linearGradient id="ldCup" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c5bb8"/><stop offset="1" stop-color="#3b2566"/></linearGradient>
+                </defs>
+                <rect width="320" height="180" fill="url(#ldBg)"/>
+                <path d="M212 40h60l10 96h-80z" fill="url(#ldCup)"/><rect x="198" y="132" width="88" height="10" rx="5" fill="#2a1a48"/>
+                <g transform="translate(58 92) rotate(-12)"><rect width="44" height="44" rx="9" fill="url(#ldDie)"/><g fill="#15151c"><circle cx="11" cy="11" r="4"/><circle cx="33" cy="33" r="4"/><circle cx="33" cy="11" r="4"/><circle cx="11" cy="33" r="4"/><circle cx="22" cy="22" r="4"/></g></g>
+                <g transform="translate(112 104) rotate(8)"><rect width="44" height="44" rx="9" fill="url(#ldDie)"/><g fill="#15151c"><circle cx="11" cy="11" r="4"/><circle cx="33" cy="33" r="4"/><circle cx="22" cy="22" r="4"/></g></g>
+                <g transform="translate(150 70) rotate(-4)"><rect width="44" height="44" rx="9" fill="url(#ldDie)"/><circle cx="22" cy="22" r="6" fill="#8b5cf6"/></g>
+                <rect x="34" y="28" width="104" height="30" rx="15" fill="#8b5cf6"/><text x="86" y="48" text-anchor="middle" font-family="Geist, system-ui, sans-serif" font-weight="700" font-size="14" fill="#fff">4 × fives</text>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>Liar's Dice</h3><span class="badge-new">New</span></div>
+              <p>Everyone hides their dice. Bid on what's under all the cups, bluff your friends, and call "Liar!" at the right moment.</p>
+              <div class="tags"><span class="tag">2–6 players</span><span class="tag">Bluffing</span><span class="tag">Mobile</span></div>
+              <div class="card-cta">Play Liar's Dice <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+
+          <a class="game-card" href="spyfall.html" data-game="spy" data-tags="party turn">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <defs><radialGradient id="spBg" cx="40%" cy="40%" r="80%"><stop offset="0" stop-color="#2d1320"/><stop offset="1" stop-color="#0b0b10"/></radialGradient></defs>
+                <rect width="320" height="180" fill="url(#spBg)"/>
+                <g transform="translate(92 100)">
+                  <ellipse cx="0" cy="-30" rx="46" ry="9" fill="#1c1c26"/>
+                  <path d="M-28 -32c2-22 12-30 28-30s26 8 28 30z" fill="#1c1c26"/>
+                  <rect x="-28" y="-40" width="56" height="7" fill="#f43f5e"/>
+                  <circle cx="-13" cy="-12" r="10" fill="none" stroke="#e5e7eb" stroke-width="3"/><circle cx="13" cy="-12" r="10" fill="none" stroke="#e5e7eb" stroke-width="3"/>
+                  <path d="M-3 -12h6" stroke="#e5e7eb" stroke-width="3"/>
+                  <path d="M-34 60c0-34 14-46 34-46s34 12 34 46z" fill="#1c1c26"/>
+                </g>
+                <g font-family="Geist, system-ui, sans-serif" font-size="11" font-weight="600">
+                  <rect x="176" y="30" width="112" height="28" rx="8" fill="#181821" stroke="#fff" stroke-opacity=".12"/><text x="190" y="48" fill="#9c9cad">🏖️ Beach</text>
+                  <rect x="176" y="66" width="112" height="28" rx="8" fill="#181821" stroke="#fff" stroke-opacity=".12"/><text x="190" y="84" fill="#9c9cad" text-decoration="line-through">🚀 Space Station</text>
+                  <rect x="176" y="102" width="112" height="28" rx="8" fill="rgba(244,63,94,.18)" stroke="#f43f5e"/><text x="190" y="120" fill="#fda4af">🏴‍☠️ Pirate Ship?</text>
+                </g>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>Spyfall</h3><span class="badge-new">New</span></div>
+              <p>Everyone knows the secret location except the spy. Ask sneaky questions, spot who's bluffing, and vote them out.</p>
+              <div class="tags"><span class="tag">3–8 players</span><span class="tag">Social</span><span class="tag">Chat</span></div>
+              <div class="card-cta">Play Spyfall <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+
+          <a class="game-card" href="codewords.html" data-game="codewords" data-tags="party turn">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <rect width="320" height="180" fill="#0c0b11"/>
+                <g font-family="Geist, system-ui, sans-serif" font-size="9" font-weight="700" text-anchor="middle" letter-spacing=".5">
+                  <g fill="#23232e" stroke="#fff" stroke-opacity=".08">
+                    <rect x="28" y="24" width="48" height="30" rx="6"/><rect x="84" y="24" width="48" height="30" rx="6"/><rect x="188" y="24" width="48" height="30" rx="6"/>
+                    <rect x="28" y="62" width="48" height="30" rx="6"/><rect x="136" y="62" width="48" height="30" rx="6"/><rect x="244" y="62" width="48" height="30" rx="6"/>
+                    <rect x="84" y="100" width="48" height="30" rx="6"/><rect x="188" y="100" width="48" height="30" rx="6"/><rect x="244" y="100" width="48" height="30" rx="6"/>
+                    <rect x="28" y="138" width="48" height="30" rx="6"/><rect x="136" y="138" width="48" height="30" rx="6"/><rect x="188" y="138" width="48" height="30" rx="6"/>
+                  </g>
+                  <rect x="136" y="24" width="48" height="30" rx="6" fill="#ef4444"/><rect x="244" y="24" width="48" height="30" rx="6" fill="#3b82f6"/>
+                  <rect x="84" y="62" width="48" height="30" rx="6" fill="#3b82f6"/><rect x="188" y="62" width="48" height="30" rx="6" fill="#a8a29e"/>
+                  <rect x="28" y="100" width="48" height="30" rx="6" fill="#ef4444"/><rect x="136" y="100" width="48" height="30" rx="6" fill="#000" stroke="#f43f5e"/>
+                  <rect x="84" y="138" width="48" height="30" rx="6" fill="#ef4444"/><rect x="244" y="138" width="48" height="30" rx="6" fill="#3b82f6"/>
+                  <g fill="#e5e7eb"><text x="52" y="42">MOON</text><text x="108" y="42">KITE</text><text x="212" y="42">OWL</text><text x="52" y="80">JAM</text><text x="160" y="80">TANK</text><text x="268" y="80">WAND</text><text x="108" y="118">MAZE</text><text x="212" y="118">GEAR</text><text x="268" y="118">LAMP</text><text x="52" y="156">FROG</text><text x="160" y="156">CAPE</text><text x="212" y="156">TACO</text></g>
+                </g>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>Codewords</h3><span class="badge-new">New</span></div>
+              <p>Red vs Blue. Spymasters give one-word clues, teammates find their words, and nobody touches the assassin.</p>
+              <div class="tags"><span class="tag">4–10 players</span><span class="tag">Teams</span><span class="tag">Words</span></div>
+              <div class="card-cta">Play Codewords <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+
+          <a class="game-card" href="typing.html" data-game="typing" data-tags="party live">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <rect width="320" height="180" fill="#0b0b10"/>
+                <g>
+                  <rect x="30" y="26" width="260" height="22" rx="8" fill="#181821"/><rect x="30" y="26" width="210" height="22" rx="8" fill="rgba(34,197,94,.3)"/><circle cx="240" cy="37" r="9" fill="#22c55e"/>
+                  <rect x="30" y="56" width="260" height="22" rx="8" fill="#181821"/><rect x="30" y="56" width="150" height="22" rx="8" fill="rgba(139,92,246,.35)"/><circle cx="180" cy="67" r="9" fill="#8b5cf6"/>
+                  <rect x="30" y="86" width="260" height="22" rx="8" fill="#181821"/><rect x="30" y="86" width="96" height="22" rx="8" fill="rgba(244,114,182,.3)"/><circle cx="126" cy="97" r="9" fill="#f472b6"/>
+                </g>
+                <g fill="#23232e" stroke="#fff" stroke-opacity=".1">
+                  <rect x="40" y="124" width="24" height="20" rx="4"/><rect x="68" y="124" width="24" height="20" rx="4"/><rect x="96" y="124" width="24" height="20" rx="4"/><rect x="124" y="124" width="24" height="20" rx="4" fill="#8b5cf6"/><rect x="152" y="124" width="24" height="20" rx="4"/><rect x="180" y="124" width="24" height="20" rx="4"/><rect x="208" y="124" width="24" height="20" rx="4"/><rect x="236" y="124" width="24" height="20" rx="4"/>
+                  <rect x="54" y="148" width="24" height="20" rx="4"/><rect x="82" y="148" width="130" height="20" rx="4"/><rect x="216" y="148" width="24" height="20" rx="4"/>
+                </g>
+                <text x="258" y="102" font-family="Geist Mono, monospace" font-size="11" fill="#9c9cad" text-anchor="end">87 wpm</text>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>Type Race</h3><span class="badge-new">New</span></div>
+              <p>Everyone types the same passage at the same time. Watch the progress bars race, and see who has the fastest fingers.</p>
+              <div class="tags"><span class="tag">2–8 players</span><span class="tag">Real-time</span><span class="tag">Keyboard</span></div>
+              <div class="card-cta">Play Type Race <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+
+          <a class="game-card" href="rps.html" data-game="rps" data-tags="party turn">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <defs><radialGradient id="rpBg" cx="50%" cy="50%" r="70%"><stop offset="0" stop-color="#1f1a3d"/><stop offset="1" stop-color="#0b0b10"/></radialGradient></defs>
+                <rect width="320" height="180" fill="url(#rpBg)"/>
+                <g fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="2"><path d="M40 40h40v30h30M40 100h40v-30M40 140h40v-20h30v-50M110 70h40v30h40"/></g>
+                <g font-size="40" text-anchor="middle" font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif">
+                  <text x="200" y="80">🪨</text><text x="248" y="120">📄</text><text x="196" y="150">✂️</text>
+                </g>
+                <text x="262" y="56" font-size="28" text-anchor="middle">🏆</text>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>RPS Tournament</h3><span class="badge-new">New</span></div>
+              <p>A knockout Rock Paper Scissors bracket. Best of 3 each match, everyone throws at once, and one person takes the trophy.</p>
+              <div class="tags"><span class="tag">2–8 players</span><span class="tag">Quick</span><span class="tag">Mobile</span></div>
+              <div class="card-cta">Play RPS Tournament <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+
+          <a class="game-card" href="snake.html" data-game="snake" data-tags="party live">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <defs>
+                  <pattern id="snGrid" width="20" height="20" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#fff" fill-opacity=".03"/><rect x="10" y="10" width="10" height="10" fill="#fff" fill-opacity=".03"/></pattern>
+                  <filter id="snGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter>
+                </defs>
+                <rect width="320" height="180" fill="#0a0a0f"/><rect width="320" height="180" fill="url(#snGrid)"/>
+                <g fill="#ff5b3a"><rect x="42" y="102" width="16" height="16" rx="4"/><rect x="62" y="102" width="16" height="16" rx="4"/><rect x="82" y="102" width="16" height="16" rx="4"/><rect x="82" y="82" width="16" height="16" rx="4"/><rect x="82" y="62" width="16" height="16" rx="4"/><rect x="102" y="62" width="18" height="18" rx="5"/></g>
+                <g fill="#4d8dff"><rect x="222" y="42" width="16" height="16" rx="4"/><rect x="222" y="62" width="16" height="16" rx="4"/><rect x="222" y="82" width="16" height="16" rx="4"/><rect x="202" y="82" width="16" height="16" rx="4"/><rect x="180" y="82" width="18" height="18" rx="5"/></g>
+                <g fill="#22c55e"><rect x="142" y="142" width="16" height="16" rx="4"/><rect x="162" y="142" width="16" height="16" rx="4"/><rect x="182" y="142" width="16" height="16" rx="4"/><rect x="202" y="140" width="18" height="18" rx="5"/></g>
+                <circle cx="150" cy="72" r="6" fill="#f472b6" filter="url(#snGlow)"/><circle cx="150" cy="72" r="5" fill="#f472b6"/>
+                <circle cx="270" cy="130" r="5" fill="#f472b6"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>Snake Battle</h3><span class="badge-new">New</span></div>
+              <p>Up to four snakes on one board. Eat to grow, cut each other off, and be the last snake slithering. First to 3 rounds.</p>
+              <div class="tags"><span class="tag">2–4 players</span><span class="tag">Real-time</span><span class="tag">Keys or swipe</span></div>
+              <div class="card-cta">Play Snake Battle <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+
+          <a class="game-card" href="chess.html" data-game="chess" data-tags="duel turn">
+            <div class="card-art">
+              <svg viewBox="0 0 320 180" aria-hidden="true">
+                <rect width="320" height="180" fill="#0c0b11"/>
+                <g transform="translate(70 18) rotate(0)">
+                  <g fill="#d9d4ec"><rect x="0" y="0" width="36" height="36"/><rect x="72" y="0" width="36" height="36"/><rect x="144" y="0" width="36" height="36"/><rect x="36" y="36" width="36" height="36"/><rect x="108" y="36" width="36" height="36"/><rect x="0" y="72" width="36" height="36"/><rect x="72" y="72" width="36" height="36"/><rect x="144" y="72" width="36" height="36"/><rect x="36" y="108" width="36" height="36"/><rect x="108" y="108" width="36" height="36"/></g>
+                  <g fill="#7b6aa8"><rect x="36" y="0" width="36" height="36"/><rect x="108" y="0" width="36" height="36"/><rect x="0" y="36" width="36" height="36"/><rect x="72" y="36" width="36" height="36"/><rect x="144" y="36" width="36" height="36"/><rect x="36" y="72" width="36" height="36"/><rect x="108" y="72" width="36" height="36"/><rect x="0" y="108" width="36" height="36"/><rect x="72" y="108" width="36" height="36"/><rect x="144" y="108" width="36" height="36"/></g>
+                  <rect x="72" y="36" width="36" height="36" fill="#b4a55c"/>
+                  <g font-size="30" text-anchor="middle" font-family="Segoe UI Symbol, Noto Sans Symbols2, DejaVu Sans, sans-serif">
+                    <text x="90" y="64" fill="#fff" stroke="#000" stroke-width="1">♛</text><text x="126" y="28" fill="#15121f">♚</text><text x="54" y="100" fill="#15121f">♞</text><text x="162" y="136" fill="#fff" stroke="#000" stroke-width="1">♜</text><text x="18" y="136" fill="#fff" stroke="#000" stroke-width="1">♔</text>
+                  </g>
+                </g>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title"><h3>Chess</h3><span class="badge-new">New</span></div>
+              <p>The real thing, with 10-minute clocks, legal-move hints, draw offers and rematches. Everyone else in the room can watch.</p>
+              <div class="tags"><span class="tag">1v1 + spectators</span><span class="tag">Turn-based</span><span class="tag">Mobile</span></div>
+              <div class="card-cta">Play Chess <span class="arrow">&rarr;</span></div>
+            </div>
+          </a>
+
+          <a class="game-card" href="connect4.html" data-game="connect" data-tags="duel turn">
             <div class="card-art">
               <svg viewBox="0 0 320 180" aria-hidden="true">
                 <defs>
@@ -163,14 +394,14 @@
               </svg>
             </div>
             <div class="card-body">
-              <div class="card-title"><h3>Connect 4</h3><span class="badge-new">New</span></div>
+              <div class="card-title"><h3>Connect 4</h3></div>
               <p>Drop your discs and get four in a row, across, down or diagonal. Easy to learn, and it gets tense fast.</p>
               <div class="tags"><span class="tag">1v1</span><span class="tag">Turn-based</span><span class="tag">Mobile</span></div>
               <div class="card-cta">Play Connect 4 <span class="arrow">&rarr;</span></div>
             </div>
           </a>
 
-          <a class="game-card" href="battleship.html" data-tags="duel turn">
+          <a class="game-card" href="battleship.html" data-game="battleship" data-tags="duel turn">
             <div class="card-art">
               <svg viewBox="0 0 320 180" aria-hidden="true">
                 <defs>
@@ -191,14 +422,14 @@
               </svg>
             </div>
             <div class="card-body">
-              <div class="card-title"><h3>Battleship</h3><span class="badge-new">New</span></div>
+              <div class="card-title"><h3>Battleship</h3></div>
               <p>Hide five ships on a 10×10 grid, then take turns calling shots. Sink their whole fleet before they sink yours.</p>
               <div class="tags"><span class="tag">1v1</span><span class="tag">Turn-based</span><span class="tag">Mobile</span></div>
               <div class="card-cta">Play Battleship <span class="arrow">&rarr;</span></div>
             </div>
           </a>
 
-          <a class="game-card" href="tron.html" data-tags="duel live">
+          <a class="game-card" href="tron.html" data-game="tron" data-tags="duel live">
             <div class="card-art">
               <svg viewBox="0 0 320 180" aria-hidden="true">
                 <defs>
@@ -218,14 +449,14 @@
               </svg>
             </div>
             <div class="card-body">
-              <div class="card-title"><h3>Light Cycles</h3><span class="badge-new">New</span></div>
+              <div class="card-title"><h3>Light Cycles</h3></div>
               <p>Tron-style. You leave a wall wherever you drive. Box your opponent in and make them crash first. It speeds up the longer a round goes.</p>
               <div class="tags"><span class="tag">1v1</span><span class="tag">Real-time</span><span class="tag">Keys or swipe</span></div>
               <div class="card-cta">Play Light Cycles <span class="arrow">&rarr;</span></div>
             </div>
           </a>
 
-          <a class="game-card" href="arena.html" data-tags="duel live">
+          <a class="game-card" href="arena.html" data-game="arena" data-tags="duel live">
             <div class="card-art">
               <svg viewBox="0 0 320 180" aria-hidden="true">
                 <defs>
@@ -253,7 +484,7 @@
             </div>
           </a>
 
-          <a class="game-card" href="pong.html" data-tags="duel live">
+          <a class="game-card" href="pong.html" data-game="pong" data-tags="duel live">
             <div class="card-art">
               <svg viewBox="0 0 320 180" aria-hidden="true">
                 <defs><filter id="pgGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter></defs>
@@ -278,12 +509,22 @@
         </div>
       </section>
 
+      <section class="section" id="stats" hidden>
+        <div class="section-head"><div><h2>Your stats</h2><p>Saved on this device only.</p></div></div>
+        <div class="stat-row" id="statTotals"></div>
+        <div class="stat-games" id="statGames"></div>
+      </section>
+
       <section class="section" id="how">
         <div class="section-head"><div><h2>How it works</h2><p>From zero to playing in about ten seconds.</p></div></div>
         <div class="steps3">
           <div class="step"><div class="n">01</div><h4>Pick a game</h4><p>Choose anything above and type a name. No sign-up, nothing to install.</p></div>
           <div class="step"><div class="n">02</div><h4>Send the invite link</h4><p>Create a room and hit "Copy invite link". Friends open it and land straight in your room.</p></div>
-          <div class="step"><div class="n">03</div><h4>Play and chat</h4><p>Chat in the room while you wait and during the game. Rematch as many times as you like.</p></div>
+          <div class="step"><div class="n">03</div><h4>Play and chat</h4><p>Chat and react in the room while you wait and during the game. Rematch as many times as you like.</p></div>
+        </div>
+        <div class="features">
+          <span>💬 Chat &amp; emoji reactions</span><span>👀 Watch 1v1 games</span><span>🔀 Switch games together</span>
+          <span>📶 Reconnects if your wifi drops</span><span>🎨 Pick an avatar</span><span>🔊 Sound effects (with mute)</span>
         </div>
       </section>
 
@@ -294,6 +535,7 @@
     </div>
   </div>
 
+  <script src="js/net.js"></script>
   <script>
     (() => {
       const cards = [...document.querySelectorAll("#cards .game-card")];
@@ -314,6 +556,61 @@
       let saved = "all";
       try { saved = localStorage.getItem("oxidpvp-filter") || "all"; } catch {}
       apply(buttons.some((b) => b.dataset.f === saved) ? saved : "all");
+
+      // Join by code: ask the server which game the code belongs to.
+      const codeIn = document.getElementById("codeIn"), codeErr = document.getElementById("codeErr");
+      codeIn.addEventListener("input", () => { codeIn.value = codeIn.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); codeErr.textContent = ""; });
+      document.getElementById("codeJoin").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        codeErr.textContent = "Looking for that room…";
+        const r = await GameUtil.joinByCode(codeIn.value);
+        if (r.error) codeErr.textContent = r.error;
+      });
+
+      // Local win stats.
+      const stats = GameUtil.stats();
+      const titles = Object.fromEntries(GameUtil.games.map((g) => [g.id, g.title]));
+      let w = 0, l = 0, d = 0;
+      const rows = [];
+      for (const [id, s] of Object.entries(stats)) {
+        if (!titles[id]) continue;
+        w += s.w; l += s.l; d += s.d;
+        rows.push([id, s]);
+        const card = document.querySelector(`.game-card[data-game="${id}"] .card-title`);
+        if (card) {
+          const b = document.createElement("span");
+          b.className = "card-record";
+          b.textContent = `${s.w}W · ${s.l}L`;
+          card.append(b);
+        }
+      }
+      if (rows.length) {
+        document.getElementById("stats").hidden = false;
+        const played = w + l + d;
+        const tot = document.getElementById("statTotals");
+        for (const [n, label] of [[played, "games played"], [w, "wins"], [played ? Math.round((w / played) * 100) + "%" : "–", "win rate"]]) {
+          const el = document.createElement("div");
+          el.className = "stat";
+          const b = document.createElement("b"); b.textContent = n;
+          const sp = document.createElement("span"); sp.textContent = label;
+          el.append(b, sp);
+          tot.append(el);
+        }
+        const list = document.getElementById("statGames");
+        rows.sort((a, b) => (b[1].w + b[1].l + b[1].d) - (a[1].w + a[1].l + a[1].d));
+        for (const [id, s] of rows) {
+          const a = document.createElement("a");
+          a.className = "stat-game";
+          a.href = document.querySelector(`.game-card[data-game="${id}"]`).getAttribute("href");
+          const t = document.createElement("b"); t.textContent = titles[id];
+          const n = document.createElement("span"); n.textContent = `${s.w}W · ${s.l}L${s.d ? ` · ${s.d}D` : ""}`;
+          const bar = document.createElement("i");
+          const total = s.w + s.l + s.d;
+          bar.style.setProperty("--p", total ? (s.w / total) * 100 + "%" : "0%");
+          a.append(t, n, bar);
+          list.append(a);
+        }
+      }
 
       // Hover glow follows the cursor.
       for (const c of cards) {

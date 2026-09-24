@@ -1,5 +1,5 @@
 /* Shared bits for the DOM-based games (Connect 4, Battleship, Quiz Battle). */
-.play { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 20px 16px 24px; }
+.play { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 20px 16px 84px; }
 .turn-banner {
   display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 18px; border-radius: 999px;
   font-weight: 600; font-size: 15px; letter-spacing: -0.01em;
