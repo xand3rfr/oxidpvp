@@ -45,6 +45,7 @@
     { id: "poker", page: "poker", title: "Poker", min: 2, max: 8 },
     { id: "cup", page: "tournament", title: "Tournament", min: 3, max: 8 },
     { id: "casino", page: "casino", title: "Casino", min: 1, max: 8 },
+    { id: "wordhunt", page: "wordhunt", title: "Word Hunt", min: 1, max: 8 },
     { id: "chess", page: "chess", title: "Chess", duel: true },
     { id: "connect", page: "connect4", title: "Connect 4", duel: true },
     { id: "battleship", page: "battleship", title: "Battleship", duel: true, noSpectate: true },

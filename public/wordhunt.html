@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>try{var t=JSON.parse(localStorage.getItem("oxidpvp-theme")||"{}"),d=document.documentElement;if(t.mode==="light")d.dataset.theme="light";if(t.accent&&t.accent!=="violet")d.dataset.accent=t.accent}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#07070a">
+  <title>Word Hunt · OXIDPVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/games.css">
+  <link rel="stylesheet" href="css/party.css">
+</head>
+<body class="game-page">
+  <header class="topbar">
+    <a class="back" href="index.html">&larr; <span>Games</span></a>
+    <div class="tb-title">Word Hunt</div>
+    <div class="net" id="side"></div>
+  </header>
+  <main class="play wh">
+    <div class="tv-top ml-top"><span id="round"></span><span class="ml-timer" id="timer"></span></div>
+    <div class="wh-main">
+      <div class="wh-left">
+        <div class="wh-current" id="current"></div>
+        <div class="wh-grid" id="grid"></div>
+        <form class="wl-form" id="typeForm" autocomplete="off"><input id="typeIn" maxlength="16" placeholder="…or type a word" aria-label="Type a word"><button class="btn primary" type="submit">Add</button></form>
+        <div class="wh-flash" id="flash"></div>
+      </div>
+      <div class="wh-right">
+        <div id="playBox"><p class="wh-count" id="mineCount"></p><div class="wh-words" id="mine"></div></div>
+        <div id="showBox" hidden><div class="wh-reveal" id="reveal"></div><p class="wh-best" id="best"></p></div>
+      </div>
+    </div>
+    <div class="tv-board" id="board"></div>
+  </main>
+  <div class="overlay" id="result" hidden>
+    <div class="panel result">
+      <div class="big" id="resultTitle"></div>
+      <ul class="standings" id="standings"></ul>
+      <div class="row">
+        <a class="btn ghost" href="index.html">Leave</a>
+        <button class="btn primary" id="again">Play again</button>
+      </div>
+      <p class="muted" id="againWait" style="font-size:13px;margin-top:12px" hidden>Waiting for the host to start another game…</p>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script src="js/party.js"></script>
+  <script src="js/wordhunt.js"></script>
+</body>
+</html>
