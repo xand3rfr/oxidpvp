@@ -1,6 +1,9 @@
 // Release notes, newest first. Add a new entry at the top for every update.
 window.CHANGELOG = [
   { v: "3.0", date: "2026-09-25", title: "Casino, bots and a lot more", items: [
+    "Casino: blackjack, roulette, slots and coinflip duels with friends, using play coins only",
+    "Saved casino wallet with a daily bonus, an upgrade shop (bigger bets, lucky charm, insurance, golden chips, table colors) and transfer codes to move it between devices",
+    "Friends can now drop into a casino table that's already running",
     "Suggestions page: send in ideas and upvote other people's",
     "This changelog, plus a \"What's new\" dot when there's an update",
     "Tidier top bar with Friends and Settings buttons",

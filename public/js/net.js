@@ -44,6 +44,7 @@
     { id: "phone", page: "telephone", title: "Telephone", min: 3, max: 8 },
     { id: "poker", page: "poker", title: "Poker", min: 2, max: 8 },
     { id: "cup", page: "tournament", title: "Tournament", min: 3, max: 8 },
+    { id: "casino", page: "casino", title: "Casino", min: 1, max: 8 },
     { id: "chess", page: "chess", title: "Chess", duel: true },
     { id: "connect", page: "connect4", title: "Connect 4", duel: true },
     { id: "battleship", page: "battleship", title: "Battleship", duel: true, noSpectate: true },
@@ -418,6 +419,9 @@
     { id: "chess", icon: "♞", name: "Grandmaster", desc: "Win 5 games of Chess", test: (t, m, st) => winsIn(st, "chess") >= 5 },
     { id: "poker", icon: "🃏", name: "High roller", desc: "Win a game of Poker", test: (t, m, st) => winsIn(st, "poker") >= 1 },
     { id: "party", icon: "🎉", name: "Life of the party", desc: "Win 10 party games", test: (t, m, st) => GAMES.filter((g) => !g.duel).reduce((a, g) => a + winsIn(st, g.id), 0) >= 10 },
+    { id: "blackjack", icon: "🂡", name: "Natural", desc: "Get a blackjack in the Casino", special: true },
+    { id: "jackpot", icon: "🎰", name: "Jackpot", desc: "Hit 7-7-7 on the slots", special: true },
+    { id: "whale", icon: "🐋", name: "Whale", desc: "Hold 100,000 casino coins", special: true },
     { id: "ace", icon: "⛳", name: "Hole in one", desc: "Sink a Mini Golf hole in one stroke", special: true },
     { id: "fast", icon: "⏱️", name: "Lightning", desc: "React in under 200 ms", special: true },
     { id: "daily", icon: "📅", name: "Wordsmith", desc: "Solve a Daily Word", special: true },
@@ -1112,7 +1116,7 @@
         const sb = $('[data-act="start"]');
         if (party && isHost) {
           sb.disabled = list.length < min;
-          sb.textContent = list.length < min ? `Need ${min - list.length} more player${min - list.length > 1 ? "s" : ""}` : `Start game (${list.length} players)`;
+          sb.textContent = list.length < min ? `Need ${min - list.length} more player${min - list.length > 1 ? "s" : ""}` : `Start game (${list.length} player${list.length === 1 ? "" : "s"})`;
         }
       },
       hide() { root.hidden = true; },
@@ -1469,9 +1473,9 @@
   // =====================================================================
   // Multiplayer rooms (2–N players)
   // =====================================================================
-  function mountRoom({ game, title, subtitle, min = 2, max = 6, lobbyExtra, onStart }) {
+  function mountRoom({ game, title, subtitle, min = 2, max = 6, lobbyExtra, onStart, lateJoin = false }) {
     let conn = null, isHost = false, myId = -1, players = [], started = false, gen = 0, code = null, moving = false;
-    let stopGame = null, handlers = [], leaveHandlers = [], rejoinHandlers = [];
+    let stopGame = null, handlers = [], leaveHandlers = [], rejoinHandlers = [], joinHandlers = [], roomRef = null;
     const graceTimers = new Map(), helloTimers = new Map();
 
     const ui = shell({
@@ -1511,7 +1515,7 @@
       if (reportTo && reportTo.conn === conn) { reportTo = null; presence.where(); }
       if (conn) { conn.close(bye); conn = null; }
       if (bye) sess.del("oxid-session");
-      handlers = []; leaveHandlers = []; rejoinHandlers = [];
+      handlers = []; leaveHandlers = []; rejoinHandlers = []; joinHandlers = []; roomRef = null;
       started = false; players = []; myId = -1;
       dock.leave(); banner(null);
     }
@@ -1588,11 +1592,21 @@
           } else broadcastLobby();
           return;
         }
-        if (started) return reject(id, "That game already started.");
+        if (started && !lateJoin) return reject(id, "That game already started.");
         if (players.length >= max) return reject(id, "Room is full.");
         const p = { id, name: cleanName(d.name), av: cleanAv(d.av) };
         players.push(p);
         conn.send({ to: id, d: { __sys: "welcome", id } });
+        if (started) {
+          // Games that allow it (like the casino) let people sit down mid-session.
+          conn.send({ to: id, d: { __sys: "start", players } });
+          if (roomRef) roomRef.players.push({ ...p });
+          talk.system(`${p.name} joined`);
+          sfx.play("pop");
+          for (const h of joinHandlers) h(p);
+          pub.update();
+          return;
+        }
         broadcastLobby();
         talk.system(`${p.name} joined`);
         sfx.play("pop");
@@ -1698,7 +1712,9 @@
         onData: (fn) => handlers.push(fn),
         onLeave: (fn) => leaveHandlers.push(fn),
         onRejoin: (fn) => rejoinHandlers.push(fn),
+        onJoin: (fn) => joinHandlers.push(fn),
       };
+      roomRef = room;
       pub.update();
       sfx.play("start");
       stopGame = onStart(room) || null;

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>try{var t=JSON.parse(localStorage.getItem("oxidpvp-theme")||"{}"),d=document.documentElement;if(t.mode==="light")d.dataset.theme="light";if(t.accent&&t.accent!=="violet")d.dataset.accent=t.accent}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#07070a">
+  <title>Casino · OXIDPVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/games.css">
+  <link rel="stylesheet" href="css/party.css">
+</head>
+<body class="game-page">
+  <header class="topbar">
+    <a class="back" href="index.html">&larr; <span>Games</span></a>
+    <div class="tb-title">Casino</div>
+    <div class="net" id="side"></div>
+  </header>
+  <main class="cs">
+    <section class="cs-main">
+      <div class="cs-bar">
+        <div class="cs-wallet"><span class="cs-coin">🪙</span><b id="coins">0</b><small id="limit"></small></div>
+        <div class="cs-chips" id="chips"></div>
+        <button class="btn sm" id="daily" type="button">🎁 Daily</button>
+        <button class="btn sm danger" id="bail" type="button" hidden>Broke? Get 100</button>
+      </div>
+      <nav class="cs-tabs">
+        <button class="cs-tab" data-tab="bj" type="button">🂡 Blackjack</button>
+        <button class="cs-tab" data-tab="rl" type="button">🎡 Roulette</button>
+        <button class="cs-tab" data-tab="slots" type="button">🎰 Slots</button>
+        <button class="cs-tab" data-tab="cf" type="button">🪙 Coinflip</button>
+        <button class="cs-tab" data-tab="shop" type="button">⬆️ Upgrades</button>
+      </nav>
+
+      <div class="cs-pane felt" data-pane="bj">
+        <div class="bj-dealer"><span class="bj-label">Dealer <b id="bjDealerTotal"></b></span><div class="bj-cards" id="bjDealer"></div></div>
+        <div class="bj-seats" id="bjSeats"></div>
+        <div class="cs-controls">
+          <button class="btn primary lg" id="bjBet" type="button">Bet</button>
+          <div class="cs-row" id="bjActions" hidden>
+            <button class="btn primary" id="bjHit" type="button">Hit</button>
+            <button class="btn" id="bjStand" type="button">Stand</button>
+            <button class="btn" id="bjDouble" type="button">Double</button>
+          </div>
+          <p class="cs-msg"><span id="bjStatus"></span> <span class="cs-timer" id="bjTimer"></span></p>
+        </div>
+        <p class="cs-note">Blackjack pays 3:2 · dealer stands on 17</p>
+      </div>
+
+      <div class="cs-pane felt" data-pane="rl" hidden>
+        <div class="rl-top">
+          <div class="rl-wheel-wrap"><div class="rl-wheel" id="rlWheel"></div><i class="rl-ball" id="rlBall"></i><span class="rl-result" id="rlResult"></span></div>
+          <div class="rl-board" id="rlBoard"></div>
+        </div>
+        <p class="cs-msg"><span id="rlStatus"></span> <span class="cs-timer" id="rlTimer"></span></p>
+        <p class="cs-note">Colors, odd/even and halves pay 1:1 · dozens 2:1 · a single number 35:1</p>
+      </div>
+
+      <div class="cs-pane felt" data-pane="slots" hidden>
+        <div class="slot-machine"><div class="reel">🍒</div><div class="reel">💎</div><div class="reel">7️⃣</div></div>
+        <button class="btn primary lg" id="slotSpin" type="button">Spin</button>
+        <p class="cs-msg" id="slotMsg">Pick a chip above, then spin.</p>
+        <p class="cs-note">3 of a kind: 🍒5× 🍋8× 🔔12× ⭐20× 💎40× 7️⃣100× · any pair 1.5× · a cherry gets half back</p>
+      </div>
+
+      <div class="cs-pane felt" data-pane="cf" hidden>
+        <div class="coin" id="coin"><span class="ca"></span><span class="cb"></span></div>
+        <p class="cs-msg" id="cfLast">Challenge someone at the table. Winner takes the whole pot.</p>
+        <div class="cf-in" id="cfIncoming"></div>
+        <div class="cf-list" id="cfPlayers"></div>
+      </div>
+
+      <div class="cs-pane" data-pane="shop" hidden>
+        <div class="shop" id="shop"></div>
+        <div class="shop-extra">
+          <h3>Table felt</h3><div class="felts" id="felts"></div>
+          <h3>Move your wallet</h3>
+          <p class="cs-note">Copy a transfer code here and paste it on another device to bring your coins and upgrades along.</p>
+          <div class="cs-row"><input class="p-input" id="xferCode" placeholder="OXC-…" aria-label="Transfer code"><button class="btn" id="exportBtn" type="button">Copy mine</button><button class="btn ghost" id="importBtn" type="button">Load code</button></div>
+          <p class="cs-note" id="stats"></p>
+        </div>
+      </div>
+    </section>
+    <aside class="cs-side">
+      <h3>At the table</h3>
+      <div class="cs-people" id="people"></div>
+      <h3>Activity</h3>
+      <ul class="cs-log" id="log"></ul>
+      <p class="cs-note">Play coins only. No real money is ever involved.</p>
+    </aside>
+  </main>
+
+  <script src="js/net.js"></script>
+  <script src="js/party.js"></script>
+  <script src="js/casino.js"></script>
+</body>
+</html>
