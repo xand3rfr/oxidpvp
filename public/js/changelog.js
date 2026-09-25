@@ -14,6 +14,7 @@ window.CHANGELOG = [
     "New game: Minesweeper Race, which is the same minefield as your opponent and a race to clear it",
     "New game: Sumo, which is shoving your friends off a shrinking platform",
     "New game: Kart Racing, which is three laps with up to six karts",
+    "New game: Crewmates, which is doing tasks, finding the impostor, reporting bodies and voting them out",
     "Suggestions page: send in ideas and upvote other people's",
     "This changelog, plus a \"What's new\" dot when there's an update",
     "Tidier top bar with Friends and Settings buttons",

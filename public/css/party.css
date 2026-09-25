@@ -931,3 +931,27 @@ button.mf-p { cursor: pointer; } button.mf-p:hover { border-color: var(--accent-
 .ms-c.boom { background: #b91c1c !important; }
 .ms-c.f { font-size: clamp(10px, 2vw, 15px); }
 .ms-c.mine { background: #3f3f46 !important; }
+
+/* ---------- Crewmates ---------- */
+.cm-hud { flex: none; display: flex; gap: 16px; align-items: center; justify-content: center; padding: 10px 16px 0; flex-wrap: wrap; }
+.cm-role { font: 800 13px var(--mono); letter-spacing: .1em; padding: 5px 12px; border-radius: 999px; background: var(--surface-2); }
+.cm-role.imp { color: #fda4af; background: rgba(244,63,94,.18); } .cm-role.crew { color: #93c5fd; background: rgba(59,130,246,.16); }
+.cm-bar { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; }
+.cm-track { width: 260px; height: 12px; border-radius: 999px; background: var(--surface-2); overflow: hidden; border: 1px solid var(--line-2); }
+.cm-track i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #22c55e, #4ade80); transition: width .4s; }
+.cm-stage { position: relative; }
+.cm-tasks { position: absolute; left: 24px; top: 24px; list-style: none; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 12px; background: rgba(0,0,0,.55); font-size: 12px; max-width: 250px; pointer-events: none; }
+.cm-tasks li.done { color: #4ade80; text-decoration: line-through; }
+.cm-tasks li.imp { color: #fda4af; }
+.cm-actions { position: absolute; right: 24px; bottom: 24px; display: flex; gap: 8px; }
+.cm-actions .btn { height: 52px; padding: 0 18px; font-size: 15px; }
+body.touching .cm-actions { bottom: 160px; }
+.cm-meet .panel { width: min(560px, 100%); }
+.cm-timer { font: 700 18px var(--mono); margin: 8px 0; }
+.cm-votes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 10px 0; }
+.cm-vote { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line-2); color: var(--text); font: 600 14px var(--sans); text-align: left; }
+button.cm-vote:hover { border-color: var(--accent); }
+.cm-vote.dead { opacity: .4; text-decoration: line-through; }
+.cm-vote span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cm-vote small { color: #fda4af; font-size: 11px; } .cm-vote b { font: 700 11px var(--mono); color: #fde68a; }
+.cm-dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
