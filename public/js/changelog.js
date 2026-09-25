@@ -1,5 +1,14 @@
 // Release notes, newest first. Add a new entry at the top for every update.
 window.CHANGELOG = [
+  { v: "3.3", date: "2026-09-25", title: "Crash, Plinko, Mines and crates", items: [
+    "Casino: Crash. Everyone at the table rides the same rocket, so cash out before it blows up. Auto cash-out included",
+    "Casino: Plinko, with low, medium and high risk boards",
+    "Casino: Mines. Find the gems, dodge the mines and cash out whenever you like",
+    "Casino crates: open Pink, Neon or Black crates for avatars, frames, titles and stickers. Duplicates give coins back",
+    "Richest this week: a casino leaderboard in the casino and on the Leaderboard page",
+    "Poker: new Casino stakes option to play with your saved casino coins",
+    "Still play coins only. No real money, ever",
+  ] },
   { v: "3.2", date: "2026-09-25", title: "Profiles, Season Pass and Game of the Day", items: [
     "Profile page: your level, stats, a 14-day win chart, recent matches and all your titles",
     "Titles: earn titles like Chess Master, Card Shark or Legend and show one under your name in every lobby",

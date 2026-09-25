@@ -41,7 +41,7 @@
         <select id="game" aria-label="Game"><option value="all">All games</option></select>
       </div>
       <div class="lb">
-        <div class="lb-row lb-head"><span>#</span><span>Player</span><span>W</span><span>L</span><span>D</span><span>Win %</span></div>
+        <div class="lb-row lb-head" id="head"><span>#</span><span>Player</span><span>W</span><span>L</span><span>D</span><span>Win %</span></div>
         <div id="rows"></div>
       </div>
       <div class="empty" id="empty" hidden>
@@ -56,15 +56,34 @@
   <script>
     (() => {
       const sel = document.getElementById("game"), rowsEl = document.getElementById("rows"), empty = document.getElementById("empty");
+      // Special boards with their own columns.
+      const SPECIAL = {
+        casino: { label: "🪙 Casino · richest this week", url: "/api/casino", cols: ["#", "Player", "Coins"], row: (r) => [r.name, r.coins.toLocaleString()] },
+      };
+      for (const [k, b] of Object.entries(SPECIAL)) sel.append(new Option(b.label, k));
       for (const g of GameUtil.games) sel.append(new Option(g.title, g.id));
       const want = new URLSearchParams(location.search).get("game");
-      if (want && GameUtil.gameById(want)) sel.value = want;
+      if (want && (GameUtil.gameById(want) || SPECIAL[want])) sel.value = want;
+      const head = document.getElementById("head"), headHTML = head.innerHTML;
       const me = (localStorage.getItem("oxidpvp-name") || "").toLowerCase();
       async function load() {
         rowsEl.textContent = "";
         let data = { rows: [] };
-        try { data = await (await fetch("/api/leaderboard?game=" + sel.value, { cache: "no-store" })).json(); } catch {}
+        const sp = SPECIAL[sel.value];
+        try { data = await (await fetch(sp ? sp.url : "/api/leaderboard?game=" + sel.value, { cache: "no-store" })).json(); } catch {}
         empty.hidden = data.rows.length > 0;
+        head.className = "lb-row lb-head" + (sp ? " lb-" + sp.cols.length : "");
+        if (sp) { head.textContent = ""; for (const c of sp.cols) { const x = document.createElement("span"); x.textContent = c; head.append(x); } }
+        else head.innerHTML = headHTML;
+        if (sp) {
+          data.rows.forEach((r, i) => {
+            const row = document.createElement("div");
+            row.className = "lb-row lb-" + sp.cols.length + (i < 3 ? " top t" + i : "") + (r.name.toLowerCase() === me ? " me" : "");
+            for (const v of [i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1, ...sp.row(r)]) { const c = document.createElement("span"); c.textContent = v; row.append(c); }
+            rowsEl.append(row);
+          });
+          return;
+        }
         data.rows.forEach((r, i) => {
           const row = document.createElement("div");
           row.className = "lb-row" + (i < 3 ? " top t" + i : "") + (r.name.toLowerCase() === me ? " me" : "");

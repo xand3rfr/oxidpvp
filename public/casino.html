@@ -33,7 +33,11 @@
         <button class="cs-tab" data-tab="bj" type="button">🂡 Blackjack</button>
         <button class="cs-tab" data-tab="rl" type="button">🎡 Roulette</button>
         <button class="cs-tab" data-tab="slots" type="button">🎰 Slots</button>
+        <button class="cs-tab" data-tab="cr" type="button">🚀 Crash</button>
+        <button class="cs-tab" data-tab="plk" type="button">🔻 Plinko</button>
+        <button class="cs-tab" data-tab="mn" type="button">💣 Mines</button>
         <button class="cs-tab" data-tab="cf" type="button">🪙 Coinflip</button>
+        <button class="cs-tab" data-tab="crate" type="button">🎁 Crates</button>
         <button class="cs-tab" data-tab="shop" type="button">⬆️ Upgrades</button>
       </nav>
 
@@ -68,11 +72,44 @@
         <p class="cs-note">3 of a kind: 🍒5× 🍋8× 🔔12× ⭐20× 💎40× 7️⃣100× · any pair 1.5× · a cherry gets half back</p>
       </div>
 
+      <div class="cs-pane cs-dark" data-pane="cr" hidden>
+        <div class="cr-hist" id="crHist"></div>
+        <div class="cr-stage"><canvas id="crCanvas" width="720" height="320"></canvas><div class="cr-mult" id="crMult">1.00×</div></div>
+        <div class="cs-row cr-controls">
+          <label class="cr-auto">Auto cash out at <input id="crAuto" type="number" min="1.01" step="0.1" placeholder="off" inputmode="decimal"> ×</label>
+          <button class="btn primary lg" id="crBtn" type="button">Bet</button>
+        </div>
+        <p class="cs-msg"><span id="crStatus"></span> <span class="cs-timer" id="crTimer"></span></p>
+        <div class="cr-players" id="crPlayers"></div>
+        <p class="cs-note">Everyone at the table rides the same rocket. Cash out before it crashes. It can crash at any moment, even at 1.00×.</p>
+      </div>
+
+      <div class="cs-pane cs-dark" data-pane="plk" hidden>
+        <div class="seg plk-risk" id="plkRisk"><button type="button" data-r="low">Low risk</button><button type="button" data-r="mid">Medium</button><button type="button" data-r="high">High risk</button></div>
+        <canvas id="plkCanvas" width="560" height="470"></canvas>
+        <button class="btn primary lg" id="plkDrop" type="button">Drop ball</button>
+        <p class="cs-msg" id="plkMsg">Pick a chip and drop a ball. The edges pay the most.</p>
+      </div>
+
+      <div class="cs-pane cs-dark" data-pane="mn" hidden>
+        <div class="cs-row mn-top"><label class="cr-auto">Mines <select id="mnCount"><option>1</option><option selected>3</option><option>5</option><option>10</option><option>15</option><option>24</option></select></label><span class="mn-info" id="mnInfo"></span></div>
+        <div class="mn-grid" id="mnGrid"></div>
+        <button class="btn primary lg" id="mnBtn" type="button">Bet</button>
+        <p class="cs-msg" id="mnMsg">Find the gems, dodge the mines. Cash out whenever you like.</p>
+      </div>
+
       <div class="cs-pane felt" data-pane="cf" hidden>
         <div class="coin" id="coin"><span class="ca"></span><span class="cb"></span></div>
         <p class="cs-msg" id="cfLast">Challenge someone at the table. Winner takes the whole pot.</p>
         <div class="cf-in" id="cfIncoming"></div>
         <div class="cf-list" id="cfPlayers"></div>
+      </div>
+
+      <div class="cs-pane crate-pane" data-pane="crate" hidden>
+        <div class="crates" id="crates"></div>
+        <div class="crate-reel" id="crateReel" hidden><div class="crate-strip" id="crateStrip"></div><i class="crate-marker"></i></div>
+        <p class="cs-msg" id="crateMsg">Crates hold cosmetics: avatars, frames, titles and stickers. Duplicates give coins back.</p>
+        <div class="crate-owned-wrap"><h3>Your collection</h3><div class="crate-owned" id="crateOwned"></div></div>
       </div>
 
       <div class="cs-pane" data-pane="shop" hidden>
@@ -89,6 +126,8 @@
     <aside class="cs-side">
       <h3>At the table</h3>
       <div class="cs-people" id="people"></div>
+      <h3>Richest this week</h3>
+      <ol class="cs-top" id="richest"><li class="cs-note">Loading…</li></ol>
       <h3>Activity</h3>
       <ul class="cs-log" id="log"></ul>
       <p class="cs-note">Play coins only. No real money is ever involved.</p>

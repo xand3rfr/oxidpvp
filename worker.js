@@ -59,6 +59,17 @@ export default {
       if (body.length > 2000) return json({ error: "too-long" }, 413);
       return board.fetch(new Request("https://board/" + (url.pathname.endsWith("vote") ? "vote" : "suggest") + "?ip=" + encodeURIComponent(ip), { method: "POST", body }));
     }
+    if (url.pathname === "/api/casino") {
+      const board = env.BOARD.get(env.BOARD.idFromName("board"));
+      if (request.method === "GET") return board.fetch(new Request("https://board/casino-top"));
+      if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+      const origin = request.headers.get("Origin");
+      if (origin && new URL(origin).host !== url.host) return new Response("Forbidden", { status: 403 });
+      const body = await request.text();
+      if (body.length > 500) return json({ error: "too-long" }, 413);
+      const ip = request.headers.get("CF-Connecting-IP") || "local";
+      return board.fetch(new Request("https://board/casino-set?ip=" + encodeURIComponent(ip), { method: "POST", body }));
+    }
     if (url.pathname === "/api/announce" && request.method === "GET") {
       return env.BOARD.get(env.BOARD.idFromName("board")).fetch(new Request("https://board/announce"));
     }
@@ -321,6 +332,9 @@ export class Directory extends DurableObject {
   }
 }
 
+// Weeks start on Monday (UTC).
+const weekOf = (t) => Math.floor((t / 864e5 + 3) / 7);
+
 // ---------- Leaderboard ----------
 export class Leaderboard extends DurableObject {
   constructor(ctx, env) {
@@ -339,6 +353,9 @@ export class Leaderboard extends DurableObject {
     // Owner settings (admin password hash, announcement) and words the owner has banned.
     this.sql.exec(`CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS bans (word TEXT PRIMARY KEY)`);
+    // Casino: each player's latest play-coin balance this week (for "Richest this week").
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS casino (week INTEGER NOT NULL, key TEXT NOT NULL, name TEXT NOT NULL, coins INTEGER NOT NULL, updated INTEGER NOT NULL, PRIMARY KEY (week, key))`);
+    this.lastCasino = new Map();
     this.lastPost = new Map();
     this.fails = new Map();
   }
@@ -410,7 +427,9 @@ export class Leaderboard extends DurableObject {
         if (!name) return json({ error: "no-name" }, 400);
         const n = this.sql.exec(`SELECT COUNT(*) AS n FROM scores WHERE key = ?`, name).one().n;
         this.sql.exec(`DELETE FROM scores WHERE key = ?`, name);
-        return json({ ok: true, removed: n });
+        const c = this.sql.exec(`SELECT COUNT(*) AS n FROM casino WHERE key = ?`, name).one().n;
+        this.sql.exec(`DELETE FROM casino WHERE key = ?`, name);
+        return json({ ok: true, removed: n + c });
       }
       case "ban": {
         const w = String(body.word || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30);
@@ -419,6 +438,7 @@ export class Leaderboard extends DurableObject {
         // Clear anything already posted with it.
         const hit = this.sql.exec(`SELECT DISTINCT key FROM scores`).toArray().filter((r) => r.key.replace(/[^a-z0-9]/g, "").includes(w));
         for (const r of hit) this.sql.exec(`DELETE FROM scores WHERE key = ?`, r.key);
+        for (const r of this.sql.exec(`SELECT DISTINCT key FROM casino`).toArray()) if (r.key.replace(/[^a-z0-9]/g, "").includes(w)) this.sql.exec(`DELETE FROM casino WHERE key = ?`, r.key);
         const sg = this.sql.exec(`SELECT id, text, name FROM sugg`).toArray().filter((r) => (r.text + r.name).toLowerCase().replace(/[^a-z0-9]/g, "").includes(w));
         for (const r of sg) { this.sql.exec(`DELETE FROM sugg WHERE id = ?`, r.id); this.sql.exec(`DELETE FROM sugg_votes WHERE sid = ?`, r.id); }
         return json({ ok: true, cleared: hit.length + sg.length });
@@ -482,6 +502,24 @@ export class Leaderboard extends DurableObject {
     const url = new URL(request.url);
     if (url.pathname === "/sugg" || url.pathname === "/suggest" || url.pathname === "/vote") return this.suggestions(url, request);
     if (url.pathname.startsWith("/admin/")) return this.admin(url, request);
+    if (url.pathname === "/casino-top") {
+      const rows = this.sql.exec(`SELECT name, coins FROM casino WHERE week = ? ORDER BY coins DESC LIMIT 25`, weekOf(Date.now())).toArray();
+      return json({ rows });
+    }
+    if (url.pathname === "/casino-set" && request.method === "POST") {
+      const who = await this.who(url.searchParams.get("ip") || "local"), now = Date.now();
+      if (now - (this.lastCasino.get(who) || 0) < 20000) return json({ error: "slow-down" }, 429);
+      let b;
+      try { b = JSON.parse(await request.text()); } catch { return json({ error: "bad-json" }, 400); }
+      const name = cleanName(b.name), coins = Math.max(0, Math.min(1e12, Math.floor(+b.coins || 0)));
+      if (!name || /^player\d*$/i.test(name) || this.bad(name)) return json({ ok: false });
+      this.lastCasino.set(who, now);
+      if (this.lastCasino.size > 5000) this.lastCasino.clear();
+      this.sql.exec(`INSERT INTO casino (week, key, name, coins, updated) VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(week, key) DO UPDATE SET coins = excluded.coins, name = excluded.name, updated = excluded.updated`, weekOf(now), name.toLowerCase(), name, coins, now);
+      this.sql.exec(`DELETE FROM casino WHERE week < ?`, weekOf(now) - 4);
+      return json({ ok: true });
+    }
     if (url.pathname === "/announce") { const a = this.kvGet("announce"); return json(a ? JSON.parse(a) : {}); }
     if (url.pathname === "/add" && request.method === "POST") {
       const { game, name, r } = await request.json();

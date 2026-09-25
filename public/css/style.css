@@ -998,3 +998,7 @@ body.touching .touch-ui { display: block; }
 .ps-tier small { font-size: 12px; color: var(--muted); min-height: 2.6em; }
 .ps-tier .btn { width: 100%; height: 34px; font-size: 13px; }
 .ps-tier.got .ps-i { filter: grayscale(.2); }
+.lb-row.lb-3 { grid-template-columns: 48px 1fr 160px; }
+.lb-row.lb-4 { grid-template-columns: 48px 1fr 90px 90px; }
+.lb-row.lb-5 { grid-template-columns: 48px 1fr 80px 56px 56px; }
+@media (max-width: 520px) { .lb-row.lb-3 { grid-template-columns: 34px 1fr 110px; } .lb-row.lb-5 { grid-template-columns: 34px 1fr 64px 40px 40px; } .lb-row.lb-5 span:nth-child(5) { display: block; } }

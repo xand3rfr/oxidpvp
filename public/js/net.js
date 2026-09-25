@@ -2178,7 +2178,7 @@
       ui.hide();
       ui.setStatus("");
       const room = {
-        isHost, myId,
+        isHost, myId, code,
         players: players.map((p) => ({ ...p })),
         send: (m) => { if (conn) conn.send({ d: m }); },
         sendTo: (id, m) => { if (conn) conn.send({ to: id, d: m }); },
