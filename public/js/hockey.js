@@ -24,6 +24,10 @@
   let link = null, me = 0, stopLoop = null, running = false;
   const mine = { x: 0, y: 0, vx: 0, vy: 0 }, opp = { x: 0, y: 0, vx: 0, vy: 0, tx: 0, ty: 0 };
   let S = null, snap = null, snapAt = 0, events = [], particles = [], flash = 0;
+  // Replay highlights: remember the last couple of seconds of what was on screen, and keep a clip
+  // of every goal. After the match you can watch them back in slow motion.
+  const CLIP = 1.8, SLOW = 0.4;
+  let buf = [], clips = [], clipDue = 0, clipBy = 0, clipAt = 0, replay = null;
 
   const newState = () => ({ p: { x: W / 2, y: H / 2, vx: 0, vy: 0 }, sc: [0, 0], w: -1, serve: 1.2, n: 0 });
 
@@ -101,7 +105,7 @@
   function fx(e) {
     if (e.k === "h") { burst(e.x, e.y, COLORS[e.i], 10, 260); GameUtil.sfx("click"); }
     else if (e.k === "w") { /* quiet */ }
-    else if (e.k === "g") { flash = 1; burst(e.i === 0 ? W - 10 : 10, e.y, COLORS[e.i], 40, 500); GameUtil.sfx(link && !link.spectator && e.i === me ? "good" : "bad"); }
+    else if (e.k === "g") { clipAt = buf.length ? buf[buf.length - 1].t + 1 : performance.now(); clipDue = performance.now() + 350; clipBy = e.i; flash = 1; burst(e.i === 0 ? W - 10 : 10, e.y, COLORS[e.i], 40, 500); GameUtil.sfx(link && !link.spectator && e.i === me ? "good" : "bad"); }
   }
   function burst(x, y, color, n, speed) {
     for (let k = 0; k < n; k++) {
@@ -120,7 +124,7 @@
     return { x: x + vx * el, y: clamp(y + vy * el, PR, H - PR) };
   }
 
-  function render(dt) {
+  function render(dt, R) {
     const s = canvas._scale;
     ctx.setTransform(s, 0, 0, s, 0, 0);
     // rink
@@ -147,8 +151,8 @@
     ctx.fillStyle = "rgba(255,255,255,0.04)";
     ctx.fillText(sc[0], W / 4, H / 2); ctx.fillText(sc[1], (W * 3) / 4, H / 2);
 
-    if (link) {
-      const ms = [me === 0 ? mine : opp, me === 0 ? opp : mine];
+    if (link || R) {
+      const ms = R ? R.m.map(([x, y]) => ({ x, y })) : [me === 0 ? mine : opp, me === 0 ? opp : mine];
       ms.forEach((m, i) => {
         ctx.shadowColor = COLORS[i]; ctx.shadowBlur = 24;
         ctx.fillStyle = COLORS[i];
@@ -157,13 +161,22 @@
         ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.arc(m.x, m.y, MR * 0.62, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.beginPath(); ctx.arc(m.x, m.y, MR * 0.3, 0, Math.PI * 2); ctx.fill();
       });
-      const p = puck();
+      const p = R ? R.p : puck();
       ctx.shadowColor = "#fff"; ctx.shadowBlur = 18;
       ctx.fillStyle = "#e5e7eb"; ctx.beginPath(); ctx.arc(p.x, p.y, PR, 0, Math.PI * 2); ctx.fill();
       ctx.shadowBlur = 0;
       ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, PR * 0.6, 0, Math.PI * 2); ctx.stroke();
-      const serving = S ? S.serve > 0 : snap && snap.st;
+      const serving = R ? false : S ? S.serve > 0 : snap && snap.st;
       if (serving && winner() < 0) { ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "600 22px Geist, system-ui, sans-serif"; ctx.fillText("Get ready…", W / 2, 60); }
+    }
+    if (R) {
+      ctx.fillStyle = "rgba(10,14,30,0.18)"; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#fff"; ctx.font = "700 26px Geist, system-ui, sans-serif"; ctx.textAlign = "left";
+      ctx.fillText(`▶ REPLAY  ·  goal ${R.idx + 1} of ${R.of}  ·  slow-mo`, 28, 40);
+      ctx.fillStyle = COLORS[R.by]; ctx.textAlign = "right";
+      ctx.fillText(R.name === "You" ? "You score!" : `${R.name} scores`, W - 28, 40);
+      ctx.textAlign = "center";
+      return;
     }
     for (const q of particles) { ctx.globalAlpha = Math.max(0, q.life * 2); ctx.fillStyle = q.color; ctx.fillRect(q.x - 2, q.y - 2, 4, 4); }
     ctx.globalAlpha = 1;
@@ -175,6 +188,7 @@
     const sc = scores(), w = winner(), key = sc.join(":") + w;
     if (key === hudKey) return;
     hudKey = key;
+    if (sc[0] + sc[1] === 0) { clips = []; replay = null; } // new match
     $("s0").textContent = sc[me]; $("s1").textContent = sc[1 - me];
     if (w >= 0) {
       const won = w === me, spec = link.spectator;
@@ -182,11 +196,14 @@
       $("resultTitle").textContent = spec ? `${link.names[w]} wins` : won ? "Victory" : "Defeat";
       $("resultScore").textContent = sc[me] + " – " + sc[1 - me];
       $("rematch").hidden = spec; $("rematch").disabled = false; $("rematch").textContent = "Rematch";
-      $("result").hidden = false;
-    } else $("result").hidden = true;
+      $("replayBtn").hidden = !clips.length;
+      $("replayBtn").textContent = `▶ Goal replays (${clips.length})`;
+      if (!replay) $("result").hidden = false;
+    } else { $("result").hidden = true; replay = null; }
   }
   $("rematch").addEventListener("click", () => {
     if (!link) return;
+    clips = []; replay = null;
     if (link.isHost) { S = newState(); Object.assign(mine, home(0)); }
     else { link.send({ t: "rm" }); $("rematch").disabled = true; $("rematch").textContent = "Starting…"; }
   });
@@ -204,11 +221,48 @@
     acc += dt;
     if (S) { hostTick(dt); if (acc >= 1 / 30) { acc = 0; sendSnap(); } }
     else if (acc >= 1 / 30 && !link.spectator) { acc = 0; link.send({ t: "m", x: mine.x | 0, y: mine.y | 0 }); }
+    if (link) {
+      const p = puck(), ms = [me === 0 ? mine : opp, me === 0 ? opp : mine];
+      buf.push({ t: now, m: ms.map((m) => [m.x, m.y]), p: { x: p.x, y: p.y } });
+      while (buf.length && buf[0].t < now - (CLIP + 0.6) * 1000) buf.shift();
+      if (clipDue && now >= clipDue) {
+        clipDue = 0;
+        // stop the clip at the goal itself so the puck doesn't jump back to the serve spot
+        const fr = buf.filter((f) => f.t >= clipAt - CLIP * 1000 && f.t < clipAt);
+        if (fr.length > 5) clips.push({ frames: fr, by: clipBy });
+        if (clips.length > 5) clips.shift();
+        $("replayBtn").hidden = !clips.length;
+        $("replayBtn").textContent = `▶ Goal replays (${clips.length})`;
+      }
+    }
     for (const q of particles) { q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.92; q.vy *= 0.92; }
     particles = particles.filter((q) => q.life > 0);
-    render(dt);
+    if (replay) playReplay(now, dt); else render(dt);
     hud();
   }
+  function playReplay(now, dt) {
+    const c = clips[replay.i], fr = c.frames;
+    const at = fr[0].t + (now - replay.t0) * SLOW;
+    if (at > fr[fr.length - 1].t + 250) {
+      replay.i++; replay.t0 = now;
+      if (replay.i >= clips.length) { replay = null; $("result").hidden = winner() < 0; render(dt); return; }
+      return playReplay(now, dt);
+    }
+    let k = 0;
+    while (k < fr.length - 1 && fr[k + 1].t <= at) k++;
+    const a = fr[k], b = fr[Math.min(k + 1, fr.length - 1)], u = b.t > a.t ? clamp((at - a.t) / (b.t - a.t), 0, 1) : 0;
+    const L = (x, y) => x + (y - x) * u;
+    const nameOf = (i) => (link && !link.spectator ? (i === me ? "You" : link.oppName) : link ? link.names[i] : "");
+    render(dt, { m: a.m.map((m, i) => [L(m[0], b.m[i][0]), L(m[1], b.m[i][1])]), p: { x: L(a.p.x, b.p.x), y: L(a.p.y, b.p.y) }, idx: replay.i, of: clips.length, by: c.by, name: nameOf(c.by) });
+  }
+  function startReplays() {
+    if (!clips.length) return;
+    $("result").hidden = true;
+    replay = { i: 0, t0: performance.now() };
+  }
+  $("replayBtn").addEventListener("click", startReplays);
+  window.__hockey = { get S() { return S; }, get clips() { return clips; }, get replay() { return replay; } }; // test hook
+  canvas.addEventListener("click", () => { if (replay) { replay = null; $("result").hidden = winner() < 0; } });
   $("peek").addEventListener("click", () => { $("result").hidden = true; });
   addEventListener("resize", () => { if (!running) render(0); });
   render(0);
@@ -225,7 +279,7 @@
       $("sw0").style.background = COLORS[me]; $("sw1").style.background = COLORS[1 - me];
       Object.assign(mine, home(me), { vx: 0, vy: 0 });
       Object.assign(opp, home(1 - me), { vx: 0, vy: 0 }); opp.tx = opp.x; opp.ty = opp.y;
-      target = null; S = l.isHost ? newState() : null; snap = null; events = []; particles = []; hudKey = "";
+      target = null; S = l.isHost ? newState() : null; snap = null; events = []; particles = []; hudKey = ""; buf = []; clips = []; replay = null; clipDue = 0;
       let lastOpp = null;
       l.onData((d) => {
         if (l.isHost) {
@@ -236,7 +290,7 @@
             if (lastOpp) { const dtm = Math.max(0.016, (now - lastOpp.t) / 1000); opp.vx = (x - lastOpp.x) / dtm; opp.vy = (y - lastOpp.y) / dtm; }
             lastOpp = { x, y, t: now };
             opp.x = x; opp.y = y; opp.tx = x; opp.ty = y;
-          } else if (d.t === "rm" && S.w >= 0) { S = newState(); Object.assign(mine, home(0)); }
+          } else if (d.t === "rm" && S.w >= 0) { S = newState(); Object.assign(mine, home(0)); clips = []; replay = null; }
         } else if (d.t === "s") {
           snap = d; snapAt = performance.now();
           const o = d.m[1 - me]; opp.tx = o[0]; opp.ty = o[1];

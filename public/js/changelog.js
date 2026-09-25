@@ -27,6 +27,11 @@ window.CHANGELOG = [
     "Suggestions page: send in ideas and upvote other people's",
     "This changelog, plus a \"What's new\" dot when there's an update",
     "Tidier top bar with Friends and Settings buttons",
+    "Air Hockey goal replays: watch every goal again in slow motion after the match",
+    "Offline mode: the home page and daily puzzles still open with no internet",
+    "Low-data mode in Settings: turns off glow effects and animations for slow Wi-Fi or older Chromebooks",
+    "Boss key: press ` (left of 1) to hide the game behind a plain notes page, and press it again to come back",
+    "A proper 404 page, with a little jumping game to play while you're lost",
   ] },
   { v: "2.6", date: "2026-09-24", title: "Friends, tournaments and speed", items: [
     "Friends list: share your friend code, see who's online and what they're playing, invite them into your room",

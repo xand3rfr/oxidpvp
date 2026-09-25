@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>try{var t=JSON.parse(localStorage.getItem("oxidpvp-theme")||"{}"),d=document.documentElement;if(t.mode==="light")d.dataset.theme="light";if(t.accent&&t.accent!=="violet")d.dataset.accent=t.accent}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#07070a">
+  <title>Page not found · OXIDPVP</title>
+  <meta name="description" content="This page doesn't exist, but you can play a game while you're here.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="hub">
+    <div class="wrap page nf">
+      <h1>404: this page wandered off</h1>
+      <p class="muted">The link might be broken, or the page moved. While you're here, jump the broken links. <kbd>Space</kbd>, <kbd>↑</kbd> or tap to jump.</p>
+      <canvas id="run" width="900" height="260" aria-label="Mini game: jump over broken links"></canvas>
+      <p class="nf-score"><span id="score">0</span> · best <span id="best">0</span></p>
+      <div class="row"><a class="btn primary lg" href="/index.html">Back to the games</a><a class="btn lg" href="/daily.html">📅 Daily Word</a></div>
+    </div>
+  </div>
+  <script src="/js/net.js"></script>
+  <script>
+    (() => {
+      const cv = document.getElementById("run"), ctx = cv.getContext("2d"), W = 900, H = 260, GROUND = 210;
+      let best = 0; try { best = +localStorage.getItem("oxidpvp-404-best") || 0; } catch {}
+      document.getElementById("best").textContent = best;
+      let S;
+      const reset = () => { S = { y: GROUND, vy: 0, obs: [], t: 0, speed: 340, score: 0, dead: false, next: 1.2, started: false }; };
+      reset();
+      const jump = () => {
+        if (S.dead) { reset(); return; }
+        S.started = true;
+        if (S.y >= GROUND - 1) { S.vy = -720; if (window.GameUtil) GameUtil.sfx("click"); }
+      };
+      addEventListener("keydown", (e) => { if (e.code === "Space" || e.code === "ArrowUp") { e.preventDefault(); jump(); } });
+      cv.addEventListener("pointerdown", (e) => { e.preventDefault(); jump(); });
+      let last = performance.now();
+      function frame(now) {
+        const dt = Math.min(0.04, (now - last) / 1000); last = now;
+        if (S.started && !S.dead) {
+          S.t += dt; S.speed += dt * 8; S.score += dt * 10;
+          S.vy += 2000 * dt; S.y = Math.min(GROUND, S.y + S.vy * dt);
+          S.next -= dt;
+          if (S.next <= 0) { S.obs.push({ x: W + 20, w: 26 + Math.random() * 20, h: 30 + Math.random() * 30, fly: Math.random() < 0.2 }); S.next = 0.8 + Math.random() * 1.1; }
+          for (const o of S.obs) o.x -= S.speed * dt;
+          S.obs = S.obs.filter((o) => o.x > -60);
+          for (const o of S.obs) {
+            const top = o.fly ? GROUND - 70 - o.h : GROUND - o.h, bottom = o.fly ? GROUND - 70 : GROUND;
+            if (120 + 18 > o.x && 120 - 18 < o.x + o.w && S.y > top && S.y - 36 < bottom) {
+              S.dead = true;
+              const sc = Math.floor(S.score);
+              if (sc > best) { best = sc; try { localStorage.setItem("oxidpvp-404-best", best); } catch {} document.getElementById("best").textContent = best; }
+              if (window.GameUtil) GameUtil.sfx("boom");
+            }
+          }
+          document.getElementById("score").textContent = Math.floor(S.score);
+        }
+        const css = getComputedStyle(document.documentElement);
+        ctx.fillStyle = css.getPropertyValue("--surface").trim() || "#111"; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = css.getPropertyValue("--line-3").trim() || "#444"; ctx.fillRect(0, GROUND + 2, W, 2);
+        // the runner: a little ghost
+        const bob = S.y < GROUND ? 0 : Math.sin(S.t * 18) * 2;
+        ctx.fillStyle = css.getPropertyValue("--accent").trim() || "#8b5cf6";
+        ctx.beginPath(); ctx.arc(120, S.y - 24 + bob, 18, Math.PI, 0); ctx.lineTo(138, S.y + bob); for (let k = 0; k < 4; k++) ctx.lineTo(138 - 9 * (k + 0.5), S.y - (k % 2 ? 0 : 6) + bob); ctx.lineTo(102, S.y + bob); ctx.fill();
+        ctx.fillStyle = "#fff"; ctx.fillRect(112, S.y - 30 + bob, 5, 7); ctx.fillRect(124, S.y - 30 + bob, 5, 7);
+        // broken links
+        ctx.font = "700 14px 'Geist Mono', monospace"; ctx.textAlign = "center";
+        for (const o of S.obs) {
+          const top = o.fly ? GROUND - 70 - o.h : GROUND - o.h;
+          ctx.fillStyle = "#f43f5e"; ctx.fillRect(o.x, top, o.w, o.h);
+          ctx.fillStyle = "#fff"; ctx.fillText("404", o.x + o.w / 2, top + o.h / 2 + 5);
+        }
+        ctx.fillStyle = css.getPropertyValue("--text").trim() || "#fff"; ctx.font = "700 18px Geist, system-ui, sans-serif";
+        if (!S.started) ctx.fillText("Tap or press Space to start", W / 2, 90);
+        if (S.dead) ctx.fillText(`Oof. ${Math.floor(S.score)} points. Tap to try again`, W / 2, 90);
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>

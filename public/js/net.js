@@ -274,6 +274,7 @@
     boom: "noise",
   };
   const VOL_KEY = "oxidpvp-volume";
+  let bossOn = false;
   const sfx = (() => {
     let ac = null, out = null, muted = store.get(MUTE_KEY) === "1";
     let vol = store.get(VOL_KEY) == null ? 0.8 : Math.max(0, Math.min(1, +store.get(VOL_KEY) || 0));
@@ -288,7 +289,7 @@
     };
     addEventListener("pointerdown", () => { try { ctx(); } catch {} }, { once: true });
     function play(name) {
-      if (muted || !TONES[name]) return;
+      if (muted || bossOn || !TONES[name]) return;
       try {
         const a = ctx();
         if (!a) return;
@@ -323,6 +324,19 @@
       audio: () => { try { return ctx(); } catch { return null; } },
     };
   })();
+
+  // ---------- Low-data mode ----------
+  // Battery/bandwidth saver: no glows, blur, background animation or music. Canvas games lose
+  // their glow too (shadowBlur is switched off for every canvas on the page).
+  const LOWFX_KEY = "oxidpvp-lowfx";
+  const lowFx = store.get(LOWFX_KEY) === "1";
+  if (lowFx) {
+    document.documentElement.classList.add("lowfx");
+    try {
+      const d = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, "shadowBlur");
+      Object.defineProperty(CanvasRenderingContext2D.prototype, "shadowBlur", { configurable: true, get() { return 0; }, set() { d.set.call(this, 0); } });
+    } catch {}
+  }
 
   // ---------- Background music ----------
   // A soft generated loop (no audio files): pad chords, a bass note and a gentle arpeggio.
@@ -380,7 +394,7 @@
       const a = sfx.audio();
       if (a && gain) { gain.gain.cancelScheduledValues(a.currentTime); gain.gain.setValueAtTime(gain.gain.value, a.currentTime); gain.gain.linearRampToValueAtTime(0, a.currentTime + 0.3); }
     }
-    const refresh = () => (on && !sfx.muted && !document.hidden ? start() : stop());
+    const refresh = () => (on && !sfx.muted && !document.hidden && !lowFx && !bossOn ? start() : stop());
     // Browsers only allow audio after a click or key press.
     const kick = () => { refresh(); };
     addEventListener("pointerdown", kick, { once: true });
@@ -557,6 +571,44 @@
   }
   const achievements = () => { const got = readAch(); return ACHIEVEMENTS.map((a) => ({ ...a, got: got[a.id] || 0 })); };
 
+  // ---------- Boss key ----------
+  // Press ` (the key left of 1) to instantly cover the page with a plain notes page and mute
+  // everything; press it again to come back. The game keeps running underneath.
+  (() => {
+    let cover = null, prevTitle = "", prevIcon = "";
+    const NOTE_ICON = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="10" y="4" width="44" height="56" rx="4" fill="#fff" stroke="#9ca3af" stroke-width="3"/><path d="M18 20h28M18 30h28M18 40h20" stroke="#9ca3af" stroke-width="3"/></svg>');
+    function toggle() {
+      const icon = document.querySelector('link[rel="icon"]');
+      if (cover) {
+        cover.remove(); cover = null; bossOn = false;
+        document.title = prevTitle;
+        if (icon && prevIcon) icon.href = prevIcon;
+        music.refresh();
+        return;
+      }
+      bossOn = true;
+      prevTitle = document.title; document.title = "Notes";
+      if (icon) { prevIcon = icon.href; icon.href = NOTE_ICON; }
+      music.refresh();
+      cover = document.createElement("div");
+      cover.className = "boss-cover";
+      cover.innerHTML = `<div class="boss-page"><h1>Unit 4 Review: Cells</h1><p class="boss-meta">Notes</p>
+        <h2>Cell structure</h2><ul><li>The nucleus holds the cell's DNA and controls its activities.</li><li>Mitochondria release energy from food through cellular respiration.</li><li>Ribosomes build proteins; they can float free or sit on the rough ER.</li><li>The cell membrane is selectively permeable: it controls what enters and leaves.</li></ul>
+        <h2>Plant vs. animal cells</h2><ul><li>Plant cells have a cell wall, chloroplasts and a large central vacuole.</li><li>Animal cells have small vacuoles and no cell wall.</li><li>Both have a nucleus, cytoplasm, membrane and mitochondria.</li></ul>
+        <h2>Transport</h2><ul><li>Diffusion: particles move from high to low concentration.</li><li>Osmosis: diffusion of water across a membrane.</li><li>Active transport uses energy to move against the gradient.</li></ul>
+        <h2>To study</h2><ul><li>Label a diagram of each cell type.</li><li>Practice questions on page 112.</li></ul></div>`;
+      document.body.append(cover);
+    }
+    addEventListener("keydown", (e) => {
+      if (e.code !== "Backquote" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target;
+      if (!cover && t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      e.preventDefault(); e.stopPropagation();
+      toggle();
+    }, true);
+    window.__bossToggle = toggle;
+  })();
+
   // ---------- Secret: the Konami code ----------
   (() => {
     const CODE = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "KeyB", "KeyA"];
@@ -570,6 +622,15 @@
       unlock("konami");
     });
   })();
+
+  // ---------- Offline mode ----------
+  // A service worker keeps a copy of the pages you've visited, so the home page and the daily
+  // puzzles still open with no internet (e.g. a Chromebook on the bus).
+  if ("serviceWorker" in navigator && location.protocol !== "file:") {
+    addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+  }
+  addEventListener("offline", () => toast("📴 You're offline. Daily puzzles still work; online games will wait for Wi‑Fi.", 4200));
+  addEventListener("online", () => toast("📶 Back online", 1800));
 
   // ---------- Settings panel: profile, look, sound ----------
   const THEME_KEY = "oxidpvp-theme";
@@ -642,6 +703,8 @@
         </section>
         <section><h3>Extras</h3>
           <label class="set-row"><span>Seasonal themes (Halloween, winter)</span><input type="checkbox" class="set-season"></label>
+          <label class="set-row"><span>Low-data mode (no glow, blur or music; reloads the page)</span><input type="checkbox" class="set-lowfx"></label>
+          <p class="set-note">Boss key: press <kbd>\`</kbd> (left of 1) to hide the game behind a notes page. Press it again to come back.</p>
         </section>
       </div>`;
     document.body.append(ov);
@@ -714,6 +777,9 @@
     const seas = q(".set-season");
     seas.checked = store.get(SEASON_KEY) !== "off";
     seas.addEventListener("change", () => { store.set(SEASON_KEY, seas.checked ? "on" : "off"); applySeason(); });
+    const lfx = q(".set-lowfx");
+    lfx.checked = lowFx;
+    lfx.addEventListener("change", () => { store.set(LOWFX_KEY, lfx.checked ? "1" : "0"); location.reload(); });
   }
 
   // ---------- Friends + presence ----------

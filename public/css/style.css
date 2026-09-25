@@ -833,3 +833,21 @@ body.touching .touch-ui { display: block; }
 .prof-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
 .prof-stats div { padding: 10px 6px; border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 2px; }
 .prof-stats b { font: 700 16px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .prof-stats span { font-size: 11px; color: var(--dim); }
+.nf { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: 60px; }
+.nf h1 { font-size: clamp(28px, 5vw, 44px); letter-spacing: -0.03em; }
+.nf canvas { width: min(900px, 100%); height: auto; border-radius: 16px; border: 1px solid var(--line-2); touch-action: manipulation; cursor: pointer; }
+.nf-score { font: 700 16px var(--mono); }
+.nf .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+/* ---------- Boss key cover ---------- */
+.boss-cover { position: fixed; inset: 0; z-index: 9999; background: #f1f3f4; overflow: auto; color: #202124; font: 15px/1.6 Arial, Helvetica, sans-serif; }
+.boss-page { max-width: 816px; min-height: 100%; margin: 24px auto; padding: 72px 90px; background: #fff; box-shadow: 0 1px 3px rgba(60,64,67,.3); }
+.boss-page h1 { font: 400 26px Arial, sans-serif; margin-bottom: 4px; }
+.boss-page h2 { font: 700 17px Arial, sans-serif; margin: 22px 0 6px; }
+.boss-page ul { padding-left: 22px; } .boss-page li { margin: 4px 0; }
+.boss-meta { color: #5f6368; font-size: 13px; margin-bottom: 18px; }
+
+/* ---------- Low-data mode ---------- */
+.lowfx *, .lowfx *::before, .lowfx *::after { animation-duration: 0s !important; animation-iteration-count: 1 !important; transition: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+.lowfx .season-layer, .lowfx .hub::before, .lowfx .hub::after { display: none !important; }
+.lowfx .btn.primary, .lowfx .game-card, .lowfx .panel { box-shadow: none !important; }
