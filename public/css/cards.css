@@ -190,3 +190,5 @@
 }
 .badge.team { left: 8px; right: auto; background: var(--accent); box-shadow: 0 4px 12px -4px var(--accent-glow); }
 .opp.partner { border-color: rgba(var(--accent-rgb),.55); }
+.hand.swapped .card { animation: swap-spin .5s cubic-bezier(.2,1.4,.4,1); }
+@keyframes swap-spin { from { transform: rotateY(90deg) scale(.8); opacity: .3; } }

@@ -1,5 +1,9 @@
 // Release notes, newest first. Add a new entry at the top for every update.
 window.CHANGELOG = [
+  { v: "3.5", date: "2026-09-25", title: "Crazy Cards and Would You Rather", items: [
+    "New game: Crazy Cards, which is Last Card with chaos rules: stack +2s and +4s, a 7 swaps hands, a 0 passes every hand along, draw until you can play, and Tornado cards shuffle everyone's hands",
+    "New game: Would You Rather. Pick a side in secret and score by siding with the crowd. Hosts can add their own questions",
+  ] },
   { v: "3.4", date: "2026-09-25", title: "Clans, messages and ranked", items: [
     "Clans: start or join a clan with a 2 to 5 letter tag. Your tag shows in every lobby, and members' wins earn clan points",
     "Messages: chat privately with friends from the Friends panel, even when they're offline",

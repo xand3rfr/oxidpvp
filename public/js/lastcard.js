@@ -1,7 +1,10 @@
 // Last Card: UNO-style card game for 2–6 players.
 // The host runs the rules engine and sends each player a personal view (only their own hand).
 // Guests just send intents: play / draw / pass / call / catch.
+// crazy.html loads this same file with window.CRAZY set: Crazy Cards adds chaos rules on top
+// (stack +2/+4, 7 swaps hands, 0 rotates every hand, draw until you can play, Tornado wilds).
 (() => {
+  const CRAZY = !!window.CRAZY;
   const COLORS = ["r", "y", "g", "b"];
   const COLOR_NAME = { r: "Red", y: "Yellow", g: "Green", b: "Blue" };
   const COLOR_HEX = { r: "#e5484d", y: "#f0b429", g: "#30a46c", b: "#3e8bff" };
@@ -31,12 +34,13 @@
     for (let k = 0; k < 4; k++) {
       d.push({ id: id++, c: "w", v: "wild" });
       d.push({ id: id++, c: "w", v: "d4" });
+      if (CRAZY) d.push({ id: id++, c: "w", v: "storm" });
     }
     return shuffle(d);
   }
   const label = (card) =>
     (card.c !== "w" ? COLOR_NAME[card.c] + " " : "") +
-    ({ skip: "Skip", rev: "Reverse", d2: "+2", wild: "Wild", d4: "Wild +4" }[card.v] || card.v);
+    ({ skip: "Skip", rev: "Reverse", d2: "+2", wild: "Wild", d4: "Wild +4", storm: "Tornado" }[card.v] || card.v);
 
   // teams: with exactly 4 players, seats alternate A B A B so partners sit opposite, and a
   // team wins as soon as either partner empties their hand.
@@ -47,12 +51,13 @@
       players: seated.map((p, i) => ({ id: p.id, name: p.name, av: p.av, hand: [], called: false, team: i % 2 })),
       deck: [], discard: [], color: "r", turn: 0, dir: 1,
       drew: false, drawnId: null, vulnerable: null, winner: null,
-      log: "", fx: null, turnEnds: 0, seq: 0, round: 0,
+      log: "", fx: null, turnEnds: 0, seq: 0, round: 0, pending: 0, pendKind: null,
     };
     const n = () => G.players.length;
     const idx = (k) => (((G.turn + G.dir * k) % n()) + n()) % n();
     const top = () => G.discard[G.discard.length - 1];
-    const canPlay = (card) => card.c === "w" || card.c === G.color || card.v === top().v;
+    // Crazy stacking: with a +2/+4 waiting on you, you can only pass it on with another one.
+    const canPlay = (card) => (G.pending ? card.v === "d4" || (card.v === "d2" && G.pendKind === "d2") : card.c === "w" || card.c === G.color || card.v === top().v);
 
     function drawCards(p, count) {
       const got = [];
@@ -90,7 +95,7 @@
       G.color = first.c;
       G.dir = 1;
       G.turn = Math.floor(Math.random() * n());
-      G.drew = false; G.drawnId = null; G.vulnerable = null; G.winner = null; G.winTeam = null;
+      G.drew = false; G.drawnId = null; G.vulnerable = null; G.winner = null; G.winTeam = null; G.pending = 0; G.pendKind = null;
       G.turnEnds = Date.now() + TURN_MS;
       G.round++;
       G.log = `Round ${G.round}: ${G.players[G.turn].name} goes first`;
@@ -164,18 +169,63 @@
           step = 2;
         } else if (card.v === "rev") {
           if (n() === 2) step = 2; else G.dir *= -1;
+        } else if ((card.v === "d2" || card.v === "d4") && CRAZY) {
+          G.pending += card.v === "d2" ? 2 : 4;
+          G.pendKind = card.v;
+          text += `. ${G.players[idx(1)].name} must stack or draw ${G.pending}!`;
         } else if (card.v === "d2" || card.v === "d4") {
           const victim = G.players[idx(1)], k = card.v === "d2" ? 2 : 4;
           drawCards(victim, k);
           text += `. ${victim.name} draws ${k}`;
           step = 2;
+        } else if (CRAZY && card.v === "7" && n() > 1) {
+          // Swap hands with whoever has the fewest cards.
+          const others = G.players.filter((x) => x !== p).sort((a, b) => a.hand.length - b.hand.length);
+          const o = others[0];
+          [p.hand, o.hand] = [o.hand, p.hand];
+          text += `. Swapped hands with ${o.name}!`;
+          G.fx = { k: "swap", pid, with: o.id, card };
+        } else if (CRAZY && card.v === "0" && n() > 1) {
+          // Everyone passes their hand along in the direction of play.
+          const hands = G.players.map((x) => x.hand);
+          G.players.forEach((x, i) => { x.hand = hands[(((i - G.dir) % n()) + n()) % n()]; });
+          text += ". Everybody passes their hand!";
+          G.fx = { k: "swap", pid, card };
+        } else if (card.v === "storm") {
+          // Tornado: every card in every hand is shuffled together and dealt back out.
+          const pile = shuffle(G.players.flatMap((x) => x.hand));
+          for (const x of G.players) { const k = x.hand.length; x.hand = pile.splice(0, k); }
+          text += ". 🌪️ Tornado! Every hand got shuffled";
+          G.fx = { k: "swap", pid, card };
         }
+        if (G.fx && G.fx.k === "swap") { for (const x of G.players) x.called = false; G.vulnerable = null; }
         G.log = text;
         advance(step);
         emit();
         return;
       }
 
+      if (m.t === "draw" && G.pending) {
+        const k = G.pending;
+        drawCards(p, k);
+        G.pending = 0; G.pendKind = null;
+        G.log = `${p.name} drew ${k}`;
+        G.fx = { k: "draw", pid };
+        advance(1);
+        emit();
+        return;
+      }
+      if (m.t === "draw" && CRAZY) {
+        if (G.drew) return;
+        // Draw until you get something you can play (up to 12 cards).
+        let c = null, got = 0;
+        do { [c] = drawCards(p, 1); got++; } while (c && !canPlay(c) && got < 12);
+        G.log = `${p.name} drew ${got} card${got === 1 ? "" : "s"}`;
+        G.fx = { k: "draw", pid };
+        if (c && canPlay(c)) { G.drew = true; G.drawnId = c.id; G.turnEnds = Math.max(G.turnEnds, Date.now() + DREW_GRACE_MS); } else advance(1);
+        emit();
+        return;
+      }
       if (m.t === "draw") {
         if (G.drew) return;
         const [c] = drawCards(p, 1);
@@ -200,6 +250,7 @@
     function tick() {
       if (G.winner != null || !n() || Date.now() < G.turnEnds) return;
       const p = G.players[G.turn];
+      if (G.pending) { drawCards(p, G.pending); G.log = `${p.name} ran out of time and drew ${G.pending}`; G.pending = 0; G.pendKind = null; advance(1); emit(); return; }
       if (!G.drew) drawCards(p, 1);
       G.log = `${p.name} ran out of time and drew a card`;
       if (G.vulnerable != null && G.vulnerable !== p.id) G.vulnerable = null;
@@ -243,7 +294,7 @@
         color: G.color, turn: cur ? cur.id : null, dir: G.dir, deck: G.deck.length,
         drew: !!(cur && cur.id === pid && G.drew), drawnId: cur && cur.id === pid ? G.drawnId : null,
         vulnerable: G.vulnerable, winner: G.winner, log: G.log, fx: G.fx,
-        left: Math.max(0, G.turnEnds - Date.now()), round: G.round,
+        left: Math.max(0, G.turnEnds - Date.now()), round: G.round, pending: G.pending, pendKind: G.pendKind, crazy: CRAZY,
       };
     }
 
@@ -257,7 +308,7 @@
     skip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="8.5"/><path d="M6.2 17.8 17.8 6.2"/></svg>',
     rev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5h14l-4-4M20 15.5H6l4 4"/></svg>',
   };
-  const glyph = (v) => ICONS[v] || { d2: "+2", d4: "+4", wild: "W" }[v] || v;
+  const glyph = (v) => ICONS[v] || { d2: "+2", d4: "+4", wild: "W", storm: "🌪" }[v] || v;
 
   function cardEl(card) {
     const el = document.createElement("div");
@@ -295,6 +346,7 @@
   function canPlayClient(card) {
     if (!V || !V.top) return false;
     if (V.drew) return card.id === V.drawnId;
+    if (V.pending) return card.v === "d4" || (card.v === "d2" && V.pendKind === "d2");
     return card.c === "w" || card.c === V.color || card.v === V.top.v;
   }
 
@@ -307,11 +359,12 @@
       if (v.top && prev.top && v.top.id !== prev.top.id) GameUtil.sfx("pop");
       else if (v.fx && v.fx.k === "draw") GameUtil.sfx("click");
       if (v.fx && v.fx.k === "call") GameUtil.sfx("good");
+      if (v.fx && v.fx.k === "swap") { GameUtil.sfx("boom"); document.getElementById("hand").classList.remove("swapped"); void document.getElementById("hand").offsetWidth; document.getElementById("hand").classList.add("swapped"); }
       if (v.fx && v.fx.k === "catch") GameUtil.sfx(v.fx.pid === v.me ? "bad" : "good");
       if (v.turn === v.me && prev.turn !== v.me && v.winner == null) setTimeout(() => GameUtil.sfx("turn"), 200);
       if (v.winner != null && prev.winner == null) {
         GameUtil.sfx(iWon(v) ? "win" : "lose");
-        GameUtil.record("lastcard", iWon(v) ? "win" : "loss");
+        GameUtil.record(CRAZY ? "crazy" : "lastcard", iWon(v) ? "win" : "loss");
       }
     }
     turnEndsLocal = performance.now() + v.left;
@@ -375,7 +428,7 @@
     const status = $("status");
     status.textContent = "";
     if (V.winner != null) status.append(V.winner === me ? "You win the round!" : iWon(V) ? `${nameOf(V.winner)} won it for your team!` : `${nameOf(V.winner)} wins the round`);
-    else if (myTurn) status.append(V.drew ? "Play the card you drew, or keep it" : "Your turn");
+    else if (myTurn) status.append(V.drew ? "Play the card you drew, or keep it" : V.pending ? `Stack a +${V.pendKind === "d4" ? "4" : "2"} or tap the deck to draw ${V.pending}` : "Your turn");
     else status.append(`${nameOf(V.turn)}'s turn`);
     if (V.top && V.top.c === "w" && V.winner == null) {
       const chip = h("span", "chip", COLOR_NAME[V.color]);
@@ -475,7 +528,7 @@
   // Lobby hookup
   // =====================================================================
   // ---------- lobby settings ----------
-  const MODE_KEY = "oxidpvp-lastcard-mode";
+  const MODE_KEY = CRAZY ? "oxidpvp-crazy-mode" : "oxidpvp-lastcard-mode";
   const loadMode = () => { try { return localStorage.getItem(MODE_KEY) || "solo"; } catch { return "solo"; } };
   function buildSettings(el) {
     el.innerHTML = `<div class="set-head">Mode</div><div class="seg" data-k="mode"></div>`;
@@ -493,9 +546,10 @@
 
   Room.mount({
     lobbyExtra: buildSettings,
-    game: "lastcard",
-    title: "Last Card",
-    subtitle: "Match color or number, 2 to 6 players. Empty your hand first, and don't forget to call your last card.",
+    game: CRAZY ? "crazy" : "lastcard",
+    title: CRAZY ? "Crazy Cards" : "Last Card",
+    subtitle: CRAZY ? "Last Card with chaos rules: stack +2s and +4s, 7 swaps hands, 0 passes every hand along, draw until you can play, and Tornado cards shuffle everyone's hands. 2 to 6 players."
+      : "Match color or number, 2 to 6 players. Empty your hand first, and don't forget to call your last card.",
     min: 2,
     max: 6,
     onStart(r) {
