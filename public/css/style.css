@@ -1063,3 +1063,28 @@ body.touching .touch-ui { display: block; }
 .cl-row { cursor: pointer; }
 .cl-row:hover { background: var(--surface-2); }
 .pf-link:hover { border-color: rgba(var(--accent-rgb), .6); }
+
+/* ---------- "Gamble with friends?" banner (links to casino.oxidpvp.net) ---------- */
+.casino-banner { position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 40; width: 150px; padding: 18px 14px 16px; border-radius: 18px 0 0 18px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+  background: radial-gradient(circle at 50% 0%, rgba(255, 210, 63, .35), transparent 65%), linear-gradient(160deg, #3a0620, #0a0206); border: 1px solid rgba(255, 210, 63, .55); border-right: 0;
+  box-shadow: 0 20px 50px -16px rgba(0,0,0,.9), 0 0 40px -12px rgba(var(--accent-rgb), .8); transition: transform .2s, box-shadow .2s; animation: cb-in .6s cubic-bezier(.2,1.3,.4,1) both .8s; }
+.casino-banner:hover { transform: translateY(-50%) translateX(-6px); box-shadow: 0 24px 60px -16px rgba(0,0,0,.9), 0 0 50px -8px rgba(var(--accent-rgb), 1); }
+@keyframes cb-in { from { transform: translateY(-50%) translateX(110%); } }
+.cb-chips { font-size: 42px; line-height: 1; filter: drop-shadow(0 6px 12px rgba(0,0,0,.6)); animation: cb-bob 2.4s ease-in-out infinite; }
+@keyframes cb-bob { 50% { transform: translateY(-4px) rotate(-6deg); } }
+.cb-text { display: flex; flex-direction: column; gap: 4px; }
+.cb-text small { font-size: 13px; font-weight: 600; line-height: 1.25; color: #fff; }
+.cb-text b { display: inline-block; margin-top: 4px; padding: 7px 14px; border-radius: 999px; font-size: 14px; background: linear-gradient(135deg, #ffd23f, #f59e0b); color: #1a1000; box-shadow: 0 6px 18px -6px rgba(255, 210, 63, .8); }
+.cb-sub { font-size: 10px; color: rgba(255,255,255,.5); letter-spacing: .02em; }
+.cb-x { position: absolute; top: 4px; left: 6px; width: 22px; height: 22px; border-radius: 6px; font-size: 16px; line-height: 1; color: rgba(255,255,255,.55); }
+.cb-x:hover { color: #fff; background: rgba(255,255,255,.1); }
+:root[data-theme="light"] .casino-banner { color: #fff; }
+@media (max-width: 900px) {
+  .casino-banner { top: auto; bottom: 14px; right: 14px; transform: none; width: auto; max-width: calc(100vw - 80px); flex-direction: row; padding: 10px 34px 10px 12px; border-radius: 16px; border-right: 1px solid rgba(255, 210, 63, .55); animation: none; }
+  .casino-banner:hover { transform: translateY(-2px); }
+  .cb-chips { font-size: 28px; }
+  .cb-text { text-align: left; }
+  .cb-text b { padding: 4px 10px; font-size: 12px; align-self: flex-start; }
+  .cb-sub { display: none; }
+  .cb-x { left: auto; right: 6px; top: 50%; transform: translateY(-50%); }
+}
