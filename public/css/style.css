@@ -1088,3 +1088,15 @@ body.touching .touch-ui { display: block; }
   .cb-sub { display: none; }
   .cb-x { left: auto; right: 6px; top: 50%; transform: translateY(-50%); }
 }
+
+/* Live broadcasts from the owner */
+.bc-wrap { position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 900; width: min(560px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.bc-pop { pointer-events: auto; display: flex; gap: 12px; align-items: center; padding: 14px 16px; border-radius: 16px; background: linear-gradient(135deg, rgba(var(--accent-rgb), .96), #a3004f); color: #fff; box-shadow: 0 20px 60px -12px var(--accent-glow); animation: bcDrop .45s cubic-bezier(.2, 1.4, .4, 1); }
+.bc-pop.warn { background: linear-gradient(135deg, #f59e0b, #b45309); }
+.bc-pop.party { background: linear-gradient(135deg, #a855f7, #ec4899, #f59e0b); }
+.bc-pop .bc-ic { font-size: 28px; }
+.bc-pop div { flex: 1; min-width: 0; }
+.bc-pop small { font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; opacity: .85; font-weight: 700; }
+.bc-pop p { margin: 2px 0 0; font-weight: 700; font-size: 16px; overflow-wrap: anywhere; }
+.bc-pop button { all: unset; cursor: pointer; font-size: 22px; padding: 0 6px; opacity: .8; }
+@keyframes bcDrop { from { opacity: 0; transform: translateY(-30px) scale(.95); } }

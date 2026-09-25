@@ -40,6 +40,12 @@
         <div class="pf-stats" id="stats"></div>
 
         <section class="pf-card">
+          <h2>Live broadcast</h2>
+          <p class="muted">Pops up right now for everyone with OXIDPVP open.</p>
+          <form class="ad-row" id="bcForm"><input class="ad-in" id="bcText" maxlength="300" placeholder="e.g. Tournament starts in 5 minutes!"><select class="ad-in" id="bcStyle" aria-label="Style" style="flex:none"><option value="info">📣 Info</option><option value="warn">⚠️ Warning</option><option value="party">🎉 Party</option></select><button class="btn primary" type="submit">Send</button></form>
+        </section>
+
+        <section class="pf-card">
           <h2>Announcement</h2>
           <p class="muted">Shows as a bar at the top of the home page for everyone. Leave empty to remove it.</p>
           <form class="ad-row" id="annForm"><input class="ad-in" id="annText" maxlength="200" placeholder="e.g. New games this weekend!"><button class="btn primary" type="submit">Save</button></form>
@@ -161,6 +167,7 @@
         if (!shown.length) list.innerHTML = '<p class="muted">Nothing here.</p>';
       }
       for (const b of $("sgFilter").querySelectorAll("button")) b.addEventListener("click", () => { filter = b.dataset.f; $("sgFilter").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); paintSugg(); });
+      $("bcForm").addEventListener("submit", async (e) => { e.preventDefault(); const r = await call("broadcast", { text: $("bcText").value, style: $("bcStyle").value }); if (r.error) GameUtil.toast(r.error); else { GameUtil.toast(`Sent to ${r.reached} open tab${r.reached === 1 ? "" : "s"}`); $("bcText").value = ""; } });
       $("annForm").addEventListener("submit", async (e) => { e.preventDefault(); const r = await call("announce", { text: $("annText").value }); GameUtil.toast(r.ok ? ($("annText").value.trim() ? "Announcement is live" : "Announcement removed") : r.error); });
       $("banForm").addEventListener("submit", async (e) => { e.preventDefault(); const r = await call("ban", { word: $("banWord").value }); if (r.error) GameUtil.toast(r.error); else { GameUtil.toast(`Banned${r.cleared ? ` · removed ${r.cleared} post${r.cleared === 1 ? "" : "s"}` : ""}`); $("banWord").value = ""; refresh(); } });
       $("lbForm").addEventListener("submit", async (e) => { e.preventDefault(); const r = await call("lb-del", { name: $("lbName").value }); GameUtil.toast(r.error ? r.error : r.removed ? "Removed from the leaderboard" : "No one by that name"); if (r.ok) { $("lbName").value = ""; refresh(); } });

@@ -520,6 +520,13 @@ export class Leaderboard extends DurableObject {
         this.kvSet("announce", text ? JSON.stringify({ text, at: now }) : null);
         return json({ ok: true });
       }
+      case "broadcast": {
+        // Live pop-up for everyone on the site right now (every open tab keeps a presence socket).
+        const text = String(body.text || "").replace(/[\u0000-\u001f<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 300);
+        if (!text) return json({ error: "Write a message." }, 400);
+        const style = ["info", "warn", "party"].includes(body.style) ? body.style : "info";
+        return this.env.PRESENCE.get(this.env.PRESENCE.idFromName("presence")).fetch(new Request("https://presence/bc", { method: "POST", body: JSON.stringify({ text, style }) }));
+      }
       case "password": {
         if (envKey) return json({ error: "The password is set as a Cloudflare secret (ADMIN_KEY). Change it there." }, 400);
         const pw = String(body.password || "");
@@ -653,6 +660,12 @@ export class Presence extends DurableObject {
   async fetch(request) {
     const url = new URL(request.url);
     const id = url.searchParams.get("id") || "", key = url.searchParams.get("key") || "";
+    if (url.pathname === "/bc" && request.method === "POST") {
+      const b = await request.json(), socks = this.ctx.getWebSockets();
+      const out = JSON.stringify({ t: "bc", text: b.text, style: b.style, at: Date.now() });
+      for (const ws of socks) trySend(ws, out);
+      return json({ ok: true, reached: socks.length });
+    }
     if (url.pathname === "/verify") {
       if (!FID_RE.test(id) || !KEY_RE.test(key)) return json({ ok: false });
       const saved = await this.ctx.storage.get("k:" + id);

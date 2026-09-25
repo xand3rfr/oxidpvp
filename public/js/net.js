@@ -755,6 +755,27 @@
   addEventListener("offline", () => toast("📴 You're offline. Daily puzzles still work; online games will wait for Wi‑Fi.", 4200));
   addEventListener("online", () => toast("📶 Back online", 1800));
 
+  // ---------- Live broadcasts from the site owner (admin.html) ----------
+  function showBroadcast(m) {
+    let wrap = document.querySelector(".bc-wrap");
+    if (!wrap) { wrap = document.createElement("div"); wrap.className = "bc-wrap"; document.body.append(wrap); }
+    const el = document.createElement("div");
+    el.className = "bc-pop " + (m.style || "info");
+    el.setAttribute("role", "alert");
+    const ic = document.createElement("span"); ic.className = "bc-ic"; ic.textContent = { info: "📣", warn: "⚠️", party: "🎉" }[m.style] || "📣";
+    const body = document.createElement("div");
+    const sm = document.createElement("small"); sm.textContent = "Announcement from the owner";
+    const p = document.createElement("p"); p.textContent = m.text;
+    body.append(sm, p);
+    const x = document.createElement("button"); x.type = "button"; x.textContent = "×"; x.setAttribute("aria-label", "Dismiss");
+    x.addEventListener("click", () => el.remove());
+    el.append(ic, body, x);
+    wrap.prepend(el);
+    while (wrap.children.length > 3) wrap.lastChild.remove();
+    setTimeout(() => el.remove(), 25000);
+    sfx.play(m.style === "warn" ? "bad" : "good");
+  }
+
   // ---------- Announcement bar (set by the site owner on admin.html) ----------
   const whenReady = (fn) => (document.readyState === "loading" ? addEventListener("DOMContentLoaded", fn) : fn());
   whenReady(() => {
@@ -995,6 +1016,7 @@
         } else if (m.t === "inv") showInvite(m);
         else if (m.t === "sent" && sentCb) sentCb(m);
         else if (m.t === "dm") onDM(m);
+        else if (m.t === "bc") showBroadcast(m);
       };
       ws.onclose = (e) => {
         clearInterval(pingT); ws = null;

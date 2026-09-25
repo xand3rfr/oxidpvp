@@ -1,5 +1,8 @@
 // Release notes, newest first. Add a new entry at the top for every update.
 window.CHANGELOG = [
+  { v: "3.9", date: "2026-09-25", title: "Live announcements", items: [
+    "The owner can now send live announcements that pop up for everyone online",
+  ] },
   { v: "3.8", date: "2026-09-25", title: "Gamble with friends", items: [
     "New banner on the home page: wanting to gamble with friends? One click takes you to OXID Casino",
     "OXID Casino now has servers, a global chat, CS-style cases and case battles (see What's new on casino.oxidpvp.net)",
