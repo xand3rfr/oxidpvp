@@ -12,6 +12,7 @@ window.CHANGELOG = [
     "New game: Emoji Guess, which is naming the movie, show or saying from emojis",
     "New game: Mafia, with secret roles (Mafia, Doctor, Detective), night kills and day votes for 5 to 12 players",
     "New game: Minesweeper Race, which is the same minefield as your opponent and a race to clear it",
+    "New game: Sumo, which is shoving your friends off a shrinking platform",
     "Suggestions page: send in ideas and upvote other people's",
     "This changelog, plus a \"What's new\" dot when there's an update",
     "Tidier top bar with Friends and Settings buttons",
