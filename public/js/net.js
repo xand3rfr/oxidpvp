@@ -47,6 +47,7 @@
     { id: "casino", page: "casino", title: "Casino", min: 1, max: 8 },
     { id: "wordhunt", page: "wordhunt", title: "Word Hunt", min: 1, max: 8 },
     { id: "categories", page: "categories", title: "Categories", min: 2, max: 8 },
+    { id: "emoji", page: "emoji", title: "Emoji Guess", min: 1, max: 10 },
     { id: "chess", page: "chess", title: "Chess", duel: true },
     { id: "connect", page: "connect4", title: "Connect 4", duel: true },
     { id: "battleship", page: "battleship", title: "Battleship", duel: true, noSpectate: true },

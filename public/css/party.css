@@ -883,3 +883,11 @@ button.ct-ans { cursor: pointer; } button.ct-ans:hover { border-color: var(--dan
 .ct-ans.ok { border-color: rgba(34,197,94,.5); } .ct-ans.ok small { color: var(--green); font-weight: 700; }
 .ct-ans.dup span, .ct-ans.voted span, .ct-ans.letter span { text-decoration: line-through; opacity: .6; }
 @media (max-width: 560px) { .ct-row { grid-template-columns: 1fr; gap: 4px; } }
+
+/* ---------- Emoji Guess ---------- */
+.em-clue { font-size: clamp(56px, 12vw, 96px); letter-spacing: .08em; line-height: 1.1; text-align: center; animation: pop .35s cubic-bezier(.2,1.6,.4,1); }
+.em-hint { font: 700 clamp(18px, 3.4vw, 26px) var(--mono); letter-spacing: .18em; color: var(--muted); text-align: center; word-break: break-word; max-width: 100%; }
+.em-hint.solved { color: var(--green); letter-spacing: .04em; font-family: var(--sans); }
+.em-feed { list-style: none; width: min(520px, 100%); display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.em-feed li.ok { color: var(--green); font-weight: 700; }
+.wl-form.shake { animation: dw-shake .35s; }
