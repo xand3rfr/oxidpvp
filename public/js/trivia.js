@@ -74,7 +74,7 @@
       last.r = { t: "r", n: G.n, correct: cur.correct, picks, gains, scores: scores() };
       send(last.r);
       G.timer = setTimeout(() => {
-        if (G.n >= G.total) { G.phase = "end"; last.end = { t: "end", scores: scores() }; send(last.end); }
+        if (G.n >= G.total) { G.phase = "end"; last.end = { t: "end", scores: scores(), teams: !!settings().teams }; send(last.end); }
         else ask();
       }, REVEAL_MS);
     }
@@ -243,18 +243,21 @@
     } else if (m.t === "end") {
       stopClock(false);
       renderBoard(m.scores);
-      showResults(m.scores);
+      showResults(m.scores, m.teams);
     }
   }
 
-  function showResults(scores) {
+  function showResults(scores, teams) {
     const sorted = [...scores].sort((a, c) => c.score - a.score);
     const top = sorted[0] ? sorted[0].score : 0;
     const winners = sorted.filter((p) => p.score === top);
-    const iWon = winners.some((p) => p.id === room.myId);
+    let iWon = winners.some((p) => p.id === room.myId);
+    const T = teams ? Party.teams(scores, (p) => p.score) : null;
+    if (T) iWon = T.winner >= 0 && T.team.get(room.myId) === T.winner;
     GameUtil.sfx(iWon ? "win" : "lose");
     GameUtil.record("trivia", iWon ? "win" : "loss");
-    $("resultTitle").textContent = iWon ? (winners.length > 1 ? "Tied for 1st" : "You win") : winners[0].name + " wins";
+    $("resultTitle").textContent = T ? (T.winner < 0 ? `Tie! ${T.totals[0]} – ${T.totals[1]}` : `${Party.TEAMS[T.winner].name} team wins! ${T.totals[0]} – ${T.totals[1]}`)
+      : iWon ? (winners.length > 1 ? "Tied for 1st" : "You win") : winners[0].name + " wins";
     const list = $("standings");
     list.textContent = "";
     sorted.forEach((p, i) => {
@@ -263,6 +266,7 @@
       const pos = document.createElement("span"); pos.className = "pos"; pos.textContent = i + 1;
       const nm = document.createElement("span"); nm.className = "pname"; nm.textContent = p.name + (p.id === room.myId ? " (you)" : "");
       const n = document.createElement("span"); n.className = "n"; n.textContent = p.score + " pts";
+      if (T) { const dot = document.createElement("i"); dot.className = "team-dot"; dot.style.background = Party.TEAMS[T.team.get(p.id)].color; nm.prepend(dot); }
       li.append(pos, GameUtil.avatar(p), nm, n);
       list.append(li);
     });
@@ -298,7 +302,7 @@
     let pool = s.onlyCustom ? [] : window.TRIVIA_QUESTIONS.filter((q) => s.cats.includes(q[0]));
     pool = pool.concat(custom);
     if (!pool.length) pool = window.TRIVIA_QUESTIONS.slice();
-    return { pool, count: Math.min(s.count, pool.length) };
+    return { pool, count: Math.min(s.count, pool.length), teams: !!s.teams };
   }
   function buildSettings(el) {
     const s = loadSettings();
@@ -311,7 +315,8 @@
         <summary>Your own questions <span class="cq-n"></span></summary>
         <textarea rows="5" spellcheck="false" placeholder="One per line:&#10;Question | right answer | wrong | wrong | wrong"></textarea>
         <label class="check"><input type="checkbox"> Only use my questions</label>
-      </details>`;
+      </details>
+      <label class="check team-check"><input type="checkbox"> Teams: Red vs Blue (players alternate by join order)</label>`;
     const seg = el.querySelector(".seg"), chips = el.querySelector(".chips");
     for (const n of [5, 10, 15, 20]) {
       const b = document.createElement("button");
@@ -332,6 +337,9 @@
     const ta = el.querySelector("textarea"), only = el.querySelector(".check input");
     ta.value = s.custom; only.checked = s.onlyCustom;
     ta.addEventListener("input", () => { s.custom = ta.value; save(); });
+    const tm = el.querySelector(".team-check input");
+    tm.checked = !!s.teams;
+    tm.addEventListener("change", () => { s.teams = tm.checked; save(); });
     only.addEventListener("change", () => { s.onlyCustom = only.checked; save(); });
     function save() {
       saveSettings(s);

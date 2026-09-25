@@ -817,3 +817,19 @@ body.touching .touch-ui { display: block; }
 @keyframes season-fall { to { transform: translateY(110vh) rotate(360deg); } }
 @keyframes season-float { 0% { transform: translate(0, 0); } 50% { transform: translate(30px, -55vh); } 100% { transform: translate(-20px, -115vh); } }
 @media (prefers-reduced-motion: reduce) { .season-layer { display: none; } }
+.pw-set { display: flex; align-items: center; gap: 10px; margin: 8px 0 4px; font-size: 13px; color: var(--muted); }
+.pw-set input { flex: 1; min-width: 0; height: 36px; padding: 0 10px; border-radius: 9px; background: var(--field); border: 1px solid var(--line-2); color: var(--text); font: 500 14px var(--sans); outline: none; }
+.pw-ask { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding: 12px; border-radius: 12px; border: 1px solid rgba(var(--accent-rgb), .5); background: rgba(var(--accent-rgb), .08); font-size: 13px; }
+.react-pop { display: grid !important; grid-template-columns: repeat(8, auto); max-width: min(420px, calc(100vw - 32px)); }
+.react-pop button.txt { grid-column: span 2; font: 700 13px var(--sans); width: auto; padding: 0 10px; color: var(--text); }
+.react-float.txt span { font: 800 22px var(--sans); color: #fff; padding: 6px 12px; border-radius: 12px; background: rgba(var(--accent-rgb), .85); }
+.plist li.has-prof { cursor: pointer; } .plist li.has-prof:hover { background: var(--surface-2); }
+.prof-pop { z-index: 70; }
+.panel.prof { width: min(380px, 100%); text-align: center; }
+.prof-top { display: flex; justify-content: center; margin-bottom: 10px; }
+.avatar.xl { width: 84px; height: 84px; font-size: 44px; }
+.avatar.xl .av-lvl { min-width: 26px; height: 26px; font-size: 12px; line-height: 24px; }
+.prof-lvl { color: var(--muted); font-size: 13px; margin: 2px 0 14px; }
+.prof-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.prof-stats div { padding: 10px 6px; border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 2px; }
+.prof-stats b { font: 700 16px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .prof-stats span { font-size: 11px; color: var(--dim); }

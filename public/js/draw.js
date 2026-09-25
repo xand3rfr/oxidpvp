@@ -41,7 +41,7 @@
       const p = byId(id);
       const knows = id === G.drawer || (p && p.guessed) || G.phase === "reveal" || G.phase === "end";
       return {
-        t: "st", phase: G.phase, round: G.round, rounds: G.rounds, drawer: G.drawer,
+        t: "st", phase: G.phase, round: G.round, rounds: G.rounds, drawer: G.drawer, teams: !!settings.teams,
         players: G.players.map(({ id, name, av, score, guessed, gain }) => ({ id, name, av, score, guessed, gain })),
         word: knows ? G.word : null, hint: hint(), len: G.word.length,
         choices: id === G.drawer && G.phase === "choose" ? G.choices : null,
@@ -71,8 +71,11 @@
       G.drawer = G.order[G.turn];
       if (!byId(G.drawer)) return nextTurn(); // they left
       for (const p of G.players) { p.guessed = false; p.gain = 0; }
-      const pool = window.DRAW_WORDS.filter((w) => !used.has(w));
-      G.choices = GameUtil.shuffle(pool.length >= 3 ? pool : window.DRAW_WORDS.slice()).slice(0, 3);
+      // Host's own word list (from the lobby settings) mixes in, or replaces the built-in words.
+      const custom = String(settings.words || "").split(/[\n,]/).map((w) => w.trim().toLowerCase().replace(/[^a-z ]/g, "").slice(0, 30)).filter((w) => w.length >= 2);
+      const base = settings.onlyWords && custom.length >= 3 ? custom : [...window.DRAW_WORDS, ...custom];
+      const pool = base.filter((w) => !used.has(w));
+      G.choices = GameUtil.shuffle(pool.length >= 3 ? pool : base.slice()).slice(0, 3);
       G.word = ""; G.revealed = []; G.strokes = [];
       G.phase = "choose";
       G.ends = Date.now() + CHOOSE_MS;
@@ -365,12 +368,13 @@
       if (!prev || prev.phase !== "end") {
         const sorted = [...v.players].sort((a, b) => b.score - a.score);
         const top = sorted[0] ? sorted[0].score : 0;
-        const won = sorted.some((p) => p.id === room.myId && p.score === top);
+        const T = v.teams ? Party.teams(v.players, (p) => p.score) : null;
+        const won = T ? T.winner >= 0 && T.team.get(room.myId) === T.winner : sorted.some((p) => p.id === room.myId && p.score === top);
         GameUtil.sfx(won ? "win" : "lose");
         GameUtil.record("draw", won ? "win" : "loss");
         results({
-          title: won ? "You win!" : `${sorted[0].name} wins`,
-          rows: sorted.map((p) => ({ p, value: p.score + " pts", win: p.score === top })),
+          title: T ? (T.winner < 0 ? `Tie! ${T.totals[0]} – ${T.totals[1]}` : `${Party.TEAMS[T.winner].name} team wins! ${T.totals[0]} – ${T.totals[1]}`) : won ? "You win!" : `${sorted[0].name} wins`,
+          rows: sorted.map((p) => ({ p, value: (T ? Party.TEAMS[T.team.get(p.id)].name + " · " : "") + p.score + " pts", win: T ? T.team.get(p.id) === T.winner : p.score === top })),
           isHost: room.isHost, meId: room.myId,
         });
       }
@@ -397,10 +401,20 @@
 
   // ---------- lobby settings ----------
   const SET_KEY = "oxidpvp-draw";
-  const loadSet = () => { let s = null; try { s = JSON.parse(localStorage.getItem(SET_KEY)); } catch {} return { rounds: 2, time: 80, ...(s || {}) }; };
+  const loadSet = () => { let s = null; try { s = JSON.parse(localStorage.getItem(SET_KEY)); } catch {} return { rounds: 2, time: 80, words: "", onlyWords: false, teams: false, ...(s || {}) }; };
   function buildSettings(el) {
     const s = loadSet();
-    el.innerHTML = `<div class="set-head">Rounds</div><div class="seg" data-k="rounds"></div><div class="set-head">Seconds to draw</div><div class="seg" data-k="time"></div>`;
+    el.innerHTML = `<div class="set-head">Rounds</div><div class="seg" data-k="rounds"></div><div class="set-head">Seconds to draw</div><div class="seg" data-k="time"></div>
+      <details class="custom-q"><summary>Your own words</summary><textarea rows="4" spellcheck="false" placeholder="Separate with commas or new lines: pizza, my dog, the principal…"></textarea>
+      <label class="check"><input type="checkbox" class="only-w"> Only use my words (needs at least 3)</label></details>
+      <label class="check"><input type="checkbox" class="teams-w"> Teams: Red vs Blue (players alternate by join order)</label>`;
+    const ta = el.querySelector("textarea"), only = el.querySelector(".only-w"), tm = el.querySelector(".teams-w");
+    ta.value = s.words; only.checked = s.onlyWords; tm.checked = s.teams;
+    const saveX = () => { try { localStorage.setItem(SET_KEY, JSON.stringify(s)); } catch {} };
+    ta.addEventListener("input", () => { s.words = ta.value; saveX(); });
+    ta.addEventListener("keydown", (e) => e.stopPropagation());
+    only.addEventListener("change", () => { s.onlyWords = only.checked; saveX(); });
+    tm.addEventListener("change", () => { s.teams = tm.checked; saveX(); });
     const opts = { rounds: [1, 2, 3], time: [60, 80, 100] };
     for (const seg of el.querySelectorAll(".seg")) {
       const k = seg.dataset.k;

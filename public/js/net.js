@@ -418,6 +418,36 @@
     try { new BroadcastChannel("oxidpvp").postMessage({ t: "result", game, result, code: reportTo && reportTo.code }); } catch {}
   }
 
+  // ---------- Profile cards ----------
+  function myProf() {
+    const st = readStats(), t = sum(st);
+    let fav = null, most = 0;
+    for (const [id, g] of Object.entries(st)) { const n = g.w + g.l + g.d; if (n > most) { most = n; fav = id; } }
+    return { w: t.w, g: t.played, fav, ach: Object.keys(readAch()).length, streak: readMeta().best || 0 };
+  }
+  const cleanProf = (x) => (x && typeof x === "object" ? {
+    w: Math.max(0, Math.min(1e6, x.w | 0)), g: Math.max(0, Math.min(1e6, x.g | 0)), ach: Math.max(0, Math.min(99, x.ach | 0)),
+    streak: Math.max(0, Math.min(9999, x.streak | 0)), fav: GAMES.some((g) => g.id === x.fav) ? x.fav : null,
+  } : null);
+  function profileCard(p) {
+    document.querySelector(".prof-pop")?.remove();
+    const a = cleanAv(p.av), pr = p.prof || {};
+    const pop = document.createElement("div");
+    pop.className = "overlay prof-pop";
+    pop.innerHTML = `<div class="panel prof"><div class="prof-top"></div><h2></h2><p class="prof-lvl"></p><div class="prof-stats"></div><button class="btn ghost full" type="button">Close</button></div>`;
+    pop.querySelector(".prof-top").append(avatarEl({ av: a }, "xl"));
+    pop.querySelector("h2").textContent = p.name;
+    pop.querySelector(".prof-lvl").textContent = `Level ${a.l}` + (a.f ? ` · ${FRAMES[a.f].name} frame` : "");
+    const fav = pr.fav && GAMES.find((g) => g.id === pr.fav);
+    for (const [n, label] of [[pr.g || 0, "games"], [pr.w || 0, "wins"], [pr.g ? Math.round(((pr.w || 0) / pr.g) * 100) + "%" : "–", "win rate"], [pr.streak || 0, "best streak"], [pr.ach || 0, "achievements"], [fav ? fav.title : "–", "favorite"]]) {
+      const d = document.createElement("div"); const b = document.createElement("b"); b.textContent = n; const sp = document.createElement("span"); sp.textContent = label; d.append(b, sp);
+      pop.querySelector(".prof-stats").append(d);
+    }
+    pop.querySelector("button").addEventListener("click", () => pop.remove());
+    pop.addEventListener("click", (e) => { if (e.target === pop) pop.remove(); });
+    document.body.append(pop);
+  }
+
   // ---------- XP, levels and weekly challenges ----------
   const XP_KEY = "oxidpvp-xp", WEEK_KEY = "oxidpvp-weekly";
   const readXP = () => Math.max(0, +store.get(XP_KEY) || 0);
@@ -879,7 +909,7 @@
   // ---------- Dock: mute, reactions, switch game, chat ----------
   const CHAT_MAX = 200, CHAT_GAP_MS = 600;
   const QUICK = ["gg", "nice!", "lol", "one more?", "brb"];
-  const REACTIONS = ["😂", "🔥", "💀", "👏", "😭", "😡", "🤯", "👀"];
+  const REACTIONS = ["😂", "🔥", "💀", "👏", "😭", "😡", "🤯", "👀", "GG", "Nice!", "Rematch?", "LOL", "Oops", "No way!"];
   const cleanText = (t) => String(t || "").replace(/\s+/g, " ").trim().slice(0, CHAT_MAX);
   const ICON = {
     chat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>',
@@ -930,6 +960,7 @@
       for (const e of REACTIONS) {
         const b = document.createElement("button");
         b.type = "button"; b.textContent = e; b.setAttribute("aria-label", "React " + e);
+        if (/^[A-Za-z]/.test(e)) b.className = "txt";
         b.addEventListener("click", () => { if (reactFn) reactFn(e); pop(null); });
         $(".react-pop").append(b);
       }
@@ -1073,6 +1104,7 @@
     el.className = "react-float";
     el.style.left = 20 + Math.random() * 60 + "%";
     const e = document.createElement("span"); e.textContent = m.e;
+    if (/^[A-Za-z]/.test(m.e)) el.classList.add("txt");
     const n = document.createElement("small"); n.textContent = m.me ? "You" : cleanName(m.name);
     el.append(e, n);
     document.body.appendChild(el);
@@ -1080,10 +1112,13 @@
   }
 
   // Chat + reactions for a room. Guests send to the host; the host stamps names and relays.
-  function social({ isHost, myId, people, toGuests, toHost }) {
+  // specOnly(id): that person is a spectator, so their chat goes to the spectator channel, which
+  // players don't see (so watchers can chat without spamming the people playing).
+  function social({ isHost, myId, people, toGuests, toHost, specOnly = () => false, amSpectator = () => false }) {
     const seen = new Map();
     function show(m) {
-      if (m.__sys === "chat") dock.add({ ...m, me: !m.sys && m.id === myId() });
+      if (m.__sys === "chat" && m.spec && !amSpectator()) return;
+      if (m.__sys === "chat") dock.add({ ...m, name: m.spec ? "👀 " + m.name : m.name, me: !m.sys && m.id === myId() });
       else if (m.__sys === "react") { floatReaction({ ...m, me: m.id === myId() }); if (m.id !== myId()) sfx.play("pop"); }
     }
     function relay(m) {
@@ -1102,7 +1137,7 @@
       fromGuest(id, d) {
         const p = person(id);
         if (!p) return false;
-        if (d.__sys === "chat") { relay({ __sys: "chat", id, name: p.name, av: p.av, text: cleanText(d.text) }); return true; }
+        if (d.__sys === "chat") { relay({ __sys: "chat", id, name: p.name, av: p.av, text: cleanText(d.text), spec: specOnly(id) || undefined }); return true; }
         if (d.__sys === "react" && REACTIONS.includes(d.e)) { relay({ __sys: "react", id, name: p.name, e: d.e }); return true; }
         return false;
       },
@@ -1145,6 +1180,7 @@
             <input class="code-in" maxlength="${CODE_LEN}" placeholder="CODE" autocomplete="off" spellcheck="false" aria-label="Room code">
             <button class="btn" type="submit">Join</button>
           </form>
+          <form class="pw-ask" hidden><span>🔒 This room has a password</span><div class="join"><input class="pw-join" maxlength="20" placeholder="Password" autocomplete="off" aria-label="Room password"><button class="btn primary" type="submit">Join</button></div></form>
           <div class="bot-box" hidden>
             <div class="or">or practice</div>
             <div class="bot-row"><button class="btn" type="button" data-bot="easy">🤖 Easy</button><button class="btn" type="button" data-bot="medium">🤖 Medium</button><button class="btn" type="button" data-bot="hard">🤖 Hard</button></div>
@@ -1158,6 +1194,7 @@
             Copy invite link
           </button>
           <label class="pub-toggle" hidden><input type="checkbox"><span>List in <a href="rooms.html" target="_blank">public rooms</a> so anyone can join</span></label>
+          <label class="pw-set" hidden><span>🔒 Password</span><input class="pw-host" maxlength="20" placeholder="None (anyone with the code)" autocomplete="off" aria-label="Room password"></label>
           <div class="plist-head"><span>Players</span><span class="pcount"></span></div>
           <ul class="plist"></ul>
           <div class="lobby-extra"></div>
@@ -1201,7 +1238,7 @@
     const profile = () => {
       const n = cleanName(nameIn.value);
       store.set(NAME_KEY, n);
-      return { name: n, av };
+      return { name: n, av: { ...av, l: level() }, prof: myProf() };
     };
 
     const status = $(".status");
@@ -1225,6 +1262,9 @@
       onJoin(code, {});
     });
     $('[data-act="start"]').addEventListener("click", () => onStart && onStart());
+    let pwCode = null;
+    $(".pw-ask").addEventListener("submit", (e) => { e.preventDefault(); if (pwCode) onJoin(pwCode, {}); });
+    for (const inp of root.querySelectorAll(".pw-join, .pw-host")) inp.addEventListener("keydown", (e) => e.stopPropagation());
     if (onBot) {
       $(".bot-box").hidden = false;
       for (const b of root.querySelectorAll("[data-bot]")) b.addEventListener("click", () => { clearHash(); onBot(b.dataset.bot); });
@@ -1233,6 +1273,9 @@
 
     const api = {
       root, $, setStatus, profile,
+      hostPassword: () => $(".pw-host").value.trim(),
+      joinPassword: () => $(".pw-join").value.trim(),
+      askPassword(code) { pwCode = code; $(".pw-ask").hidden = false; setTimeout(() => $(".pw-join").focus(), 50); },
       showMenu() { $('[data-view="menu"]').hidden = false; $('[data-view="room"]').hidden = true; root.hidden = false; },
       showRoom(code, { isHost, party }) {
         $('[data-view="menu"]').hidden = true; $('[data-view="room"]').hidden = false; root.hidden = false;
@@ -1242,6 +1285,8 @@
         wait.hidden = party && isHost;
         wait.textContent = party ? "Waiting for the host to start…" : "Waiting for an opponent. Anyone else who joins can watch.";
         $(".lobby-extra").hidden = !isHost;
+        $(".pw-set").hidden = !isHost;
+        $(".pw-ask").hidden = true;
       },
       people(list, { max, min, isHost, party, labels = {} }) {
         const ul = $(".plist");
@@ -1249,6 +1294,7 @@
         for (const p of list) {
           const li = document.createElement("li");
           li.append(avatarEl(p));
+          if (p.prof) { li.classList.add("has-prof"); li.title = "View profile"; li.addEventListener("click", () => profileCard(p)); }
           const nm = document.createElement("span");
           nm.className = "pname"; nm.textContent = p.name;
           li.append(nm);
@@ -1337,7 +1383,7 @@
     let pingTimer = 0, graceTimer = 0, moving = false;
     const helloTimers = new Map();
     const peopleList = () => [hostP, opp, ...specs.values()].filter(Boolean);
-    const pub = lister(() => (isHost ? conn : null), () => ({ host: hostP ? hostP.name : "", players: opp ? 2 : 1, max: 2, started, watch: spectate }));
+    const pub = lister(() => (isHost ? conn : null), () => ({ host: hostP ? hostP.name : "", players: opp ? 2 : 1, max: 2, started, watch: spectate, locked: !!ui.hostPassword() }));
 
     const ui = shell({
       game, title, subtitle,
@@ -1376,6 +1422,8 @@
       people: peopleList,
       toGuests: (m) => conn && conn.send({ to: "all", d: m }),
       toHost: (m) => conn && conn.send({ d: m }),
+      specOnly: (id) => specs.has(id),
+      amSpectator: () => spectator,
     });
 
     function renderPeople() {
@@ -1489,7 +1537,7 @@
     function onGuestData(id, d) {
       if (d.__sys === "hello") {
         clearTimeout(helloTimers.get(id));
-        const p = { id, name: cleanName(d.name), av: cleanAv(d.av) };
+        const p = { id, name: cleanName(d.name), av: cleanAv(d.av), prof: cleanProf(d.prof) };
         if (opp && opp.id === id) { // our opponent reconnected (or reloaded)
           opp = p;
           clearTimeout(graceTimer); banner(null);
@@ -1499,6 +1547,7 @@
           return;
         }
         if (specs.has(id)) { specs.set(id, p); accept(id, "spectator"); broadcastPeople(); return; }
+        if (ui.hostPassword() && String(d.pw || "") !== ui.hostPassword()) return reject(id, "__pw");
         if (!opp && !started) {
           opp = p;
           accept(id, "player");
@@ -1563,7 +1612,7 @@
       ui.setStatus("Joining…", "pulse");
       hello();
     }
-    const hello = () => conn && conn.send({ d: { __sys: "hello", name: me.name, av: me.av } });
+    const hello = () => conn && conn.send({ d: { __sys: "hello", name: me.name, av: me.av, prof: me.prof, pw: ui.joinPassword() } });
     function onGuestMsg(m) {
       if (m.sys === "host-left") return fail("The host left the room.");
       if (m.sys === "host-away") return banner("The host lost connection. Waiting for them…");
@@ -1578,6 +1627,7 @@
         return;
       }
       if (d.__sys === "people") { hostP = d.host; opp = d.opp; specs = new Map((d.specs || []).map((p) => [p.id, p])); renderPeople(); return; }
+      if (d.__sys === "reject" && d.reason === "__pw") { const c = code; fail(ui.joinPassword() ? "Wrong password." : "This room needs a password."); ui.askPassword(c); return; }
       if (d.__sys === "reject") return fail(d.reason);
       if (d.__sys === "move") return follow(d);
       if (d.__sys === "chat" || d.__sys === "react") return talk.show(d);
@@ -1675,7 +1725,7 @@
       const ids = players.filter((p) => p.id !== myId).map((p) => p.id);
       if (conn && ids.length) conn.send({ to: ids, d: m });
     };
-    const pub = lister(() => (isHost ? conn : null), () => ({ host: players[0] ? players[0].name : "", players: players.length, max, started }));
+    const pub = lister(() => (isHost ? conn : null), () => ({ host: players[0] ? players[0].name : "", players: players.length, max, started, locked: !!ui.hostPassword() }));
 
     function render() { ui.people(players.map((p) => ({ ...p, me: p.id === myId })), { min, max, isHost, party: true }); }
 
@@ -1765,9 +1815,10 @@
           } else broadcastLobby();
           return;
         }
+        if (ui.hostPassword() && String(d.pw || "") !== ui.hostPassword()) return reject(id, "__pw");
         if (started && !lateJoin) return reject(id, "That game already started.");
         if (players.length >= max) return reject(id, "Room is full.");
-        const p = { id, name: cleanName(d.name), av: cleanAv(d.av) };
+        const p = { id, name: cleanName(d.name), av: cleanAv(d.av), prof: cleanProf(d.prof) };
         players.push(p);
         conn.send({ to: id, d: { __sys: "welcome", id } });
         if (started) {
@@ -1824,7 +1875,7 @@
       code = c;
       const me = ui.profile();
       ui.setStatus(resume ? "Rejoining…" : "Connecting…", "pulse");
-      const hello = () => conn && conn.send({ d: { __sys: "hello", name: me.name, av: me.av } });
+      const hello = () => conn && conn.send({ d: { __sys: "hello", name: me.name, av: me.av, prof: me.prof, pw: ui.joinPassword() } });
       const myName = me.name;
       let cn;
       try {
@@ -1841,6 +1892,7 @@
                 if (!started) { ui.showRoom(c, { isHost: false, party: true }); ui.setStatus(""); enterDock(); }
               } else if (d.__sys === "chat" || d.__sys === "react") talk.show(d);
               else if (d.__sys === "lobby") { players = d.players; render(); }
+              else if (d.__sys === "reject" && d.reason === "__pw") { const c = code; backToMenu(ui.joinPassword() ? "Wrong password." : "This room needs a password."); ui.askPassword(c); }
               else if (d.__sys === "reject") backToMenu(d.reason);
               else if (d.__sys === "move") {
                 if (!gameById(d.game) || !/^[A-Z0-9]{5}$/.test(d.code)) return;

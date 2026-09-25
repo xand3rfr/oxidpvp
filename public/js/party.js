@@ -179,5 +179,16 @@
     return best;
   }
   window.Party.search = search;
+
+  // Team mode for party games: players alternate Red, Blue, Red… in join order, so every client
+  // works out the same teams from the same player list. Returns totals and the winning team.
+  const TEAMS = [{ name: "Red", color: "#ef4444" }, { name: "Blue", color: "#3b82f6" }];
+  window.Party.TEAMS = TEAMS;
+  window.Party.teams = (players, scoreOf) => {
+    const team = new Map(players.map((p, i) => [p.id, i % 2]));
+    const totals = [0, 0];
+    for (const p of players) totals[team.get(p.id)] += scoreOf(p);
+    return { team, totals, winner: totals[0] === totals[1] ? -1 : totals[0] > totals[1] ? 0 : 1 };
+  };
   window.Party.pickRandom = (a) => a[Math.floor(Math.random() * a.length)];
 })();

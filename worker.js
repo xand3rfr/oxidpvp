@@ -226,7 +226,7 @@ export class GameRoom extends DurableObject {
       code, game,
       host: cleanName(p.host),
       players: clampInt(p.players, 0, MAX_SOCKETS), max: clampInt(p.max, 1, MAX_SOCKETS),
-      started: !!p.started, watch: !!p.watch,
+      started: !!p.started, watch: !!p.watch, locked: !!p.locked,
     } : null;
     await this.ctx.storage.put("listed", !!entry);
     await dirCall(this.env, entry ? { add: entry } : { remove: code });

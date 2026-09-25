@@ -17,6 +17,26 @@
     School: ["Homework", "Recess", "Cafeteria", "Principal", "Field trip", "Pop quiz", "Locker", "Gym class", "Detention", "School bus", "Science fair", "Yearbook"],
   };
   const { h, fmt, results, hideResults, countdown } = Party;
+  // Host's custom category from the lobby: a name plus at least 6 words.
+  const CUSTOM_KEY = "oxidpvp-imposter";
+  const loadCustom = () => { try { return { cat: "", words: "", only: false, ...(JSON.parse(localStorage.getItem(CUSTOM_KEY)) || {}) }; } catch { return { cat: "", words: "", only: false }; } };
+  function customSet() {
+    const c = loadCustom();
+    const words = [...new Set(String(c.words).split(/[\n,]/).map((w) => w.trim().slice(0, 24)).filter(Boolean))];
+    return words.length >= 6 ? { cat: String(c.cat).trim().slice(0, 24) || "Custom", words, only: !!c.only } : null;
+  }
+  function buildSettings(el) {
+    const c = loadCustom();
+    el.innerHTML = `<details class="custom-q"><summary>Your own category</summary>
+      <input class="p-input" maxlength="24" placeholder="Category name, e.g. Our teachers">
+      <textarea rows="4" spellcheck="false" placeholder="At least 6 words, separated with commas or new lines"></textarea>
+      <label class="check"><input type="checkbox"> Only use my category</label></details>`;
+    const name = el.querySelector("input.p-input"), ta = el.querySelector("textarea"), only = el.querySelector(".check input");
+    name.value = c.cat; ta.value = c.words; only.checked = c.only;
+    const save = () => { try { localStorage.setItem(CUSTOM_KEY, JSON.stringify({ cat: name.value, words: ta.value, only: only.checked })); } catch {} };
+    for (const x of [name, ta]) { x.addEventListener("input", save); x.addEventListener("keydown", (e) => e.stopPropagation()); }
+    only.addEventListener("change", save);
+  }
   const $ = (id) => document.getElementById(id);
   const cleanClue = (s) => String(s || "").replace(/[^\p{L}\p{N}' -]/gu, "").trim().split(/\s+/)[0].slice(0, 20);
 
@@ -51,11 +71,14 @@
       clearTimeout(G.timer);
       G.round++;
       if (G.round > G.rounds) { G.phase = "end"; return publish(); }
-      const cats = Object.keys(WORDS);
+      const cs = customSet();
+      const bank = cs ? (cs.only ? { [cs.cat]: cs.words } : { ...WORDS, [cs.cat]: cs.words }) : WORDS;
+      G.bank = bank;
+      const cats = Object.keys(bank);
       let cat, word;
       for (let k = 0; k < 50; k++) {
         cat = cats[Math.floor(Math.random() * cats.length)];
-        word = WORDS[cat][Math.floor(Math.random() * WORDS[cat].length)];
+        word = bank[cat][Math.floor(Math.random() * bank[cat].length)];
         if (!G.used.has(word)) break;
       }
       G.used.add(word);
@@ -104,7 +127,7 @@
       const caught = top > 0 && tops.length === 1 && tops[0] === G.imp;
       G.reveal = { votes: { ...G.votes }, accused: tops.length === 1 ? tops[0] : null, caught, guess: null, gains: {} };
       if (caught && byId(G.imp)) {
-        const others = GameUtil.shuffle(WORDS[G.cat].filter((w) => w !== G.word)).slice(0, 7);
+        const others = GameUtil.shuffle((G.bank || WORDS)[G.cat].filter((w) => w !== G.word)).slice(0, 7);
         G.options = GameUtil.shuffle([G.word, ...others]);
         G.phase = "guess";
         G.ends = Date.now() + GUESS_MS;
@@ -256,6 +279,7 @@
   $("again").addEventListener("click", () => { if (engine) engine.newGame(); });
 
   Room.mount({
+    lobbyExtra: buildSettings,
     game: "imposter",
     title: "Imposter",
     subtitle: "Everyone knows the secret word except one faker. Give one-word clues and vote out the imposter. 3 to 10 players.",

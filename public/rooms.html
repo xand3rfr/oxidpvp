@@ -70,7 +70,7 @@
           const card = document.createElement("div");
           card.className = "room-card";
           const top = document.createElement("div"); top.className = "room-top";
-          const t = document.createElement("b"); t.textContent = g.title;
+          const t = document.createElement("b"); t.textContent = (r.locked ? "🔒 " : "") + g.title;
           const st = document.createElement("span");
           st.className = "room-status " + (canJoin ? "open" : canWatch ? "watch" : "busy");
           st.textContent = canJoin ? "Waiting for players" : canWatch ? "In progress · watch" : r.started ? "In progress" : "Full";
