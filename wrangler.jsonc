@@ -8,8 +8,9 @@
     "binding": "ASSETS",
     // Unknown pages get public/404.html (which has a little game on it).
     "not_found_handling": "404-page",
-    // Everything is a static file except /api/*, which runs worker.js.
-    "run_worker_first": ["/api/*"]
+    // Everything is a static file except /api/*, which runs worker.js. "/" also goes through
+    // the worker so casino.oxidpvp.net can open straight into the casino.
+    "run_worker_first": ["/api/*", "/"]
   },
   // One Durable Object per game room (SQLite-backed, so it works on the free plan).
   "durable_objects": {

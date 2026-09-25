@@ -7,6 +7,8 @@
   const { h } = Party;
   const $ = (id) => document.getElementById(id);
   const WALLET_KEY = "oxidpvp-wallet", START = 1000, DAILY_BASE = 250, BAILOUT = 100;
+  // More games plug in from casino-games.js through Casino.register({ engine(E), onPrivate, render, pub... }).
+  const EXT = [];
 
   // =====================================================================
   // Wallet + upgrades (saved on this device)
@@ -32,6 +34,8 @@
   const saveWallet = () => { try { localStorage.setItem(WALLET_KEY, JSON.stringify(W)); } catch {} };
   saveWallet();
   const lvl = (id) => W.up[id] | 0;
+  // VIP tiers (casino-games.js) multiply the daily bonus.
+  const dailyAmt = () => Math.floor((DAILY_BASE + lvl("daily") * 150) * (window.Casino && window.Casino.dailyMult ? window.Casino.dailyMult() : 1));
   const fmtC = (n) => Math.floor(n).toLocaleString();
   const today = () => new Date().toDateString();
 
@@ -111,13 +115,16 @@
     const note = (t) => { G.log.unshift({ t, at: Date.now() }); G.log.length = Math.min(G.log.length, 12); };
     const pub = () => ({
       t: "st",
-      players: G.players.map((p) => ({ id: p.id, name: p.name, av: p.av, coins: p.coins, gold: p.gold, delta: p.delta })),
+      players: G.players.map((p) => ({ id: p.id, name: p.name, av: p.av, coins: p.coins, gold: p.gold, delta: p.delta, wag: p.wag || 0 })),
       bj: { phase: G.bj.phase, ends: G.bj.ends - Date.now(), seats: G.bj.seats, dealer: G.bj.phase === "play" ? [G.bj.dealer[0], "??"] : G.bj.dealer, turn: G.bj.turn },
       rl: { phase: G.rl.phase, ends: G.rl.ends - Date.now(), bets: G.rl.bets, result: G.rl.result },
       cr: { phase: G.cr.phase, ends: G.cr.ends - Date.now(), el: G.cr.phase === "run" ? Date.now() - G.cr.start : 0, crash: G.cr.phase === "crash" ? G.cr.crash : null, bets: G.cr.bets, hist: G.cr.hist, n: G.cr.n },
       cf: G.cf, log: G.log,
+      x: Object.assign({}, ...exts.map((e) => (e.pub ? e.pub() : {}))),
     });
     const publish = () => out.all(pub());
+    const E = { G, P, note, publish, later: (k, ms, fn) => later(k, ms, fn), take: (p, a) => take(p, a), give: (p, a) => give(p, a), maxBet: (p) => maxBet(p), to: (id, m) => out.to(id, m), players: () => G.players };
+    const exts = EXT.map((x) => (x.engine ? x.engine(E) : {}) || {});
     const later = (k, ms, fn) => { clearTimeout(G.timers[k]); G.timers[k] = setTimeout(fn, ms); };
 
     function addPlayer(p, info) {
@@ -150,6 +157,7 @@
       amt = Math.floor(+amt);
       if (!(amt >= 1) || amt > p.coins) return 0;
       p.coins -= amt; p.delta = -amt;
+      p.wag = (p.wag || 0) + amt; // total wagered, for the VIP club
       return amt;
     }
     function give(p, amt) { if (p && amt > 0) { p.coins += Math.floor(amt); p.delta = Math.floor(amt); } }
@@ -410,17 +418,20 @@
       cf.offers = cf.offers.filter((o) => o.from !== id && o.to !== id);
       if (bj.turn === id) bjNext();
       if (p) note(`${p.name} left the table`);
+      for (const e of exts) if (e.leave) e.leave(id);
       publish();
     }
-    const stop = () => { for (const t of Object.values(G.timers)) clearTimeout(t); };
-    return { G, hello, adjust, bjBet, bjAct, rlBetPlace, slot, cfOffer, cfAnswer, cfCancel, crBet, crOut, plinko, mnStart, mnPick, mnCash, mnView, leave, pub, stop };
+    const stop = () => { for (const t of Object.values(G.timers)) clearTimeout(t); for (const e of exts) if (e.stop) e.stop(); };
+    const extMsg = (from, m) => { for (const e of exts) if (e.handle && e.handle(from, m)) return true; return false; };
+    const extRejoin = (id) => { for (const e of exts) if (e.rejoin) e.rejoin(id); };
+    return { extMsg, extRejoin, G, hello, adjust, bjBet, bjAct, rlBetPlace, slot, cfOffer, cfAnswer, cfCancel, crBet, crOut, plinko, mnStart, mnPick, mnCash, mnView, leave, pub, stop };
   }
 
   // =====================================================================
   // UI
   // =====================================================================
-  let room = null, engine = null, V = null, tab = "bj", chip = 25, clocks = {};
-  try { tab = sessionStorage.getItem("oxid-casino-tab") || "bj"; } catch {}
+  let room = null, engine = null, V = null, tab = "lobby", chip = 25, clocks = {};
+  try { tab = sessionStorage.getItem("oxid-casino-tab") || "lobby"; } catch {}
   const me = () => (V ? V.players.find((p) => p.id === room.myId) : null);
   const nm = (id) => { const p = V && V.players.find((x) => x.id === id); return p ? (p.id === room.myId ? "You" : p.name) : "?"; };
   function act(m) { if (room.isHost) hostHandle(room.myId, m); else room.send(m); }
@@ -441,6 +452,7 @@
     else if (m.t === "mns") engine.mnStart(from, m.amt, m.count);
     else if (m.t === "mnp") engine.mnPick(from, m.cell);
     else if (m.t === "mnc") engine.mnCash(from);
+    else engine.extMsg(from, m);
   }
 
   function cardEl(c) {
@@ -454,7 +466,7 @@
     $("coins").textContent = fmtC(W.coins);
     const dailyReady = W.lastDaily !== today();
     $("daily").disabled = !dailyReady;
-    $("daily").textContent = dailyReady ? `🎁 Daily +${fmtC(DAILY_BASE + lvl("daily") * 150)}` : "🎁 Come back tomorrow";
+    $("daily").textContent = dailyReady ? `🎁 Daily +${fmtC(dailyAmt())}` : "🎁 Tomorrow";
     $("bail").hidden = W.coins >= 10;
     $("limit").textContent = `Max bet ${fmtC(limitFor(lvl("limit")))}`;
     document.documentElement.style.setProperty("--felt", FELTS[W.felt] || FELTS[0]);
@@ -652,6 +664,7 @@
     const log = $("log");
     log.textContent = "";
     for (const l of V.log.slice(0, 8)) log.append(h("li", "", l.t));
+    for (const x of EXT) if (x.render) x.render(V, tab);
   }
 
   function onState(v) {
@@ -684,6 +697,7 @@
     if (m.t === "slot") onSlot(m);
     else if (m.t === "plk") onPlinko(m);
     else if (m.t === "mn") onMines(m);
+    else for (const x of EXT) if (x.onPrivate && x.onPrivate(m)) break;
   }
   function onSlot(m) {
     const reels = [...document.querySelectorAll(".reel")];
@@ -996,14 +1010,7 @@
   setInterval(() => { postRichest(); loadRichest(); }, 30000);
 
   // ---------- controls ----------
-  for (const b of document.querySelectorAll(".cs-tab")) b.addEventListener("click", () => {
-    tab = b.dataset.tab;
-    try { sessionStorage.setItem("oxid-casino-tab", tab); } catch {}
-    render();
-    if (tab === "shop") renderShop();
-    if (tab === "crate") renderCrates();
-    if (tab === "plk") plkDraw();
-  });
+  for (const b of document.querySelectorAll(".cs-tab")) b.addEventListener("click", () => goTab(b.dataset.tab));
   $("bjBet").addEventListener("click", () => { GameUtil.sfx("click"); act({ t: "bj", amt: chip }); });
   $("bjHit").addEventListener("click", () => act({ t: "bja", a: "hit" }));
   $("bjStand").addEventListener("click", () => act({ t: "bja", a: "stand" }));
@@ -1015,7 +1022,7 @@
   $("daily").addEventListener("click", () => {
     if (W.lastDaily === today() || !room) return;
     W.lastDaily = today();
-    const bonus = DAILY_BASE + lvl("daily") * 150;
+    const bonus = dailyAmt();
     W.coins += bonus;
     saveWallet();
     act({ t: "adj", amt: bonus });
@@ -1057,6 +1064,25 @@
   })();
   renderWallet(); renderChips();
 
+  // Tabs can also be opened from anywhere with data-go="tab" (the lobby tiles use this).
+  function goTab(t) {
+    tab = t;
+    try { sessionStorage.setItem("oxid-casino-tab", tab); } catch {}
+    render();
+    if (tab === "shop") renderShop();
+    if (tab === "crate") renderCrates();
+    if (tab === "plk") plkDraw();
+    document.querySelector(".cs-main")?.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  document.addEventListener("click", (e) => { const g = e.target.closest("[data-go]"); if (g) { e.preventDefault(); goTab(g.dataset.go); GameUtil.sfx("click"); } });
+
+  window.Casino = {
+    register(x) { EXT.push(x); if (x.init) x.init(); },
+    h, $, fmtC, act: (m) => room && act(m), chip: () => chip, myId: () => (room ? room.myId : -1), state: () => V, wallet: () => W,
+    saveWallet, renderWallet, cardEl, deck, total, RANKS, SUITS, SUIT_CH, clock, nm, tab: () => tab, goTab, limit: () => limitFor(lvl("limit")),
+    isHost: () => !!(room && room.isHost), room: () => room,
+  };
+
   Room.mount({
     game: "casino",
     title: "Casino",
@@ -1074,7 +1100,7 @@
         engine = createEngine(r, out);
         r.onData((from, m) => hostHandle(from, m));
         r.onLeave((id) => engine.leave(id));
-        r.onRejoin((id) => { r.sendTo(id, engine.pub()); r.sendTo(id, engine.mnView(id)); });
+        r.onRejoin((id) => { r.sendTo(id, engine.pub()); r.sendTo(id, engine.mnView(id)); engine.extRejoin(id); });
         r.onJoin(() => {});
         setTimeout(() => engine && engine.hello(r.myId, { coins: W.coins, up: W.up }), 100);
       } else {

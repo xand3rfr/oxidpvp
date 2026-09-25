@@ -113,6 +113,8 @@ export default {
       return env.PRESENCE.get(env.PRESENCE.idFromName("presence")).fetch(request);
     }
     if (url.pathname.startsWith("/api/")) return new Response("Not found", { status: 404 });
+    // casino.oxidpvp.net: the front page is the casino. Every other file is shared with the main site.
+    if (url.hostname.startsWith("casino.") && url.pathname === "/") return env.ASSETS.fetch(new Request(new URL("/casino", url), request));
     return env.ASSETS.fetch(request);
   },
 };

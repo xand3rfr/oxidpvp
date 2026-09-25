@@ -6,7 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#000000">
-  <title>Casino · OXIDPVP</title>
+  <title>OXID Casino · Play-coin casino with friends</title>
+  <meta name="description" content="OXID Casino: slots, blackjack, roulette, crash, plinko, mines and more with free play coins. No real money, ever.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -15,33 +16,81 @@
   <link rel="stylesheet" href="css/games.css">
   <link rel="stylesheet" href="css/party.css">
 </head>
-<body class="game-page">
-  <header class="topbar">
-    <a class="back" href="index.html">&larr; <span>Games</span></a>
-    <div class="tb-title">Casino</div>
-    <div class="net" id="side"></div>
+<body class="game-page casino-page">
+  <header class="topbar cs-head">
+    <a class="back" id="backLink" href="index.html">&larr; <span>OXIDPVP</span></a>
+    <a class="cs-logo" href="#" data-go="lobby"><i>♠</i><span>OXID</span><b>CASINO</b></a>
+    <div class="cs-head-mid">
+      <div class="cs-wallet"><span class="cs-coin">🪙</span><b id="coins">0</b><small id="limit"></small></div>
+      <button class="btn sm primary" id="daily" type="button">🎁 Daily</button>
+      <button class="btn sm danger" id="bail" type="button" hidden>Broke? Get 100</button>
+    </div>
+    <div class="cs-head-right">
+      <button class="cs-vip-badge" id="vipBadge" type="button" data-go="vip">🥉 Bronze</button>
+      <button class="btn sm ghost" id="inviteBtn" type="button">👥 Invite</button>
+      <div class="net" id="side"></div>
+    </div>
   </header>
-  <main class="cs">
-    <section class="cs-main">
-      <div class="cs-bar">
-        <div class="cs-wallet"><span class="cs-coin">🪙</span><b id="coins">0</b><small id="limit"></small></div>
-        <div class="cs-chips" id="chips"></div>
-        <button class="btn sm" id="daily" type="button">🎁 Daily</button>
-        <button class="btn sm danger" id="bail" type="button" hidden>Broke? Get 100</button>
+  <div class="cs-app">
+    <nav class="cs-nav" aria-label="Casino games">
+      <div class="cs-nav-group">
+        <button class="cs-tab" data-tab="lobby" type="button"><span class="ni">🏠</span><span>Lobby</span></button>
       </div>
-      <nav class="cs-tabs">
-        <button class="cs-tab" data-tab="bj" type="button">🂡 Blackjack</button>
-        <button class="cs-tab" data-tab="rl" type="button">🎡 Roulette</button>
-        <button class="cs-tab" data-tab="slots" type="button">🎰 Slots</button>
-        <button class="cs-tab" data-tab="cr" type="button">🚀 Crash</button>
-        <button class="cs-tab" data-tab="plk" type="button">🔻 Plinko</button>
-        <button class="cs-tab" data-tab="mn" type="button">💣 Mines</button>
-        <button class="cs-tab" data-tab="cf" type="button">🪙 Coinflip</button>
-        <button class="cs-tab" data-tab="crate" type="button">🎁 Crates</button>
-        <button class="cs-tab" data-tab="shop" type="button">⬆️ Upgrades</button>
-      </nav>
+      <div class="cs-nav-group">
+        <h4>Originals</h4>
+        <button class="cs-tab" data-tab="cr" type="button"><span class="ni">🚀</span><span>Crash</span></button>
+        <button class="cs-tab" data-tab="plk" type="button"><span class="ni">🔻</span><span>Plinko</span></button>
+        <button class="cs-tab" data-tab="mn" type="button"><span class="ni">💣</span><span>Mines</span></button>
+        <button class="cs-tab" data-tab="dice" type="button"><span class="ni">🎲</span><span>Dice</span></button>
+        <button class="cs-tab" data-tab="keno" type="button"><span class="ni">🔢</span><span>Keno</span></button>
+        <button class="cs-tab" data-tab="hilo" type="button"><span class="ni">🃏</span><span>Hi-Lo</span></button>
+        <button class="cs-tab" data-tab="wheel" type="button"><span class="ni">🎡</span><span>Wheel</span></button>
+        <button class="cs-tab" data-tab="scratch" type="button"><span class="ni">🎟️</span><span>Scratch cards</span></button>
+      </div>
+      <div class="cs-nav-group">
+        <h4>Slots</h4>
+        <button class="cs-tab" data-tab="pd" type="button"><span class="ni">💎</span><span>Pink Diamonds</span></button>
+        <button class="cs-tab" data-tab="slots" type="button"><span class="ni">🎰</span><span>Classic 7s</span></button>
+      </div>
+      <div class="cs-nav-group">
+        <h4>Table games</h4>
+        <button class="cs-tab" data-tab="bj" type="button"><span class="ni">🂡</span><span>Blackjack</span></button>
+        <button class="cs-tab" data-tab="rl" type="button"><span class="ni">🎯</span><span>Roulette</span></button>
+        <button class="cs-tab" data-tab="bac" type="button"><span class="ni">🀄</span><span>Baccarat</span></button>
+        <button class="cs-tab" data-tab="vp" type="button"><span class="ni">♠️</span><span>Video Poker</span></button>
+      </div>
+      <div class="cs-nav-group">
+        <h4>Live</h4>
+        <button class="cs-tab" data-tab="race" type="button"><span class="ni">🏇</span><span>Horse Racing</span></button>
+        <button class="cs-tab" data-tab="cf" type="button"><span class="ni">🪙</span><span>Coinflip duels</span></button>
+      </div>
+      <div class="cs-nav-group">
+        <h4>Rewards</h4>
+        <button class="cs-tab" data-tab="vip" type="button"><span class="ni">👑</span><span>VIP Club</span></button>
+        <button class="cs-tab" data-tab="spin" type="button"><span class="ni">🎁</span><span>Daily free spin</span></button>
+        <button class="cs-tab" data-tab="crate" type="button"><span class="ni">📦</span><span>Crates</span></button>
+        <button class="cs-tab" data-tab="shop" type="button"><span class="ni">⬆️</span><span>Upgrades</span></button>
+      </div>
+      <p class="cs-nav-note">Play coins only. Coins can't be bought and have no real value.</p>
+    </nav>
+    <main class="cs cs-main">
+      <div class="cs-ticker" id="ticker"><span class="cs-tk-label">LIVE</span><div class="cs-tk-track" id="tickerTrack"></div></div>
+      <div class="cs-bar" id="chipsBar"><span class="cs-bar-label">Bet</span><div class="cs-chips" id="chips"></div></div>
 
-      <div class="cs-pane felt" data-pane="bj">
+      <div class="cs-pane cs-lobby" data-pane="lobby">
+        <section class="cs-hero">
+          <div>
+            <p class="cs-hero-kicker">Welcome to</p>
+            <h1>OXID <b>Casino</b></h1>
+            <p>20 games, a progressive jackpot, a VIP club and friends at your table. Free play coins only: nothing to buy, nothing to lose.</p>
+            <div class="cs-hero-cta"><button class="btn primary lg" type="button" data-go="pd">💎 Play Pink Diamonds</button><button class="btn lg" type="button" data-go="spin">🎁 Free daily spin</button></div>
+          </div>
+          <div class="cs-jackpot"><small>Progressive jackpot</small><b id="jackpot">25,000</b><span>Hit 5 💎 on Pink Diamonds</span></div>
+        </section>
+        <div id="lobbyTiles"></div>
+      </div>
+
+<div class="cs-pane felt" data-pane="bj">
         <div class="bj-dealer"><span class="bj-label">Dealer <b id="bjDealerTotal"></b></span><div class="bj-cards" id="bjDealer"></div></div>
         <div class="bj-seats" id="bjSeats"></div>
         <div class="cs-controls">
@@ -122,20 +171,17 @@
           <p class="cs-note" id="stats"></p>
         </div>
       </div>
-    </section>
-    <aside class="cs-side">
-      <h3>At the table</h3>
-      <div class="cs-people" id="people"></div>
-      <h3>Richest this week</h3>
-      <ol class="cs-top" id="richest"><li class="cs-note">Loading…</li></ol>
-      <h3>Activity</h3>
-      <ul class="cs-log" id="log"></ul>
-      <p class="cs-note">Play coins only. No real money is ever involved.</p>
-    </aside>
-  </main>
 
-  <script src="js/net.js"></script>
-  <script src="js/party.js"></script>
-  <script src="js/casino.js"></script>
+    </main>
+    <aside class="cs-side">
+      <div class="cs-side-card"><h3>At your table</h3><div class="cs-people" id="people"></div><button class="btn sm full" type="button" id="inviteBtn2">👥 Invite friends</button></div>
+      <div class="cs-side-card"><h3>Richest this week</h3><ol class="cs-top" id="richest"><li class="cs-note">Loading…</li></ol></div>
+      <div class="cs-side-card"><h3>Table activity</h3><ul class="cs-log" id="log"></ul></div>
+      <p class="cs-note">Play coins only. No real money is ever involved, and coins can't be bought or cashed out.</p>
+    </aside>
+  </div>
+
+  <script src="js/sub.js"></script>
+  <script>loadScripts(["js/net.js", "js/party.js", "js/casino.js", "js/casino-games.js"]);</script>
 </body>
 </html>

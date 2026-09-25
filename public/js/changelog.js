@@ -1,5 +1,16 @@
 // Release notes, newest first. Add a new entry at the top for every update.
 window.CHANGELOG = [
+  { v: "3.6", date: "2026-09-25", title: "OXID Casino", items: [
+    "The casino got a full makeover: a real casino lobby with a game menu, live wins ticker and a progressive jackpot",
+    "It now has its own address, casino.oxidpvp.net, and your coins, level and name carry over automatically",
+    "You walk straight into your own table. Hit Invite to bring friends in",
+    "New: Pink Diamonds, a 5-reel slot with 10 lines, wilds and a progressive jackpot",
+    "New: Dice, Keno, Hi-Lo, Wheel and Scratch cards",
+    "New: Baccarat, Video Poker (Jacks or Better) and Horse Racing with friends",
+    "New: VIP Club with 6 levels, a bigger daily bonus and rakeback on everything you bet",
+    "New: a free daily prize wheel with up to 25,000 coins",
+    "Still play coins only. Coins can't be bought and have no real value",
+  ] },
   { v: "3.5", date: "2026-09-25", title: "Crazy Cards and Would You Rather", items: [
     "New game: Crazy Cards, which is Last Card with chaos rules: stack +2s and +4s, a 7 swaps hands, a 0 passes every hand along, draw until you can play, and Tornado cards shuffle everyone's hands",
     "New game: Would You Rather. Pick a side in secret and score by siding with the crowd. Hosts can add their own questions",
