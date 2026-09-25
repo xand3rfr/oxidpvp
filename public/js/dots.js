@@ -67,11 +67,52 @@
     }
   }
 
+  // ---------- Computer opponent ----------
+  const cloneS = (S) => ({ ...S, h: S.h.slice(), v: S.v.slice(), box: S.box.slice(), over: S.over && { ...S.over } });
+  const allMoves = (S) => {
+    const out = [];
+    for (let r = 0; r < N; r++) for (let c = 0; c < B; c++) if (S.h[r * B + c] < 0) out.push({ k: "h", r, c });
+    for (let r = 0; r < B; r++) for (let c = 0; c < N; c++) if (S.v[r * N + c] < 0) out.push({ k: "v", r, c });
+    return out;
+  };
+  const sides = (S, r, c) => (S.h[r * B + c] >= 0) + (S.h[(r + 1) * B + c] >= 0) + (S.v[r * N + c] >= 0) + (S.v[r * N + c + 1] >= 0);
+  const boxesOf = (m) => (m.k === "h" ? [[m.r - 1, m.c], [m.r, m.c]] : [[m.r, m.c - 1], [m.r, m.c]]).filter(([r, c]) => r >= 0 && c >= 0 && r < B && c < B);
+  const completes = (S, m) => boxesOf(m).some(([r, c]) => S.box[r * B + c] < 0 && sides(S, r, c) === 3);
+  const givesAway = (S, m) => boxesOf(m).some(([r, c]) => S.box[r * B + c] < 0 && sides(S, r, c) === 2);
+  // How many boxes the other player could grab in a row if we play m (they take greedily).
+  function cost(S, side, m) {
+    const c = cloneS(S);
+    move(c, side, m);
+    let n = 0;
+    for (let guard = 0; guard < 40 && !c.over && c.turn !== side; guard++) {
+      const take = allMoves(c).find((x) => completes(c, x));
+      if (!take) break;
+      const before = c.box.filter((x) => x >= 0).length;
+      move(c, c.turn, take);
+      n += c.box.filter((x) => x >= 0).length - before;
+    }
+    return n;
+  }
+  function ai(S, side, level) {
+    const moves = allMoves(S);
+    if (!moves.length) return null;
+    const grab = moves.filter((m) => completes(S, m));
+    if (level === "easy") return grab.length && Math.random() < 0.6 ? Party.pickRandom(grab) : Party.pickRandom(moves);
+    if (grab.length) return Party.pickRandom(grab);
+    const safe = moves.filter((m) => !givesAway(S, m));
+    if (safe.length) return Party.pickRandom(safe);
+    if (level === "medium") return Party.pickRandom(moves);
+    // Hard: forced to open something, so open the smallest chain.
+    let best = null, bestC = Infinity;
+    for (const m of moves) { const c = cost(S, side, m); if (c < bestC) { bestC = c; best = m; } }
+    return best;
+  }
+
   Party.turnDuel({
     game: "dots",
     title: "Dots & Boxes",
     subtitle: "Take turns drawing lines. Close a box to claim it and go again. Most boxes wins.",
     chip: (side) => COLORS[side],
-    newState, move, render,
+    newState, move, render, ai,
   });
 })();

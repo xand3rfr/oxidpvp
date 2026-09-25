@@ -159,7 +159,59 @@
     else { link.send({ t: "rm" }); rematchBtn.disabled = true; rematchBtn.textContent = "Waiting for host…"; }
   });
 
+  // ---------- Computer opponent (plays piece 2) ----------
+  const ORDER = [3, 2, 4, 1, 5, 0, 6];
+  function windowScore(b, me) {
+    let v = 0;
+    const them = 3 - me;
+    const lines = [[1, 0], [0, 1], [1, 1], [1, -1]];
+    for (let c = 0; c < COLS; c++) for (let r = 0; r < ROWS; r++) for (const [dc, dr] of lines) {
+      const ec = c + dc * 3, er = r + dr * 3;
+      if (ec < 0 || ec >= COLS || er < 0 || er >= ROWS) continue;
+      let m = 0, t = 0;
+      for (let k = 0; k < 4; k++) { const x = b[at(c + dc * k, r + dr * k)]; if (x === me) m++; else if (x === them) t++; }
+      if (m && t) continue;
+      if (m === 3) v += 6; else if (m === 2) v += 2;
+      if (t === 3) v -= 8; else if (t === 2) v -= 2;
+    }
+    for (let r = 0; r < ROWS; r++) { if (b[at(3, r)] === me) v += 3; else if (b[at(3, r)] === them) v -= 3; }
+    return v;
+  }
+  function botMove(S, level) {
+    const me = 2, valid = ORDER.filter((c) => !S.b[at(c, ROWS - 1)]);
+    if (!valid.length) return null;
+    if (level === "easy" && Math.random() < 0.5) return valid[Math.floor(Math.random() * valid.length)];
+    const depth = level === "hard" ? 7 : level === "medium" ? 4 : 2, deadline = performance.now() + 900;
+    const play = (st, piece, c) => { const n = { ...st, b: st.b.slice(), sc: [0, 0], line: [] }; drop(n, piece, c); return n; };
+    function nega(st, d, a, b, piece) {
+      if (st.win) return st.win === 3 ? 0 : st.win === piece ? 1e6 + d : -1e6 - d;
+      if (d === 0 || performance.now() > deadline) return windowScore(st.b, piece);
+      let best = -Infinity;
+      for (const c of ORDER) {
+        if (st.b[at(c, ROWS - 1)]) continue;
+        const v = -nega(play(st, piece, c), d - 1, -b, -a, 3 - piece);
+        if (v > best) best = v;
+        if (best > a) a = best;
+        if (a >= b) break;
+      }
+      return best === -Infinity ? 0 : best;
+    }
+    let bestC = valid[0], bestV = -Infinity;
+    for (const c of valid) {
+      const v = -nega(play({ ...S, turn: me }, me, c), depth - 1, -Infinity, Infinity, 1) + Math.random() * 0.5;
+      if (v > bestV) { bestV = v; bestC = c; }
+    }
+    return bestC;
+  }
+
   Lobby.mount({
+    bot: (level) => ({
+      onMessage(o, reply) {
+        if (o.t !== "s" || !o.s || o.s.win || o.s.turn !== 2) return;
+        const c = botMove(o.s, level);
+        if (c != null) setTimeout(() => reply({ t: "drop", c }), 500 + Math.random() * 400);
+      },
+    }),
     game: "connect",
     title: "Connect 4",
     subtitle: "Drop discs, get four in a row. Horizontal, vertical or diagonal.",

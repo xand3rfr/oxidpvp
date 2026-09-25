@@ -119,6 +119,17 @@
 
     Lobby.mount({
       game: cfg.game, title: cfg.title, subtitle: cfg.subtitle,
+      // With cfg.ai the lobby offers practice against the computer: the bot answers each state
+      // where it's the guest's turn with a move, after a short "thinking" pause.
+      bot: cfg.ai ? (level) => ({
+        onMessage(o, reply) {
+          if (o.t !== "st" || !o.S || o.S.over || o.S.turn !== 1) return;
+          const S0 = clone(o.S), t0 = performance.now();
+          const m = cfg.ai(S0, 1, level);
+          if (m == null) return;
+          setTimeout(() => reply({ t: "mv", m }), Math.max(0, 450 + Math.random() * 400 - (performance.now() - t0)));
+        },
+      }) : null,
       onStart(l) {
         link = l; V = null; sc = [0, 0]; n = 0; first = 0;
         $("name0").textContent = l.spectator ? l.myName : "You";
@@ -137,4 +148,36 @@
     });
   }
   window.Party.turnDuel = turnDuel;
+
+  // Game-tree search for the computer opponents. g = { moves(S, side), play(S, side, m) -> S2,
+  // score(S, side) }. Returns the best move for `side` looking `depth` plies ahead (alpha-beta).
+  // A side can move twice in a row (checkers jumps, dots boxes): the turn is read from S.turn.
+  function search(S, side, depth, g, deadline = performance.now() + 900) {
+    let best = null, bestV = -Infinity;
+    const moves = g.moves(S, side);
+    if (!moves.length) return null;
+    const order = moves.map((m) => ({ m, S2: g.play(S, side, m) }));
+    order.sort((a, b) => g.score(b.S2, side) - g.score(a.S2, side));
+    function ab(S, d, a, b) {
+      if (S.over) return S.over.winner === side ? 1e6 + d : S.over.winner < 0 ? 0 : -1e6 - d;
+      if (d <= 0 || performance.now() > deadline) return g.score(S, side);
+      const who = S.turn, mv = g.moves(S, who);
+      if (!mv.length) return g.score(S, side);
+      if (who === side) {
+        let v = -Infinity;
+        for (const m of mv) { v = Math.max(v, ab(g.play(S, who, m), d - 1, a, b)); a = Math.max(a, v); if (a >= b) break; }
+        return v;
+      }
+      let v = Infinity;
+      for (const m of mv) { v = Math.min(v, ab(g.play(S, who, m), d - 1, a, b)); b = Math.min(b, v); if (a >= b) break; }
+      return v;
+    }
+    for (const { m, S2 } of order) {
+      const v = ab(S2, depth - 1, bestV, Infinity) + Math.random() * 0.01;
+      if (v > bestV) { bestV = v; best = m; }
+    }
+    return best;
+  }
+  window.Party.search = search;
+  window.Party.pickRandom = (a) => a[Math.floor(Math.random() * a.length)];
 })();

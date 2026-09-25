@@ -279,7 +279,68 @@ $("peek").addEventListener("click", () => { $("result").hidden = true; });
 
 render();
 
+// =====================================================================
+// Computer opponent: alpha-beta search on material plus simple positional bonuses.
+// =====================================================================
+const CENTER = [0, 1, 2, 3, 3, 2, 1, 0];
+function evaluate(ch, color) {
+  let v = 0;
+  const board = ch.board();
+  for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
+    const p = board[r][f];
+    if (!p) continue;
+    let x = VALUE[p.type] * 100;
+    if (p.type === "n" || p.type === "b") x += (CENTER[r] + CENTER[f]) * 4;
+    if (p.type === "p") x += (p.color === "w" ? 6 - r : r - 1) * 6 + (f >= 2 && f <= 5 ? CENTER[r] * 3 : 0);
+    if (p.type === "k" && ch.history().length < 40) x -= (CENTER[r] + CENTER[f]) * 6; // keep the king tucked away early
+    v += p.color === color ? x : -x;
+  }
+  return v;
+}
+function botMove(fen, level) {
+  const ch = new Chess(fen), color = ch.turn();
+  const moves = ch.moves({ verbose: true });
+  if (!moves.length) return null;
+  if (level === "easy" && Math.random() < 0.55) return moves[Math.floor(Math.random() * moves.length)];
+  const depth = level === "hard" ? 3 : level === "medium" ? 2 : 1, deadline = performance.now() + (level === "hard" ? 2500 : 1200);
+  const ordered = (list) => list.sort((a, b) => (b.captured ? VALUE[b.captured] * 10 - VALUE[b.piece] : 0) - (a.captured ? VALUE[a.captured] * 10 - VALUE[a.piece] : 0));
+  function ab(d, a, b, maxing) {
+    if (ch.isCheckmate()) return maxing ? -1e6 - d : 1e6 + d;
+    if (ch.isDraw() || ch.isStalemate()) return 0;
+    if (d === 0 || performance.now() > deadline) return evaluate(ch, color);
+    const list = ordered(ch.moves({ verbose: true }));
+    let best = maxing ? -Infinity : Infinity;
+    for (const m of list) {
+      ch.move(m);
+      const v = ab(d - 1, a, b, !maxing);
+      ch.undo();
+      if (maxing) { best = Math.max(best, v); a = Math.max(a, v); } else { best = Math.min(best, v); b = Math.min(b, v); }
+      if (a >= b) break;
+    }
+    return best;
+  }
+  let best = null, bestV = -Infinity;
+  for (const m of ordered(moves)) {
+    ch.move(m);
+    const v = ab(depth - 1, -Infinity, Infinity, false) + Math.random() * 8;
+    ch.undo();
+    if (v > bestV) { bestV = v; best = m; }
+  }
+  return best;
+}
+
 Lobby.mount({
+  bot: (level) => ({
+    onMessage(o, reply) {
+      if (o.t !== "st" || o.over) return;
+      const botColor = o.hostColor === "w" ? "b" : "w";
+      if (o.fen.split(" ")[1] !== botColor) return;
+      setTimeout(() => {
+        const m = botMove(o.fen, level);
+        if (m) reply({ t: "mv", from: m.from, to: m.to, promo: m.promotion || "q" });
+      }, 300 + Math.random() * 300);
+    },
+  }),
   game: "chess",
   title: "Chess",
   subtitle: "Classic chess with 10-minute clocks. Colors swap every game.",

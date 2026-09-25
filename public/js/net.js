@@ -380,8 +380,9 @@
   const STATS_KEY = "oxidpvp-stats";
   const readStats = () => { try { return JSON.parse(store.get(STATS_KEY)) || {}; } catch { return {}; } };
   // The room we're in, so results also go to the global leaderboard (via the room server).
-  let reportTo = null;
+  let reportTo = null, botMode = false;
   function record(game, result) {
+    if (botMode) return; // practice games against the computer don't count
     const s = readStats();
     const g = s[game] || (s[game] = { w: 0, l: 0, d: 0 });
     if (result === "win") g.w++; else if (result === "loss") g.l++; else g.d++;
@@ -980,7 +981,7 @@
   }
 
   // ---------- Lobby panel (shared markup for both kinds of room) ----------
-  function shell({ game, title, subtitle, onHost, onJoin, onStart, onLeave }) {
+  function shell({ game, title, subtitle, onHost, onJoin, onStart, onLeave, onBot }) {
     const root = document.createElement("div");
     root.className = "overlay lobby";
     root.innerHTML = `
@@ -1006,6 +1007,10 @@
             <input class="code-in" maxlength="${CODE_LEN}" placeholder="CODE" autocomplete="off" spellcheck="false" aria-label="Room code">
             <button class="btn" type="submit">Join</button>
           </form>
+          <div class="bot-box" hidden>
+            <div class="or">or practice</div>
+            <div class="bot-row"><button class="btn" type="button" data-bot="easy">🤖 Easy</button><button class="btn" type="button" data-bot="medium">🤖 Medium</button><button class="btn" type="button" data-bot="hard">🤖 Hard</button></div>
+          </div>
         </div>
         <div class="wait" data-view="room" hidden>
           <div class="label">Room code</div>
@@ -1080,6 +1085,10 @@
       onJoin(code, {});
     });
     $('[data-act="start"]').addEventListener("click", () => onStart && onStart());
+    if (onBot) {
+      $(".bot-box").hidden = false;
+      for (const b of root.querySelectorAll("[data-bot]")) b.addEventListener("click", () => { clearHash(); onBot(b.dataset.bot); });
+    }
     $('[data-act="leave"]').addEventListener("click", () => onLeave());
 
     const api = {
@@ -1180,7 +1189,7 @@
   // =====================================================================
   // 1v1 lobby
   // =====================================================================
-  function mount({ game, title, subtitle, onStart, spectate = true }) {
+  function mount({ game, title, subtitle, onStart, spectate = true, bot = null }) {
     const netEl = document.getElementById("net");
     let conn = null, isHost = false, gen = 0, code = null, started = false;
     let me = null, hostP = null, opp = null, specs = new Map(), spectator = false;
@@ -1195,7 +1204,31 @@
       onHost: (fixed) => hostRoom(fixed),
       onJoin: (c, o) => joinRoom(c, o),
       onLeave: () => { teardown(true); ui.showMenu(); ui.setStatus(""); },
+      onBot: bot ? (level) => startBot(level) : null,
     });
+
+    // Practice against the computer: no server at all. We're the host; the bot plays the guest
+    // side by reading what the host sends and answering like a guest would.
+    function startBot(level) {
+      teardown(true);
+      const me = ui.profile(), hostHandlers = [];
+      const label = level[0].toUpperCase() + level.slice(1);
+      const brain = bot(level);
+      const reply = (m) => setTimeout(() => { for (const h of hostHandlers) h(m); }, 0);
+      botMode = true;
+      link = {
+        isHost: true, spectator: false, bot: level,
+        myName: me.name, oppName: `Computer (${label})`, names: [me.name, `Computer (${label})`], rtt: 0,
+        send: (o) => setTimeout(() => brain.onMessage(o, reply), 0),
+        onData: (fn) => hostHandlers.push(fn),
+        onRejoin: () => {},
+      };
+      started = true;
+      ui.hide();
+      if (netEl) { netEl.className = "net good"; netEl.lastChild.textContent = "vs computer"; }
+      sfx.play("start");
+      stopGame = onStart(link) || null;
+    }
 
     const talk = social({
       isHost: () => isHost,
@@ -1228,7 +1261,7 @@
       if (reportTo && reportTo.conn === conn) { reportTo = null; presence.where(); }
       if (conn) { conn.close(bye); conn = null; }
       if (bye) sess.del("oxid-session");
-      opp = hostP = null; specs = new Map(); started = false; spectator = false;
+      opp = hostP = null; specs = new Map(); started = false; spectator = false; botMode = false; link = null;
       handlers = []; rejoinHandlers = []; link = null;
       dock.leave(); banner(null);
       document.body.classList.remove("spectating");

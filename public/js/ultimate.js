@@ -57,11 +57,52 @@
     if (ui.spectator) $("info").textContent = `${ui.names[0]} ✕ vs ${ui.names[1]} ◯`;
   }
 
+  // ---------- Computer opponent ----------
+  const cloneS = (S) => ({ ...S, cells: S.cells.slice(), boards: S.boards.slice(), over: S.over && { ...S.over } });
+  const lineScore = (get, me) => {
+    let v = 0;
+    for (const L of LINES) {
+      const vals = L.map(get), mine = vals.filter((x) => x === me).length, theirs = vals.filter((x) => x && x !== me && x !== 3).length, dead = vals.includes(3);
+      if (dead) continue;
+      if (mine && !theirs) v += mine === 2 ? 3 : 1;
+      if (theirs && !mine) v -= theirs === 2 ? 3 : 1;
+    }
+    return v;
+  };
+  const AI = {
+    moves: (S) => {
+      const out = [];
+      for (let b = 0; b < 9; b++) {
+        if (S.boards[b] || (S.next >= 0 && S.next !== b)) continue;
+        for (let c = 0; c < 9; c++) if (!S.cells[b * 9 + c]) out.push({ b, c });
+      }
+      return out;
+    },
+    play: (S, side, m) => { const c = cloneS(S); move(c, side, m); return c; },
+    score: (S, side) => {
+      const me = side + 1;
+      let v = lineScore((k) => S.boards[k], me) * 12;
+      for (let b = 0; b < 9; b++) {
+        if (S.boards[b] === me) v += b === 4 ? 14 : 10;
+        else if (S.boards[b] && S.boards[b] !== 3) v -= b === 4 ? 14 : 10;
+        else if (!S.boards[b]) v += lineScore((k) => S.cells[b * 9 + k], me);
+      }
+      if (S.next < 0 && S.turn !== side) v -= 4; // handing them a free move is bad
+      return v;
+    },
+  };
+  function ai(S, side, level) {
+    const moves = AI.moves(S, side);
+    if (!moves.length) return null;
+    if (level === "easy") return Party.pickRandom(moves);
+    return Party.search(S, side, level === "hard" ? 5 : 2, AI);
+  }
+
   Party.turnDuel({
     game: "uttt",
     title: "Ultimate Tic-Tac-Toe",
     subtitle: "Tic-tac-toe inside tic-tac-toe. Where you play decides where they play next.",
     chip: (side) => COLORS[side],
-    newState, move, render,
+    newState, move, render, ai,
   });
 })();

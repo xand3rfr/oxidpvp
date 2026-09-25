@@ -114,6 +114,29 @@
     if (cell.querySelector(".ck-pc.can")) { sel = i; GameUtil.sfx("click"); render(curS, { ...lastUi, fresh: false, prev: null }); }
   });
 
+  // ---------- Computer opponent ----------
+  const cloneS = (S) => ({ ...S, b: S.b.slice(), last: S.last && { ...S.last }, over: S.over && { ...S.over } });
+  const AI = {
+    moves: (S, side) => legal(S, side).map((x) => ({ from: x.from, to: x.to })),
+    play: (S, side, m) => { const c = cloneS(S); move(c, side, m); return c; },
+    score: (S, side) => {
+      let v = 0;
+      S.b.forEach((p, i) => {
+        if (!p) return;
+        const s = sideOf(p), row = i >> 3;
+        const val = isKing(p) ? 1.75 : 1 + 0.06 * (s === 0 ? 7 - row : row);
+        v += s === side ? val : -val;
+      });
+      return v;
+    },
+  };
+  function ai(S, side, level) {
+    const moves = AI.moves(S, side);
+    if (!moves.length) return null;
+    if (level === "easy") return Party.pickRandom(moves);
+    return Party.search(S, side, level === "hard" ? 7 : 3, AI);
+  }
+
   Party.turnDuel({
     game: "checkers",
     title: "Checkers",
@@ -123,5 +146,6 @@
     move,
     render,
     yourTurnText: (S) => (S.chain >= 0 ? "Keep jumping!" : "Your move"),
+    ai,
   });
 })();
