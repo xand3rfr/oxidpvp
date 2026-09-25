@@ -1,5 +1,9 @@
 // Release notes, newest first. Add a new entry at the top for every update.
 window.CHANGELOG = [
+  { v: "3.8", date: "2026-09-25", title: "Gamble with friends", items: [
+    "New banner on the home page: wanting to gamble with friends? One click takes you to OXID Casino",
+    "OXID Casino now has servers, a global chat, CS-style cases and case battles (see What's new on casino.oxidpvp.net)",
+  ] },
   { v: "3.7", date: "2026-09-25", title: "The casino has its own home", items: [
     "OXID Casino moved to its own site: casino.oxidpvp.net. Old casino links take you there",
     "The Season Pass swapped its coin rewards for new titles, stickers, avatars and bonus XP",
