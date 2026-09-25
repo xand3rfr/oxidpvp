@@ -1,5 +1,16 @@
 // Release notes, newest first. Add a new entry at the top for every update.
 window.CHANGELOG = [
+  { v: "3.2", date: "2026-09-25", title: "Profiles, Season Pass and Game of the Day", items: [
+    "Profile page: your level, stats, a 14-day win chart, recent matches and all your titles",
+    "Titles: earn titles like Chess Master, Card Shark or Legend and show one under your name in every lobby",
+    "Season Pass: 30 tiers of free rewards every month (coins, avatars, frames, titles and stickers)",
+    "Game of the Day: one game a day gives double XP",
+    "Search games, plus new Solo, Quick and ★ Favorites filters. Star any game to pin it to the front",
+    "Press / on the home page to jump to the search box",
+    "Fullscreen button in every game",
+    "Custom themes: pick any accent color and a background (Glow, Grid, Hearts or Stars) in Settings",
+    "Suggestions now show when an idea is Planned or Added",
+  ] },
   { v: "3.1", date: "2026-09-25", title: "Pink and black", items: [
     "New look: the whole site is now pink and black, with a new logo",
     "Pink chess boards to match",

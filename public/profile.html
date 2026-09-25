@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>try{var t=JSON.parse(localStorage.getItem("oxidpvp-theme")||"{}"),d=document.documentElement;if(t.mode==="light")d.dataset.theme="light";var a=t.accent;if(!t.b&&a==="violet")a="pink";if(a&&a!=="pink")d.dataset.accent=a}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#000000">
+  <title>Profile · OXIDPVP</title>
+  <meta name="description" content="Your OXIDPVP profile: level, stats, titles and match history.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-in">
+      <a class="brand" href="index.html"><i class="brand-mark"></i><span>OXID<b>PVP</b></span></a>
+      <div class="nav-links">
+        <a href="index.html#games">Games</a>
+        <a href="rooms.html">Public rooms</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <a href="suggestions.html">Suggestions</a>
+        <a href="profile.html" aria-current="page">Profile</a>
+      </div>
+      <div class="nav-right">
+        <a class="btn primary" href="index.html#games">Play now</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="hub">
+    <div class="wrap page">
+      <section class="pf-hero">
+        <div class="pf-av" id="pfAv"></div>
+        <div class="pf-id">
+          <h1 id="pfName"></h1>
+          <p class="pf-title" id="pfTitle"></p>
+          <div class="pf-lvl"><b id="pfLvl"></b><div class="lvl-track"><i id="pfBar"></i></div><small id="pfXp"></small></div>
+          <p class="muted pf-code">Friend code <b id="pfCode"></b></p>
+        </div>
+        <div class="pf-actions">
+          <button class="btn" id="pfEdit" type="button">Edit profile</button>
+          <a class="btn ghost" href="pass.html">Season pass</a>
+        </div>
+      </section>
+
+      <div class="pf-stats" id="pfStats"></div>
+
+      <div class="pf-grid">
+        <section class="pf-card">
+          <h2>Last 14 days</h2>
+          <div class="pf-chart" id="pfChart"></div>
+          <div class="pf-legend"><span><i class="w"></i>Wins</span><span><i class="l"></i>Losses</span><span><i class="d"></i>Draws</span></div>
+        </section>
+        <section class="pf-card">
+          <h2>Recent matches</h2>
+          <ol class="pf-hist" id="pfHist"></ol>
+        </section>
+      </div>
+
+      <section class="pf-card">
+        <h2>Titles <small class="muted" id="pfTitleCount"></small></h2>
+        <p class="muted">Pick one to show under your name in every lobby.</p>
+        <div class="pf-titles" id="pfTitles"></div>
+      </section>
+
+      <section class="pf-card">
+        <h2>Your games</h2>
+        <div class="stat-games" id="pfGames"></div>
+        <p class="muted" id="pfNoGames" hidden>Play a few games and your stats will show up here.</p>
+      </section>
+      <p class="muted pf-note">Your profile is saved in this browser. Use the same browser to keep your progress.</p>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const titles = Object.fromEntries(GameUtil.games.map((g) => [g.id, g]));
+      function paint() {
+        const name = GameUtil.myName() || "Player", av = GameUtil.myAvatar(), prof = GameUtil.profile(), clan = GameUtil.clan();
+        $("pfAv").textContent = ""; $("pfAv").append(GameUtil.avatar({ av: { ...av, l: GameUtil.level() }, name }, "xl"));
+        $("pfName").textContent = (clan ? `[${clan.tag}] ` : "") + name;
+        $("pfTitle").textContent = prof.t ? GameUtil.titleName(prof.t) : "No title yet";
+        const lv = GameUtil.level(), xp = GameUtil.xp(), a = GameUtil.xpFor(lv), b = GameUtil.xpFor(lv + 1);
+        $("pfLvl").textContent = `Level ${lv}`;
+        $("pfBar").style.width = Math.round(((xp - a) / (b - a)) * 100) + "%";
+        $("pfXp").textContent = `${xp - a} / ${b - a} XP to level ${lv + 1} · ${xp.toLocaleString()} XP total`;
+        $("pfCode").textContent = GameUtil.fid();
+
+        const fav = prof.fav && titles[prof.fav];
+        $("pfStats").textContent = "";
+        for (const [n, label] of [[prof.g, "games played"], [prof.w, "wins"], [prof.g ? Math.round((prof.w / prof.g) * 100) + "%" : "–", "win rate"], [prof.streak, "best streak"], [prof.ach, "achievements"], [fav ? fav.title : "–", "favorite game"]]) {
+          const d = document.createElement("div"); d.className = "stat";
+          const bb = document.createElement("b"); bb.textContent = n; const sp = document.createElement("span"); sp.textContent = label;
+          d.append(bb, sp); $("pfStats").append(d);
+        }
+
+        // Chart: wins/losses/draws per day for the last two weeks.
+        const hist = GameUtil.history(), days = [];
+        const start = new Date(); start.setHours(0, 0, 0, 0);
+        for (let i = 13; i >= 0; i--) { const d0 = start.getTime() - i * 864e5; days.push({ d0, w: 0, l: 0, d: 0 }); }
+        for (const h of hist) { const day = days.find((x) => h.at >= x.d0 && h.at < x.d0 + 864e5); if (day) day[h.r === "win" ? "w" : h.r === "loss" ? "l" : "d"]++; }
+        const max = Math.max(1, ...days.map((x) => x.w + x.l + x.d));
+        $("pfChart").textContent = "";
+        for (const x of days) {
+          const col = document.createElement("div"); col.className = "pf-col";
+          col.title = `${new Date(x.d0).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}: ${x.w}W ${x.l}L${x.d ? " " + x.d + "D" : ""}`;
+          for (const k of ["d", "l", "w"]) { if (!x[k]) continue; const seg = document.createElement("i"); seg.className = k; seg.style.height = (x[k] / max) * 100 + "%"; col.append(seg); }
+          const lab = document.createElement("span"); lab.textContent = new Date(x.d0).toLocaleDateString(undefined, { weekday: "narrow" });
+          col.append(lab);
+          $("pfChart").append(col);
+        }
+
+        // Match history.
+        $("pfHist").textContent = "";
+        const ago = (t) => { const s = (Date.now() - t) / 1000; return s < 60 ? "just now" : s < 3600 ? Math.floor(s / 60) + "m ago" : s < 86400 ? Math.floor(s / 3600) + "h ago" : Math.floor(s / 86400) + "d ago"; };
+        for (const h of hist.slice(0, 20)) {
+          const li = document.createElement("li");
+          const g = titles[h.g];
+          li.innerHTML = `<span class="pf-r"></span><b></b><time></time>`;
+          li.querySelector(".pf-r").textContent = h.r === "win" ? "W" : h.r === "loss" ? "L" : "D";
+          li.querySelector(".pf-r").className = "pf-r " + h.r;
+          li.querySelector("b").textContent = g ? g.title : h.g;
+          li.querySelector("time").textContent = ago(h.at);
+          $("pfHist").append(li);
+        }
+        if (!hist.length) { const li = document.createElement("li"); li.className = "muted"; li.textContent = "No matches yet. Go play something!"; $("pfHist").append(li); }
+
+        // Titles.
+        const list = GameUtil.titles(), cur = GameUtil.myTitle();
+        $("pfTitleCount").textContent = `${list.filter((x) => x.got).length} of ${list.length}`;
+        $("pfTitles").textContent = "";
+        const none = document.createElement("button"); none.type = "button"; none.className = "pf-t" + (!cur ? " on" : ""); none.innerHTML = "<b>No title</b><small>Keep it simple</small>";
+        none.addEventListener("click", () => { GameUtil.setTitle(""); paint(); });
+        $("pfTitles").append(none);
+        for (const x of list) {
+          const bt = document.createElement("button"); bt.type = "button";
+          bt.className = "pf-t" + (x.got ? "" : " locked") + (x.id === cur ? " on" : "");
+          bt.innerHTML = "<b></b><small></small>";
+          bt.querySelector("b").textContent = (x.got ? "" : "🔒 ") + x.name;
+          bt.querySelector("small").textContent = x.desc;
+          bt.disabled = !x.got;
+          bt.addEventListener("click", () => { GameUtil.setTitle(x.id); GameUtil.sfx("click"); paint(); });
+          $("pfTitles").append(bt);
+        }
+
+        // Per-game stats.
+        const st = GameUtil.stats(), rows = Object.entries(st).filter(([id]) => titles[id]).sort((a, b) => (b[1].w + b[1].l + b[1].d) - (a[1].w + a[1].l + a[1].d));
+        $("pfGames").textContent = "";
+        $("pfNoGames").hidden = rows.length > 0;
+        for (const [id, s] of rows) {
+          const a2 = document.createElement("a"); a2.className = "stat-game"; a2.href = GameUtil.pageFor(id);
+          const t = document.createElement("b"); t.textContent = titles[id].title;
+          const n = document.createElement("span"); n.textContent = `${s.w}W · ${s.l}L${s.d ? ` · ${s.d}D` : ""}`;
+          const bar = document.createElement("i"); const tot = s.w + s.l + s.d;
+          bar.style.setProperty("--p", tot ? (s.w / tot) * 100 + "%" : "0%");
+          a2.append(t, n, bar); $("pfGames").append(a2);
+        }
+      }
+      paint();
+      $("pfEdit").addEventListener("click", () => GameUtil.openSettings());
+      // Repaint when settings close (name, avatar or title may have changed).
+      new MutationObserver(() => { if (!document.querySelector(".settings-overlay")) paint(); }).observe(document.body, { childList: true });
+    })();
+  </script>
+</body>
+</html>

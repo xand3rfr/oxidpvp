@@ -106,13 +106,23 @@
   const AV_COLORS = ["#ec4899", "#ec4899", "#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#14b8a6", "#64748b"];
   const cleanName = (n) => String(n || "").replace(/\s+/g, " ").trim().slice(0, 16) || "Player";
   const savedName = () => store.get(NAME_KEY) || "";
-  // Unlockables: bonus avatar emojis by level, and avatar frames by level or achievement.
-  const BONUS_AV = [{ e: "🐉", lvl: 5 }, { e: "🦖", lvl: 8 }, { e: "🧠", lvl: 12 }, { e: "🛸", lvl: 18 }, { e: "💎", lvl: 22 }, { e: "🌈", lvl: 30 }];
+  // Items won from casino crates and the season pass (anything that isn't unlocked by level).
+  // Keys look like "frame:8", "av:🦩", "title:goat", "sticker:party".
+  const OWN_KEY = "oxidpvp-owned";
+  const readOwned = () => { try { return new Set(JSON.parse(store.get(OWN_KEY)) || []); } catch { return new Set(); } };
+  function grant(key) { const o = readOwned(); if (o.has(key)) return false; o.add(key); store.set(OWN_KEY, JSON.stringify([...o])); return true; }
+  const owns = (key) => readOwned().has(key);
+  // Unlockables: bonus avatar emojis by level (or owned), and avatar frames by level, achievement or owned.
+  const BONUS_AV = [{ e: "🐉", lvl: 5 }, { e: "🦖", lvl: 8 }, { e: "🧠", lvl: 12 }, { e: "🛸", lvl: 18 }, { e: "💎", lvl: 22 }, { e: "🌈", lvl: 30 },
+    { e: "🦩", own: true }, { e: "🍓", own: true }, { e: "🦋", own: true }, { e: "🪩", own: true }, { e: "🧁", own: true }, { e: "🐲", own: true }, { e: "🌸", own: true }, { e: "🍒", own: true }];
   const ALL_AV = [...AVATARS, ...BONUS_AV.map((b) => b.e)];
   const FRAMES = [
     { id: 0, name: "None" }, { id: 1, name: "Bronze", lvl: 3 }, { id: 2, name: "Silver", lvl: 6 }, { id: 3, name: "Gold", lvl: 10 },
     { id: 4, name: "Neon", lvl: 15 }, { id: 5, name: "Rainbow", lvl: 25 }, { id: 6, name: "Sam", ach: "sam" }, { id: 7, name: "Whale", ach: "whale" },
+    { id: 8, name: "Sakura", own: true }, { id: 9, name: "Diamond", own: true }, { id: 10, name: "Inferno", own: true }, { id: 11, name: "Galaxy", own: true }, { id: 12, name: "Pink Crown", own: true },
   ];
+  const avLocked = (b, lv) => b && (b.own ? !owns("av:" + b.e) : lv < b.lvl);
+  const frameLocked = (f, lv, got) => (f.lvl && lv < f.lvl) || (f.ach && !got[f.ach]) || (f.own && !owns("frame:" + f.id));
   const cleanAv = (a) => ({
     e: a && ALL_AV.includes(a.e) ? a.e : AVATARS[0],
     c: a && a.c >= 0 && a.c < AV_COLORS.length ? a.c | 0 : 0,
@@ -414,6 +424,14 @@
   const readStats = () => { try { return JSON.parse(store.get(STATS_KEY)) || {}; } catch { return {}; } };
   // The room we're in, so results also go to the global leaderboard (via the room server).
   let reportTo = null, botMode = false;
+  const HIST_KEY = "oxidpvp-history";
+  const readHistory = () => { try { return JSON.parse(store.get(HIST_KEY)) || []; } catch { return []; } };
+  // Game of the Day: one game a day (same for everyone) that gives double XP.
+  const dayNo = () => { const d = new Date(); return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5); };
+  function gameOfDay() {
+    const pool = GAMES.filter((g) => g.id !== "cup" && g.id !== "casino");
+    return pool[(Math.imul(dayNo() ^ 0x5bd1e995, 2654435761) >>> 0) % pool.length];
+  }
   function record(game, result) {
     if (botMode) return; // practice games against the computer don't count
     const s = readStats();
@@ -425,7 +443,11 @@
     meta.best = Math.max(meta.best || 0, meta.streak);
     store.set(META_KEY, JSON.stringify(meta));
     checkAchievements();
-    addXP(result === "win" ? 30 : result === "draw" ? 18 : 12, result === "win" ? "win" : "played");
+    const gotd = gameOfDay().id === game ? 2 : 1;
+    addXP((result === "win" ? 30 : result === "draw" ? 18 : 12) * gotd, (result === "win" ? "win" : "played") + (gotd > 1 ? " · Game of the Day ×2" : ""));
+    const hist = readHistory();
+    hist.unshift({ g: game, r: result, at: Date.now() });
+    store.set(HIST_KEY, JSON.stringify(hist.slice(0, 100)));
     weeklyEvent({ kind: "game", game, result });
     if (reportTo && !reportTo.conn.closed) reportTo.conn.send({ rec: { r: result, name: reportTo.name } });
     // Let other OXIDPVP tabs know (a tournament tab uses this to fill in the bracket).
@@ -437,20 +459,22 @@
     const st = readStats(), t = sum(st);
     let fav = null, most = 0;
     for (const [id, g] of Object.entries(st)) { const n = g.w + g.l + g.d; if (n > most) { most = n; fav = id; } }
-    return { w: t.w, g: t.played, fav, ach: Object.keys(readAch()).length, streak: readMeta().best || 0 };
+    return { w: t.w, g: t.played, fav, ach: Object.keys(readAch()).length, streak: readMeta().best || 0, t: myTitle(), clan: myClanTag() };
   }
   const cleanProf = (x) => (x && typeof x === "object" ? {
     w: Math.max(0, Math.min(1e6, x.w | 0)), g: Math.max(0, Math.min(1e6, x.g | 0)), ach: Math.max(0, Math.min(99, x.ach | 0)),
     streak: Math.max(0, Math.min(9999, x.streak | 0)), fav: GAMES.some((g) => g.id === x.fav) ? x.fav : null,
+    t: TITLES.some((tt) => tt.id === x.t) ? x.t : null, clan: typeof x.clan === "string" && /^[A-Z0-9]{2,5}$/.test(x.clan) ? x.clan : null,
   } : null);
   function profileCard(p) {
     document.querySelector(".prof-pop")?.remove();
     const a = cleanAv(p.av), pr = p.prof || {};
     const pop = document.createElement("div");
     pop.className = "overlay prof-pop";
-    pop.innerHTML = `<div class="panel prof"><div class="prof-top"></div><h2></h2><p class="prof-lvl"></p><div class="prof-stats"></div><button class="btn ghost full" type="button">Close</button></div>`;
+    pop.innerHTML = `<div class="panel prof"><div class="prof-top"></div><h2></h2><p class="prof-title"></p><p class="prof-lvl"></p><div class="prof-stats"></div><button class="btn ghost full" type="button">Close</button></div>`;
     pop.querySelector(".prof-top").append(avatarEl({ av: a }, "xl"));
-    pop.querySelector("h2").textContent = p.name;
+    pop.querySelector("h2").textContent = (pr.clan ? `[${pr.clan}] ` : "") + p.name;
+    pop.querySelector(".prof-title").textContent = pr.t ? titleName(pr.t) : "";
     pop.querySelector(".prof-lvl").textContent = `Level ${a.l}` + (a.f ? ` · ${FRAMES[a.f].name} frame` : "");
     const fav = pr.fav && GAMES.find((g) => g.id === pr.fav);
     for (const [n, label] of [[pr.g || 0, "games"], [pr.w || 0, "wins"], [pr.g ? Math.round(((pr.w || 0) / pr.g) * 100) + "%" : "–", "win rate"], [pr.streak || 0, "best streak"], [pr.ach || 0, "achievements"], [fav ? fav.title : "–", "favorite"]]) {
@@ -473,12 +497,64 @@
     if (!n) return;
     const before = level(), xp = readXP() + n;
     store.set(XP_KEY, String(xp));
+    passAdd(n);
     const after = levelOf(xp);
     if (after > before) {
       const unlocked = [...BONUS_AV.filter((b) => b.lvl > before && b.lvl <= after).map((b) => b.e), ...FRAMES.filter((f) => f.lvl > before && f.lvl <= after).map((f) => f.name + " frame")];
       setTimeout(() => { toast(`⭐ Level ${after}!${unlocked.length ? " Unlocked: " + unlocked.join(", ") : ""}`, 3600); sfx.play("win"); }, 900);
     } else if (why) setTimeout(() => toast(`+${n} XP · ${why}`, 1800), 300);
   }
+  // ---------- Season pass: 30 tiers of rewards, a new season every month ----------
+  const PASS_KEY = "oxidpvp-pass", PASS_TIER_XP = 150;
+  const seasonId = () => { const d = new Date(); return d.getFullYear() * 100 + d.getMonth() + 1; };
+  function readPass() {
+    let p;
+    try { p = JSON.parse(store.get(PASS_KEY)); } catch {}
+    if (!p || p.s !== seasonId()) p = { s: seasonId(), xp: 0, got: [] };
+    return p;
+  }
+  function passAdd(n) { const p = readPass(); p.xp += n; store.set(PASS_KEY, JSON.stringify(p)); }
+  const PASS_REWARDS = [
+    { c: 250 }, { av: "🍓" }, { c: 300 }, { st: "heart" }, { c: 400 }, { f: 8 }, { c: 500 }, { st: "fire" }, { av: "🦋" }, { c: 750 },
+    { t: "icon" }, { st: "crown" }, { c: 1000 }, { av: "🌸" }, { f: 9 }, { c: 1200 }, { st: "skull" }, { av: "🪩" }, { c: 1500 }, { t: "nolife" },
+    { st: "money" }, { c: 2000 }, { av: "🐲" }, { f: 11 }, { c: 2500 }, { st: "rocket" }, { av: "🍒" }, { c: 3000 }, { f: 10 }, { f: 12, c: 5000 },
+  ];
+  // Casino wallet (shared with casino.html): add or take play coins.
+  const WALLET_KEY = "oxidpvp-wallet";
+  const wallet = {
+    get() { try { const w = JSON.parse(store.get(WALLET_KEY)); if (w && typeof w.coins === "number") return w; } catch {} return { coins: 1000, up: {} }; },
+    coins() { return Math.max(0, Math.floor(this.get().coins)); },
+    add(n) { const w = this.get(); w.coins = Math.max(0, Math.floor(w.coins + n)); store.set(WALLET_KEY, JSON.stringify(w)); return w.coins; },
+  };
+  function grantReward(r) {
+    const out = [];
+    if (r.c) { wallet.add(r.c); out.push(`${r.c.toLocaleString()} casino coins`); }
+    if (r.av) { grant("av:" + r.av); out.push(`${r.av} avatar`); }
+    if (r.f != null) { grant("frame:" + r.f); out.push(`${FRAMES[r.f].name} frame`); }
+    if (r.t) { grant("title:" + r.t); out.push(`"${titleName(r.t)}" title`); }
+    if (r.st) { grant("sticker:" + r.st); out.push(`${(STICKERS.find((x) => x.id === r.st) || {}).e || ""} sticker`); }
+    return out.join(" + ");
+  }
+  function passView() {
+    const p = readPass(), tier = Math.min(PASS_REWARDS.length, Math.floor(p.xp / PASS_TIER_XP));
+    const end = new Date(); end.setMonth(end.getMonth() + 1, 1); end.setHours(0, 0, 0, 0);
+    return { season: p.s, xp: p.xp, tier, perTier: PASS_TIER_XP, ends: end.getTime(), rewards: PASS_REWARDS.map((r, i) => ({ ...r, n: i + 1, open: i < tier, got: p.got.includes(i + 1) })) };
+  }
+  function passClaim(n) {
+    const p = readPass(), tier = Math.floor(p.xp / PASS_TIER_XP);
+    if (n < 1 || n > PASS_REWARDS.length || n > tier || p.got.includes(n)) return null;
+    p.got.push(n);
+    store.set(PASS_KEY, JSON.stringify(p));
+    return grantReward(PASS_REWARDS[n - 1]);
+  }
+  // Stickers: big animated reactions. The first few are free; the rest come from the pass and crates.
+  const STICKERS = [
+    { id: "party", e: "🥳", free: true }, { id: "laugh", e: "🤣", free: true }, { id: "clap", e: "👏", free: true }, { id: "cry", e: "😭", free: true },
+    { id: "heart", e: "💖" }, { id: "fire", e: "🔥" }, { id: "crown", e: "👑" }, { id: "skull", e: "☠️" }, { id: "money", e: "🤑" }, { id: "rocket", e: "🚀" },
+    { id: "goat", e: "🐐" }, { id: "clown", e: "🤡" }, { id: "brain", e: "🧠" }, { id: "ghost", e: "👻" },
+  ];
+  const myStickers = () => STICKERS.filter((x) => x.free || owns("sticker:" + x.id));
+
   const weekNo = () => { const d = new Date(); const t = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()); return Math.floor((t / 864e5 + 3) / 7); }; // weeks start Monday
   const CHALLENGES = [
     { id: "win3", text: "Win 3 games", goal: 3, test: (e) => e.kind === "game" && e.result === "win" },
@@ -571,6 +647,49 @@
   }
   const achievements = () => { const got = readAch(); return ACHIEVEMENTS.map((a) => ({ ...a, got: got[a.id] || 0 })); };
 
+  // ---------- Titles (shown under your name) ----------
+  const TITLE_KEY = "oxidpvp-title";
+  const winsAny = (st, ids) => ids.reduce((a, id) => a + winsIn(st, id), 0);
+  const TITLES = [
+    { id: "rookie", name: "Rookie", desc: "Everyone starts somewhere", test: () => true },
+    { id: "regular", name: "Regular", desc: "Play 25 games", test: (t) => t.played >= 25 },
+    { id: "veteran", name: "Veteran", desc: "Play 100 games", test: (t) => t.played >= 100 },
+    { id: "champ", name: "Champion", desc: "Win 50 games", test: (t) => t.w >= 50 },
+    { id: "unstop", name: "Unstoppable", desc: "Win 5 in a row", test: (t, m) => (m.best || 0) >= 5 },
+    { id: "chess", name: "Chess Master", desc: "Win 10 games of Chess", test: (t, m, st) => winsIn(st, "chess") >= 10 },
+    { id: "cards", name: "Card Shark", desc: "Win 10 card games", test: (t, m, st) => winsAny(st, ["poker", "lastcard", "bluff", "crazy"]) >= 10 },
+    { id: "words", name: "Wordsmith", desc: "Win 10 word games", test: (t, m, st) => winsAny(st, ["bomb", "wordhunt", "hangman", "categories", "typing", "codewords"]) >= 10 },
+    { id: "speed", name: "Speed Demon", desc: "Win 10 racing or reflex games", test: (t, m, st) => winsAny(st, ["racing", "tron", "reaction", "parkour", "clicker", "tower"]) >= 10 },
+    { id: "artist", name: "Artist", desc: "Win 10 drawing games", test: (t, m, st) => winsAny(st, ["draw", "phone", "speeddraw"]) >= 10 },
+    { id: "detective", name: "Detective", desc: "Win 10 social deduction games", test: (t, m, st) => winsAny(st, ["spy", "imposter", "mafia", "crew", "hide"]) >= 10 },
+    { id: "brain", name: "Big Brain", desc: "Win 10 quiz games", test: (t, m, st) => winsAny(st, ["trivia", "millionaire", "flags", "emoji"]) >= 10 },
+    { id: "lucky", name: "Lucky", desc: "Hit the slots jackpot", test: (t, m, st, got) => !!got.jackpot },
+    { id: "whale", name: "Whale", desc: "Hold 100,000 casino coins", test: (t, m, st, got) => !!got.whale },
+    { id: "collector", name: "Collector", desc: "Unlock 15 achievements", test: (t, m, st, got) => Object.keys(got).length >= 15 },
+    { id: "pro", name: "Pro", desc: "Reach level 10", test: (t, m, st, got, lv) => lv >= 10 },
+    { id: "legend", name: "Legend", desc: "Reach level 25", test: (t, m, st, got, lv) => lv >= 25 },
+    { id: "sam", name: "Sam's Friend", desc: "Find the Sam corner", test: (t, m, st, got) => !!got.sam },
+    { id: "menace", name: "Pink Menace", desc: "Found in a casino crate", own: true },
+    { id: "goat", name: "The GOAT", desc: "Found in a casino crate", own: true },
+    { id: "main", name: "Main Character", desc: "Found in a casino crate", own: true },
+    { id: "sweaty", name: "Sweaty", desc: "Found in a casino crate", own: true },
+    { id: "nolife", name: "No Life", desc: "Season pass reward", own: true },
+    { id: "icon", name: "Icon", desc: "Season pass reward", own: true },
+  ];
+  function titleList() {
+    const st = readStats(), t = sum(st), m = readMeta(), got = readAch(), lv = level();
+    return TITLES.map((x) => ({ id: x.id, name: x.name, desc: x.desc, got: x.own ? owns("title:" + x.id) : !!x.test(t, m, st, got, lv) }));
+  }
+  const titleName = (id) => (TITLES.find((x) => x.id === id) || {}).name || "";
+  function myTitle() {
+    const id = store.get(TITLE_KEY);
+    return id && titleList().some((x) => x.id === id && x.got) ? id : null;
+  }
+  const setTitle = (id) => store.set(TITLE_KEY, id || "");
+  const CLAN_KEY = "oxidpvp-clan";
+  const readClan = () => { try { const c = JSON.parse(store.get(CLAN_KEY)); return c && /^[A-Z0-9]{2,5}$/.test(c.tag) ? c : null; } catch { return null; } };
+  const myClanTag = () => { const c = readClan(); return c ? c.tag : null; };
+
   // ---------- Boss key ----------
   // Press ` (the key left of 1) to instantly cover the page with a plain notes page and mute
   // everything; press it again to come back. The game keeps running underneath.
@@ -632,6 +751,23 @@
   addEventListener("offline", () => toast("📴 You're offline. Daily puzzles still work; online games will wait for Wi‑Fi.", 4200));
   addEventListener("online", () => toast("📶 Back online", 1800));
 
+  // ---------- Announcement bar (set by the site owner on admin.html) ----------
+  const whenReady = (fn) => (document.readyState === "loading" ? addEventListener("DOMContentLoaded", fn) : fn());
+  whenReady(() => {
+    const nav = document.querySelector(".nav");
+    if (!nav || location.pathname.includes("admin")) return;
+    fetch("/api/announce", { cache: "no-store" }).then((r) => r.json()).then((a) => {
+      if (!a || !a.text || store.get("oxidpvp-ann-seen") === String(a.at)) return;
+      const bar = document.createElement("div");
+      bar.className = "announce"; bar.setAttribute("role", "status");
+      const sp = document.createElement("span"); sp.textContent = "📣 " + a.text;
+      const x = document.createElement("button"); x.type = "button"; x.textContent = "×"; x.setAttribute("aria-label", "Dismiss");
+      x.addEventListener("click", () => { store.set("oxidpvp-ann-seen", String(a.at)); bar.remove(); });
+      bar.append(sp, x);
+      nav.after(bar);
+    }).catch(() => {});
+  });
+
   // ---------- Settings panel: profile, look, sound ----------
   const THEME_KEY = "oxidpvp-theme";
   const ACCENTS = { pink: "#ec4899", violet: "#8b5cf6", blue: "#3b82f6", teal: "#14b8a6", green: "#22c55e", orange: "#f97316", red: "#ef4444" };
@@ -647,6 +783,18 @@
     const d = document.documentElement;
     if (t.mode === "light") d.dataset.theme = "light"; else delete d.dataset.theme;
     if (t.accent && t.accent !== "pink") d.dataset.accent = t.accent; else delete d.dataset.accent;
+    // A custom accent color: work out lighter/darker shades and set them directly.
+    const VARS = ["--accent", "--accent-hi", "--accent-lo", "--accent-rgb", "--accent-hi-rgb", "--grad"];
+    if (t.accent === "custom" && /^#[0-9a-f]{6}$/i.test(t.custom || "")) {
+      const n = parseInt(t.custom.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255];
+      const mix = (to, k) => c.map((v) => Math.round(v + (to - v) * k));
+      const hex = (a) => "#" + a.map((v) => v.toString(16).padStart(2, "0")).join("");
+      const hi = mix(255, 0.3), lo = mix(0, 0.35);
+      d.style.setProperty("--accent", t.custom); d.style.setProperty("--accent-hi", hex(hi)); d.style.setProperty("--accent-lo", hex(lo));
+      d.style.setProperty("--accent-rgb", c.join(", ")); d.style.setProperty("--accent-hi-rgb", hi.join(", "));
+      d.style.setProperty("--grad", `linear-gradient(135deg, ${hex(mix(255, 0.45))} 0%, ${t.custom} 50%, ${hex(mix(0, 0.5))} 100%)`);
+    } else for (const v of VARS) d.style.removeProperty(v);
+    if (t.bg && t.bg !== "black") d.dataset.bg = t.bg; else delete d.dataset.bg;
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.content = t.mode === "light" ? "#fff5fa" : "#000000";
   }
@@ -697,11 +845,15 @@
           <div class="set-level"></div>
           <div class="set-emojis"></div><div class="set-colors"></div>
           <h3>Avatar frame</h3><div class="set-frames"></div>
+          <h3>Title</h3><select class="set-title" aria-label="Title"></select>
           <p class="set-note">Used in every game. Changes apply the next time you join a room. Level up by playing to unlock more.</p>
         </section>
         <section><h3>Look</h3>
           <div class="seg set-mode"><button type="button" data-v="dark">Dark</button><button type="button" data-v="light">Light</button></div>
           <div class="set-accents"></div>
+          <label class="set-row"><span>Custom color</span><input type="color" class="set-custom" aria-label="Custom accent color"></label>
+          <h3>Background</h3>
+          <div class="seg set-bg"><button type="button" data-v="black">Black</button><button type="button" data-v="glow">Glow</button><button type="button" data-v="grid">Grid</button><button type="button" data-v="hearts">Hearts</button><button type="button" data-v="stars">Stars</button></div>
         </section>
         <section><h3>Sound</h3>
           <label class="set-row"><span>Sound effects</span><input type="range" class="set-vol" min="0" max="100"></label>
@@ -733,7 +885,8 @@
     };
     const lv = level(), got = readAch();
     for (const e of ALL_AV) {
-      const bonus = BONUS_AV.find((x) => x.e === e), locked = bonus && lv < bonus.lvl;
+      const bonus = BONUS_AV.find((x) => x.e === e), locked = avLocked(bonus, lv);
+      if (bonus && bonus.own && locked) continue; // crate/pass items only show once you have them
       const b = document.createElement("button"); b.type = "button"; b.textContent = e;
       if (locked) { b.disabled = true; b.classList.add("locked"); b.title = `Unlocks at level ${bonus.lvl}`; }
       b.addEventListener("click", () => { av = { ...av, e }; store.set(AV_KEY, JSON.stringify(av)); paintAv(); sfx.play("click"); });
@@ -742,7 +895,8 @@
     const xp = readXP(), next = xpFor(lv + 1), prevX = xpFor(lv);
     q(".set-level").innerHTML = `<b>Level ${lv}</b><div class="lvl-track"><i style="width:${Math.round(((xp - prevX) / (next - prevX)) * 100)}%"></i></div><small>${xp - prevX} / ${next - prevX} XP</small>`;
     for (const f of FRAMES) {
-      const locked = (f.lvl && lv < f.lvl) || (f.ach && !got[f.ach]);
+      const locked = frameLocked(f, lv, got);
+      if (f.own && locked) continue;
       const b = document.createElement("button"); b.type = "button";
       const prev = avatarEl({ av: { ...av, f: f.id, l: 1 } }, "sm");
       b.append(prev, document.createTextNode(f.name));
@@ -764,8 +918,19 @@
     const paintLook = () => {
       ov.querySelectorAll(".set-mode button").forEach((b) => b.classList.toggle("on", b.dataset.v === t.mode));
       ov.querySelectorAll(".set-accents button").forEach((b) => b.classList.toggle("on", b.dataset.v === t.accent));
+      ov.querySelectorAll(".set-bg button").forEach((b) => b.classList.toggle("on", b.dataset.v === (t.bg || "black")));
+      q(".set-custom").closest(".set-row").classList.toggle("on", t.accent === "custom");
     };
     ov.querySelectorAll(".set-mode button").forEach((b) => b.addEventListener("click", () => { t.mode = b.dataset.v; store.set(THEME_KEY, JSON.stringify(t)); applyTheme(t); paintLook(); }));
+    const custom = q(".set-custom");
+    custom.value = /^#[0-9a-f]{6}$/i.test(t.custom || "") ? t.custom : "#ff2e93";
+    custom.addEventListener("input", () => { t.accent = "custom"; t.custom = custom.value; store.set(THEME_KEY, JSON.stringify(t)); applyTheme(t); paintLook(); });
+    ov.querySelectorAll(".set-bg button").forEach((b) => b.addEventListener("click", () => { t.bg = b.dataset.v; store.set(THEME_KEY, JSON.stringify(t)); applyTheme(t); paintLook(); sfx.play("click"); }));
+    const tsel = q(".set-title");
+    const curT = myTitle();
+    tsel.append(new Option("No title", ""));
+    for (const x of titleList()) { const o = new Option(x.got ? x.name : `🔒 ${x.name} (${x.desc})`, x.id); o.disabled = !x.got; if (x.id === curT) o.selected = true; tsel.append(o); }
+    tsel.addEventListener("change", () => { setTitle(tsel.value); sfx.play("click"); });
     for (const [k, c] of Object.entries(ACCENTS)) {
       const b = document.createElement("button"); b.type = "button"; b.dataset.v = k; b.style.background = c; b.setAttribute("aria-label", k + " accent");
       b.addEventListener("click", () => { t.accent = k; store.set(THEME_KEY, JSON.stringify(t)); applyTheme(t); paintLook(); sfx.play("click"); });
@@ -990,6 +1155,8 @@
     off: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zM17 9l5 6M22 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     friends: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c1.8.7 3 2.4 3.5 5.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
     gear: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2.1 1.2M17.7 15.3l2.1 1.2M4.2 16.5l2.1-1.2M17.7 8.7l2.1-1.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+    full: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    unfull: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     swap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h13l-3-3M20 16H7l3 3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   };
 
@@ -1020,6 +1187,7 @@
           <button class="dock-btn friends-btn" type="button" title="Friends" aria-label="Friends">${ICON.friends}</button>
           <button class="dock-btn gear" type="button" title="Settings" aria-label="Settings">${ICON.gear}</button>
           <button class="dock-btn mute" type="button"></button>
+          <button class="dock-btn full-btn" type="button" title="Fullscreen" aria-label="Fullscreen"></button>
           <button class="dock-btn react-btn" type="button" title="React" aria-label="React" hidden>😀</button>
           <button class="dock-btn switch-btn" type="button" title="Switch game" hidden>${ICON.swap}<span>Switch game</span></button>
           <button class="chat-toggle" type="button" aria-expanded="false" title="Chat (Enter)" hidden>${ICON.chat}<span>Chat</span><b class="chat-badge" hidden></b></button>
@@ -1042,6 +1210,13 @@
       paintMute();
       muteBtn.addEventListener("click", () => { sfx.toggle(); paintMute(); });
       $(".gear").addEventListener("click", () => openSettings());
+      // Fullscreen: handy on a small Chromebook screen.
+      const fullBtn = $(".full-btn");
+      const paintFull = () => { const on = !!document.fullscreenElement; fullBtn.innerHTML = on ? ICON.unfull : ICON.full; fullBtn.title = on ? "Exit fullscreen" : "Fullscreen"; };
+      if (!document.fullscreenEnabled) fullBtn.hidden = true;
+      paintFull();
+      document.addEventListener("fullscreenchange", paintFull);
+      fullBtn.addEventListener("click", () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else document.documentElement.requestFullscreen().catch(() => toast("Fullscreen isn't allowed here")); });
       $(".friends-btn").addEventListener("click", () => openFriends());
       $(".chat-toggle").addEventListener("click", () => toggle());
       $(".chat-panel .chat-close").addEventListener("click", () => toggle(false));
@@ -1369,7 +1544,8 @@
           li.append(avatarEl(p));
           if (p.prof) { li.classList.add("has-prof"); li.title = "View profile"; li.addEventListener("click", () => profileCard(p)); }
           const nm = document.createElement("span");
-          nm.className = "pname"; nm.textContent = p.name;
+          nm.className = "pname"; nm.textContent = (p.prof && p.prof.clan ? `[${p.prof.clan}] ` : "") + p.name;
+          if (p.prof && p.prof.t) { const tt = document.createElement("small"); tt.className = "ptitle"; tt.textContent = titleName(p.prof.t); nm.append(tt); }
           li.append(nm);
           for (const tag of [p.id === 0 && "Host", labels[p.id], p.me && "You"]) {
             if (!tag) continue;
@@ -2145,5 +2321,7 @@
     level, xp: readXP, xpFor, addXP, weekly: weeklyView, dailySolved, frames: FRAMES, bonusAvatars: BONUS_AV,
     meta: readMeta, onNameChange: (f) => nameListeners.push(f), myName: savedName, myAvatar, avatar: avatarEl, cleanName,
     sfx: (n) => sfx.play(n), record, stats: readStats, games: GAMES, joinByCode, pageFor, gameById,
+    gameOfDay, history: readHistory, pass: passView, passClaim, wallet, stickers: () => STICKERS, myStickers, titles: titleList, myTitle, setTitle, titleName, grant, owns, profile: myProf,
+    clan: readClan, setClan: (c) => store.set(CLAN_KEY, c ? JSON.stringify(c) : ""), fid: () => identity.id,
   };
 })();

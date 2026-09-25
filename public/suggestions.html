@@ -75,6 +75,7 @@
           vb.querySelector("b").textContent = r.votes;
           el.querySelector("p").textContent = r.text;
           el.querySelector("small").textContent = `${r.name} · ${ago(r.created)}`;
+          if (r.status) { const b = document.createElement("span"); b.className = "sg-status " + r.status; b.textContent = r.status === "done" ? "✓ Added" : "Planned"; el.querySelector("small").append(b); }
           vb.addEventListener("click", async () => {
             vb.disabled = true;
             try {

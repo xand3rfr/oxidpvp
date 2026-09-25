@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>try{var t=JSON.parse(localStorage.getItem("oxidpvp-theme")||"{}"),d=document.documentElement;if(t.mode==="light")d.dataset.theme="light";var a=t.accent;if(!t.b&&a==="violet")a="pink";if(a&&a!=="pink")d.dataset.accent=a}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#000000">
+  <title>Admin · OXIDPVP</title>
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-in">
+      <a class="brand" href="index.html"><i class="brand-mark"></i><span>OXID<b>PVP</b></span></a>
+      <div class="nav-links"><a href="index.html#games">Games</a><a href="suggestions.html">Suggestions</a><a href="leaderboard.html">Leaderboard</a></div>
+      <div class="nav-right"><button class="btn ghost" id="logout" type="button" hidden>Log out</button></div>
+    </div>
+  </nav>
+
+  <div class="hub">
+    <div class="wrap page">
+      <div class="page-head"><div><h1>Admin</h1><p class="muted">Owner tools for OXIDPVP.</p></div></div>
+
+      <form class="pf-card ad-login" id="loginForm" hidden>
+        <h2 id="loginTitle">Log in</h2>
+        <p class="muted" id="loginNote">Enter the admin password.</p>
+        <input class="ad-in" id="pw" type="password" autocomplete="current-password" placeholder="Admin password" aria-label="Admin password">
+        <input class="ad-in" id="pw2" type="password" autocomplete="new-password" placeholder="Type it again" aria-label="Confirm password" hidden>
+        <button class="btn primary" type="submit" id="loginBtn">Log in</button>
+        <p class="ad-err" id="loginErr"></p>
+      </form>
+
+      <div id="panel" hidden>
+        <div class="pf-stats" id="stats"></div>
+
+        <section class="pf-card">
+          <h2>Announcement</h2>
+          <p class="muted">Shows as a bar at the top of the home page for everyone. Leave empty to remove it.</p>
+          <form class="ad-row" id="annForm"><input class="ad-in" id="annText" maxlength="200" placeholder="e.g. New games this weekend!"><button class="btn primary" type="submit">Save</button></form>
+        </section>
+
+        <section class="pf-card">
+          <h2>Suggestions <small class="muted" id="sgCount"></small></h2>
+          <div class="ad-filter seg" id="sgFilter"><button type="button" data-f="" class="on">All</button><button type="button" data-f="new">New</button><button type="button" data-f="planned">Planned</button><button type="button" data-f="done">Done</button></div>
+          <div class="ad-list" id="sgList"></div>
+        </section>
+
+        <div class="pf-grid">
+          <section class="pf-card">
+            <h2>Banned words</h2>
+            <p class="muted">Names and suggestions containing these are blocked, and anything already posted with them is removed.</p>
+            <form class="ad-row" id="banForm"><input class="ad-in" id="banWord" maxlength="30" placeholder="word"><button class="btn" type="submit">Ban</button></form>
+            <div class="ad-chips" id="bans"></div>
+          </section>
+          <section class="pf-card">
+            <h2>Leaderboard</h2>
+            <p class="muted">Remove a name from the leaderboard.</p>
+            <form class="ad-row" id="lbForm"><input class="ad-in" id="lbName" maxlength="16" placeholder="Player name"><button class="btn" type="submit">Remove</button></form>
+            <h2 class="ad-sub">Most played</h2>
+            <ol class="ad-top" id="top"></ol>
+          </section>
+        </div>
+
+        <section class="pf-card">
+          <h2>Change password</h2>
+          <form class="ad-row" id="pwForm"><input class="ad-in" id="newPw" type="password" autocomplete="new-password" placeholder="New password (8+ characters)"><button class="btn" type="submit">Change</button></form>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      let key = "";
+      try { key = sessionStorage.getItem("oxidpvp-admin") || ""; } catch {}
+      const call = async (action, body = {}, k = key) => {
+        const r = await fetch("/api/admin/" + action, { method: "POST", headers: { "x-admin-key": k }, body: JSON.stringify(body) });
+        const d = await r.json().catch(() => ({ error: "Server error" }));
+        if (r.status === 401 && action !== "login" && action !== "claim") { logout(); }
+        return d;
+      };
+      const logout = () => { key = ""; try { sessionStorage.removeItem("oxidpvp-admin"); } catch {} $("panel").hidden = true; $("logout").hidden = true; showLogin(); };
+      $("logout").addEventListener("click", logout);
+      let claimed = true;
+      async function showLogin() {
+        const st = await (await fetch("/api/admin/state", { method: "POST", body: "{}" })).json().catch(() => ({ claimed: true }));
+        claimed = st.claimed;
+        $("loginForm").hidden = false;
+        $("pw2").hidden = claimed;
+        $("loginTitle").textContent = claimed ? "Log in" : "Set up admin";
+        $("loginNote").textContent = claimed ? "Enter the admin password." : "No admin password yet. Pick one now (8+ characters). Only someone with this password can use this page, so keep it secret.";
+        $("loginBtn").textContent = claimed ? "Log in" : "Set password";
+        $("pw").focus();
+      }
+      $("loginForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        $("loginErr").textContent = "";
+        const pw = $("pw").value;
+        if (!claimed) {
+          if (pw !== $("pw2").value) { $("loginErr").textContent = "The two passwords don't match."; return; }
+          const r = await call("claim", {}, pw);
+          if (r.error) { $("loginErr").textContent = r.error; return; }
+        }
+        const r = await call("login", {}, pw);
+        if (r.error) { $("loginErr").textContent = r.error; return; }
+        key = pw;
+        try { sessionStorage.setItem("oxidpvp-admin", key); } catch {}
+        enter();
+      });
+
+      let rows = [], filter = "";
+      async function refresh() {
+        const s = await call("stats");
+        if (s.error) return;
+        $("stats").textContent = "";
+        for (const [n, l] of [[s.rooms, "public rooms open"], [s.players, "players on leaderboard"], [s.week, "active this week"], [s.results, "results recorded"], [s.suggestions, "suggestions"], [s.votes, "votes"]]) {
+          const d = document.createElement("div"); d.className = "stat"; const b = document.createElement("b"); b.textContent = (n || 0).toLocaleString(); const sp = document.createElement("span"); sp.textContent = l; d.append(b, sp); $("stats").append(d);
+        }
+        try { $("annText").value = s.announce ? JSON.parse(s.announce).text : ""; } catch { $("annText").value = ""; }
+        $("bans").textContent = "";
+        for (const w of s.bans) {
+          const c = document.createElement("button"); c.type = "button"; c.className = "ad-chip"; c.textContent = w + " ×"; c.title = "Unban";
+          c.addEventListener("click", async () => { await call("unban", { word: w }); refresh(); });
+          $("bans").append(c);
+        }
+        if (!s.bans.length) $("bans").innerHTML = '<span class="muted">None yet.</span>';
+        const names = Object.fromEntries(GameUtil.games.map((g) => [g.id, g.title]));
+        $("top").textContent = "";
+        for (const t of s.top) { const li = document.createElement("li"); li.innerHTML = "<span></span><b></b>"; li.querySelector("span").textContent = names[t.game] || t.game; li.querySelector("b").textContent = t.n; $("top").append(li); }
+        const sg = await call("sugg");
+        rows = sg.rows || [];
+        paintSugg();
+      }
+      function paintSugg() {
+        const list = $("sgList");
+        list.textContent = "";
+        const shown = rows.filter((r) => !filter || (filter === "new" ? !r.status : r.status === filter));
+        $("sgCount").textContent = `${shown.length} shown · ${rows.length} total`;
+        for (const r of shown) {
+          const el = document.createElement("div"); el.className = "ad-sg";
+          el.innerHTML = `<b class="ad-votes"></b><div class="ad-sg-body"><p></p><small></small></div><select aria-label="Status"><option value="">New</option><option value="planned">Planned</option><option value="done">Done</option></select><button class="btn ghost ad-del" type="button" title="Delete">Delete</button>`;
+          el.querySelector(".ad-votes").textContent = "▲ " + r.votes;
+          el.querySelector("p").textContent = r.text;
+          el.querySelector("small").textContent = `${r.name} · ${new Date(r.created).toLocaleString()}`;
+          const sel = el.querySelector("select"); sel.value = r.status || "";
+          sel.addEventListener("change", async () => { await call("sugg-status", { id: r.id, status: sel.value }); r.status = sel.value; GameUtil.toast("Saved"); paintSugg(); });
+          el.querySelector(".ad-del").addEventListener("click", async () => {
+            if (!confirm("Delete this suggestion?\n\n" + r.text)) return;
+            await call("sugg-del", { id: r.id }); rows = rows.filter((x) => x !== r); paintSugg();
+          });
+          list.append(el);
+        }
+        if (!shown.length) list.innerHTML = '<p class="muted">Nothing here.</p>';
+      }
+      for (const b of $("sgFilter").querySelectorAll("button")) b.addEventListener("click", () => { filter = b.dataset.f; $("sgFilter").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); paintSugg(); });
+      $("annForm").addEventListener("submit", async (e) => { e.preventDefault(); const r = await call("announce", { text: $("annText").value }); GameUtil.toast(r.ok ? ($("annText").value.trim() ? "Announcement is live" : "Announcement removed") : r.error); });
+      $("banForm").addEventListener("submit", async (e) => { e.preventDefault(); const r = await call("ban", { word: $("banWord").value }); if (r.error) GameUtil.toast(r.error); else { GameUtil.toast(`Banned${r.cleared ? ` · removed ${r.cleared} post${r.cleared === 1 ? "" : "s"}` : ""}`); $("banWord").value = ""; refresh(); } });
+      $("lbForm").addEventListener("submit", async (e) => { e.preventDefault(); const r = await call("lb-del", { name: $("lbName").value }); GameUtil.toast(r.error ? r.error : r.removed ? "Removed from the leaderboard" : "No one by that name"); if (r.ok) { $("lbName").value = ""; refresh(); } });
+      $("pwForm").addEventListener("submit", async (e) => { e.preventDefault(); const pw = $("newPw").value; const r = await call("password", { password: pw }); if (r.error) GameUtil.toast(r.error); else { key = pw; try { sessionStorage.setItem("oxidpvp-admin", key); } catch {} $("newPw").value = ""; GameUtil.toast("Password changed"); } });
+
+      function enter() { $("loginForm").hidden = true; $("panel").hidden = false; $("logout").hidden = false; refresh(); }
+      if (key) call("login").then((r) => (r.ok ? enter() : showLogin())); else showLogin();
+    })();
+  </script>
+</body>
+</html>

@@ -25,6 +25,7 @@
         <a href="suggestions.html">Suggestions</a>
         <a href="changelog.html" id="navChangelog">Changelog</a>
         <a href="daily.html">Daily Word</a>
+        <a href="profile.html">Profile</a>
       </div>
       <div class="nav-right">
         <span class="status-pill"><i></i>Servers online</span>
@@ -90,8 +91,16 @@
             <button class="filter" data-f="duel" aria-pressed="false">1v1</button>
             <button class="filter" data-f="turn" aria-pressed="false">Turn-based</button>
             <button class="filter" data-f="live" aria-pressed="false">Real-time</button>
+            <button class="filter" data-f="solo" aria-pressed="false">Solo</button>
+            <button class="filter" data-f="quick" aria-pressed="false">Quick</button>
+            <button class="filter" data-f="fav" aria-pressed="false">★ Favorites</button>
           </div>
         </div>
+        <div class="game-tools">
+          <label class="game-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="gameSearch" type="search" placeholder="Search games…" autocomplete="off" aria-label="Search games"></label>
+          <a class="gotd" id="gotd" hidden></a>
+        </div>
+        <p class="no-games" id="noGames" hidden>No games match that. Try another word, or <button type="button" id="clearSearch">show all games</button>.</p>
 
         <div class="cards" id="cards">
           <a class="game-card" href="tournament.html" data-game="cup" data-tags="party turn">
@@ -1276,18 +1285,75 @@
       const cards = [...document.querySelectorAll("#cards .game-card")];
       const buttons = [...document.querySelectorAll(".filter")];
       const count = document.getElementById("count");
+      // Extra tags: games you can play alone (bots or solo mode) and quick ones (a few minutes).
+      const SOLO = ["chess", "connect", "checkers", "uttt", "dots", "snake", "typing", "casino", "wordhunt", "emoji", "racing", "tower", "clicker", "parkour", "millionaire", "flags"];
+      const QUICK = ["rps", "reaction", "tron", "pong", "hockey", "connect", "bomb", "mines", "sumo", "tanks", "arena", "typing", "clicker", "tower", "flags", "wyr"];
+      for (const c of cards) {
+        const id = c.dataset.game;
+        if (SOLO.includes(id)) c.dataset.tags += " solo";
+        if (QUICK.includes(id)) c.dataset.tags += " quick";
+      }
+      // Favorites: a star on every card; starred games move to the front.
+      const FAV_KEY = "oxidpvp-favs";
+      let favs = [];
+      try { favs = JSON.parse(localStorage.getItem(FAV_KEY)) || []; } catch {}
+      const grid = document.getElementById("cards");
+      const order = cards.slice();
+      const sortCards = () => { for (const c of [...order].sort((a, b) => favs.includes(b.dataset.game) - favs.includes(a.dataset.game))) grid.append(c); };
+      for (const c of cards) {
+        const star = document.createElement("button");
+        star.type = "button"; star.className = "fav-btn";
+        const paint = () => { const on = favs.includes(c.dataset.game); star.classList.toggle("on", on); star.textContent = on ? "★" : "☆"; star.title = on ? "Remove from favorites" : "Add to favorites"; star.setAttribute("aria-label", star.title); };
+        paint();
+        star.addEventListener("click", (e) => {
+          e.preventDefault(); e.stopPropagation();
+          const id = c.dataset.game;
+          favs = favs.includes(id) ? favs.filter((x) => x !== id) : [...favs, id];
+          try { localStorage.setItem(FAV_KEY, JSON.stringify(favs)); } catch {}
+          paint(); sortCards(); apply(current);
+          if (window.GameUtil) GameUtil.sfx("pop");
+        });
+        c.querySelector(".card-art").append(star);
+      }
+      sortCards();
+      const search = document.getElementById("gameSearch"), noGames = document.getElementById("noGames");
+      let current = "all";
       const apply = (f) => {
+        current = f;
         let shown = 0;
+        const q = search.value.trim().toLowerCase();
         for (const c of cards) {
-          const on = f === "all" || c.dataset.tags.split(" ").includes(f);
+          const tagOk = f === "all" || (f === "fav" ? favs.includes(c.dataset.game) : c.dataset.tags.split(" ").includes(f));
+          const textOk = !q || c.textContent.toLowerCase().includes(q);
+          const on = tagOk && textOk;
           c.hidden = !on;
           if (on) shown++;
         }
         for (const b of buttons) b.setAttribute("aria-pressed", b.dataset.f === f);
         count.textContent = shown === cards.length ? `${shown} games` : `${shown} of ${cards.length} games`;
+        noGames.hidden = shown > 0;
+        if (f === "fav" && !favs.length) { noGames.hidden = false; noGames.firstChild.textContent = "No favorites yet. Tap the ☆ on a game to add it, or "; }
+        else noGames.firstChild.textContent = "No games match that. Try another word, or ";
         try { localStorage.setItem("oxidpvp-filter", f); } catch {}
       };
       for (const b of buttons) b.addEventListener("click", () => apply(b.dataset.f));
+      search.addEventListener("input", () => apply(current));
+      search.addEventListener("keydown", (e) => { if (e.key === "Escape") { search.value = ""; apply(current); } });
+      document.getElementById("clearSearch").addEventListener("click", () => { search.value = ""; apply("all"); });
+      // "/" jumps to the search box.
+      addEventListener("keydown", (e) => { if (e.key === "/" && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); search.focus(); search.scrollIntoView({ block: "center", behavior: "smooth" }); } });
+
+      // Game of the Day: double XP in one game, same for everyone, new every day.
+      const gd = GameUtil.gameOfDay(), gdCard = cards.find((c) => c.dataset.game === gd.id);
+      if (gdCard) {
+        const el = document.getElementById("gotd");
+        el.href = gdCard.getAttribute("href");
+        el.innerHTML = `<span class="gotd-i">🌟</span><span><small>Game of the Day</small><b></b></span><span class="gotd-x">2× XP</span>`;
+        el.querySelector("b").textContent = gd.title;
+        el.hidden = false;
+        const badge = document.createElement("span"); badge.className = "badge-gotd"; badge.textContent = "🌟 2× XP today";
+        gdCard.querySelector(".card-title").append(badge);
+      }
       let saved = "all";
       try { saved = localStorage.getItem("oxidpvp-filter") || "all"; } catch {}
       apply(buttons.some((b) => b.dataset.f === saved) ? saved : "all");
@@ -1340,7 +1406,7 @@
         }
       };
       renderLevel();
-      document.getElementById("navLevel").addEventListener("click", () => GameUtil.openSettings());
+      document.getElementById("navLevel").addEventListener("click", () => { location.href = "profile.html"; });
 
       // Daily Word streak on the button
       try {

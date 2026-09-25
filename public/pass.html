@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>try{var t=JSON.parse(localStorage.getItem("oxidpvp-theme")||"{}"),d=document.documentElement;if(t.mode==="light")d.dataset.theme="light";var a=t.accent;if(!t.b&&a==="violet")a="pink";if(a&&a!=="pink")d.dataset.accent=a}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#000000">
+  <title>Season Pass · OXIDPVP</title>
+  <meta name="description" content="30 tiers of free rewards every month on OXIDPVP.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-in">
+      <a class="brand" href="index.html"><i class="brand-mark"></i><span>OXID<b>PVP</b></span></a>
+      <div class="nav-links">
+        <a href="index.html#games">Games</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <a href="profile.html">Profile</a>
+        <a href="pass.html" aria-current="page">Season pass</a>
+      </div>
+      <div class="nav-right"><a class="btn primary" href="index.html#games">Play now</a></div>
+    </div>
+  </nav>
+
+  <div class="hub">
+    <div class="wrap page">
+      <section class="ps-hero">
+        <div>
+          <p class="ps-kicker" id="psSeason"></p>
+          <h1>Season Pass</h1>
+          <p class="muted">Every bit of XP you earn this month fills the pass. 30 tiers of free rewards: casino coins, avatars, frames, titles and stickers. Everything resets on the 1st.</p>
+        </div>
+        <div class="ps-now">
+          <b id="psTier"></b>
+          <div class="lvl-track"><i id="psBar"></i></div>
+          <small id="psXp"></small>
+          <small id="psEnds"></small>
+          <button class="btn primary" id="psAll" type="button" hidden>Claim all</button>
+        </div>
+      </section>
+      <div class="ps-track" id="psTrack"></div>
+      <p class="muted pf-note">Earn XP by playing games (wins give more), unlocking achievements, weekly challenges and daily puzzles. The Game of the Day gives double.</p>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const stickers = Object.fromEntries(GameUtil.stickers().map((s) => [s.id, s.e]));
+      const frames = GameUtil.frames;
+      function icon(r) {
+        if (r.st) return stickers[r.st];
+        if (r.av) return r.av;
+        if (r.t) return "🏷️";
+        if (r.f != null) return "🖼️";
+        return "🪙";
+      }
+      function label(r) {
+        const parts = [];
+        if (r.f != null) parts.push(frames[r.f].name + " frame");
+        if (r.c) parts.push(r.c.toLocaleString() + " coins");
+        if (r.av) parts.push("Avatar");
+        if (r.t) parts.push(`“${GameUtil.titleName(r.t)}”`);
+        if (r.st) parts.push("Sticker");
+        return parts.join(" + ");
+      }
+      function paint() {
+        const P = GameUtil.pass();
+        $("psSeason").textContent = `Season ${MONTHS[(P.season % 100) - 1]} ${Math.floor(P.season / 100)}`;
+        $("psTier").textContent = P.tier >= P.rewards.length ? "Pass complete! 🎉" : `Tier ${P.tier} of ${P.rewards.length}`;
+        const into = P.xp - P.tier * P.perTier;
+        $("psBar").style.width = P.tier >= P.rewards.length ? "100%" : Math.round((into / P.perTier) * 100) + "%";
+        $("psXp").textContent = P.tier >= P.rewards.length ? `${P.xp.toLocaleString()} XP this season` : `${into} / ${P.perTier} XP to tier ${P.tier + 1}`;
+        const days = Math.max(0, Math.ceil((P.ends - Date.now()) / 864e5));
+        $("psEnds").textContent = `Ends in ${days} day${days === 1 ? "" : "s"}`;
+        const ready = P.rewards.filter((r) => r.open && !r.got);
+        $("psAll").hidden = ready.length < 2;
+        $("psAll").textContent = `Claim all (${ready.length})`;
+        const tr = $("psTrack");
+        tr.textContent = "";
+        for (const r of P.rewards) {
+          const el = document.createElement("div");
+          el.className = "ps-tier" + (r.got ? " got" : r.open ? " open" : "") + (r.n % 10 === 0 ? " big" : "");
+          el.innerHTML = `<span class="ps-n"></span><span class="ps-i"></span><small></small><button class="btn" type="button"></button>`;
+          el.querySelector(".ps-n").textContent = r.n;
+          el.querySelector(".ps-i").textContent = icon(r);
+          el.querySelector("small").textContent = label(r);
+          const b = el.querySelector("button");
+          b.textContent = r.got ? "Claimed" : r.open ? "Claim" : "🔒";
+          b.disabled = r.got || !r.open;
+          if (r.open && !r.got) b.classList.add("primary");
+          b.addEventListener("click", () => claim(r.n));
+          tr.append(el);
+        }
+      }
+      function claim(n) {
+        const got = GameUtil.passClaim(n);
+        if (got) { GameUtil.toast("🎁 " + got, 2600); GameUtil.sfx("win"); }
+        paint();
+      }
+      $("psAll").addEventListener("click", () => {
+        const P = GameUtil.pass(), list = [];
+        for (const r of P.rewards) if (r.open && !r.got) { const g = GameUtil.passClaim(r.n); if (g) list.push(g); }
+        if (list.length) { GameUtil.toast(`🎁 Claimed ${list.length} rewards!`, 2600); GameUtil.sfx("win"); }
+        paint();
+      });
+      paint();
+    })();
+  </script>
+</body>
+</html>

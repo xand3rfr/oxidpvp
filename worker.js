@@ -59,6 +59,22 @@ export default {
       if (body.length > 2000) return json({ error: "too-long" }, 413);
       return board.fetch(new Request("https://board/" + (url.pathname.endsWith("vote") ? "vote" : "suggest") + "?ip=" + encodeURIComponent(ip), { method: "POST", body }));
     }
+    if (url.pathname === "/api/announce" && request.method === "GET") {
+      return env.BOARD.get(env.BOARD.idFromName("board")).fetch(new Request("https://board/announce"));
+    }
+    // Site owner tools (admin.html). Every call carries the admin password in a header.
+    const adm = url.pathname.match(/^\/api\/admin\/([a-z-]{2,20})$/);
+    if (adm) {
+      if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+      const origin = request.headers.get("Origin");
+      if (origin && new URL(origin).host !== url.host) return new Response("Forbidden", { status: 403 });
+      const body = await request.text();
+      if (body.length > 4000) return json({ error: "too-long" }, 413);
+      const ip = request.headers.get("CF-Connecting-IP") || "local";
+      return env.BOARD.get(env.BOARD.idFromName("board")).fetch(new Request("https://board/admin/" + adm[1] + "?ip=" + encodeURIComponent(ip), {
+        method: "POST", body, headers: { "x-admin-key": (request.headers.get("x-admin-key") || "").slice(0, 200) },
+      }));
+    }
     if (url.pathname === "/api/presence") {
       if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected WebSocket", { status: 426 });
       const origin = request.headers.get("Origin");
@@ -319,7 +335,109 @@ export class Leaderboard extends DurableObject {
       id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, name TEXT NOT NULL, votes INTEGER NOT NULL DEFAULT 1,
       created INTEGER NOT NULL, who TEXT NOT NULL)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS sugg_votes (sid INTEGER NOT NULL, who TEXT NOT NULL, PRIMARY KEY (sid, who))`);
+    try { this.sql.exec(`ALTER TABLE sugg ADD COLUMN status TEXT NOT NULL DEFAULT ''`); } catch {} // added later: "planned" / "done"
+    // Owner settings (admin password hash, announcement) and words the owner has banned.
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS bans (word TEXT PRIMARY KEY)`);
     this.lastPost = new Map();
+    this.fails = new Map();
+  }
+  kvGet(k) { const r = this.sql.exec(`SELECT v FROM kv WHERE k = ?`, k).toArray(); return r.length ? r[0].v : null; }
+  kvSet(k, v) { if (v == null) this.sql.exec(`DELETE FROM kv WHERE k = ?`, k); else this.sql.exec(`INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`, k, v); }
+  banned(text) {
+    const flat = String(text || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (!flat) return false;
+    return this.sql.exec(`SELECT word FROM bans`).toArray().some((r) => flat.includes(r.word));
+  }
+  bad(text) { return rude(text) || this.banned(text); }
+  async hash(pw) {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("oxidpvp-admin:" + pw));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  // The admin password is ADMIN_KEY (a Worker secret) if set; otherwise the first person to open
+  // admin.html picks one, and it's stored here (hashed).
+  async admin(url, request) {
+    const action = url.pathname.split("/")[2];
+    const ip = url.searchParams.get("ip") || "local", now = Date.now();
+    const f = this.fails.get(ip) || { n: 0, t: now };
+    if (now - f.t > 600000) { f.n = 0; f.t = now; }
+    let body = {};
+    try { body = JSON.parse(await request.text() || "{}"); } catch { return json({ error: "bad-json" }, 400); }
+    const envKey = this.env.ADMIN_KEY || "";
+    const stored = this.kvGet("admin");
+    if (action === "state") return json({ claimed: !!(envKey || stored) });
+    if (f.n >= 10) return json({ error: "Too many wrong passwords. Wait 10 minutes." }, 429);
+    const given = request.headers.get("x-admin-key") || "";
+    if (action === "claim") {
+      if (envKey || stored) return json({ error: "Already set up. Log in instead." }, 409);
+      if (given.length < 8) return json({ error: "Use at least 8 characters." }, 400);
+      this.kvSet("admin", await this.hash(given));
+      return json({ ok: true });
+    }
+    const ok = envKey ? given === envKey : !!stored && (await this.hash(given)) === stored;
+    if (!ok) { f.n++; this.fails.set(ip, f); return json({ error: "Wrong password." }, 401); }
+    this.fails.delete(ip);
+    switch (action) {
+      case "login": return json({ ok: true });
+      case "stats": {
+        const one = (q) => this.sql.exec(q).one().n;
+        let rooms = 0;
+        try { rooms = (await (await this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName("dir")).fetch(new Request("https://dir/list"))).json()).rooms.length; } catch {}
+        return json({
+          suggestions: one(`SELECT COUNT(*) AS n FROM sugg`), votes: one(`SELECT COUNT(*) AS n FROM sugg_votes`),
+          players: one(`SELECT COUNT(DISTINCT key) AS n FROM scores`), results: one(`SELECT COALESCE(SUM(w + l + d), 0) AS n FROM scores`),
+          week: one(`SELECT COUNT(DISTINCT key) AS n FROM scores WHERE updated > ${now - 7 * 864e5}`),
+          rooms, bans: this.sql.exec(`SELECT word FROM bans ORDER BY word`).toArray().map((r) => r.word),
+          announce: this.kvGet("announce") || "",
+          top: this.sql.exec(`SELECT game, SUM(w + l + d) AS n FROM scores GROUP BY game ORDER BY n DESC LIMIT 10`).toArray(),
+        });
+      }
+      case "sugg": return json({ rows: this.sql.exec(`SELECT id, text, name, votes, created, status FROM sugg ORDER BY votes DESC, created DESC LIMIT 500`).toArray() });
+      case "sugg-del": {
+        const id = body.id | 0;
+        this.sql.exec(`DELETE FROM sugg WHERE id = ?`, id);
+        this.sql.exec(`DELETE FROM sugg_votes WHERE sid = ?`, id);
+        return json({ ok: true });
+      }
+      case "sugg-status": {
+        const st = ["", "planned", "done"].includes(body.status) ? body.status : "";
+        this.sql.exec(`UPDATE sugg SET status = ? WHERE id = ?`, st, body.id | 0);
+        return json({ ok: true });
+      }
+      case "lb-del": {
+        const name = cleanName(body.name).toLowerCase();
+        if (!name) return json({ error: "no-name" }, 400);
+        const n = this.sql.exec(`SELECT COUNT(*) AS n FROM scores WHERE key = ?`, name).one().n;
+        this.sql.exec(`DELETE FROM scores WHERE key = ?`, name);
+        return json({ ok: true, removed: n });
+      }
+      case "ban": {
+        const w = String(body.word || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30);
+        if (w.length < 3) return json({ error: "Use at least 3 letters." }, 400);
+        this.sql.exec(`INSERT OR IGNORE INTO bans (word) VALUES (?)`, w);
+        // Clear anything already posted with it.
+        const hit = this.sql.exec(`SELECT DISTINCT key FROM scores`).toArray().filter((r) => r.key.replace(/[^a-z0-9]/g, "").includes(w));
+        for (const r of hit) this.sql.exec(`DELETE FROM scores WHERE key = ?`, r.key);
+        const sg = this.sql.exec(`SELECT id, text, name FROM sugg`).toArray().filter((r) => (r.text + r.name).toLowerCase().replace(/[^a-z0-9]/g, "").includes(w));
+        for (const r of sg) { this.sql.exec(`DELETE FROM sugg WHERE id = ?`, r.id); this.sql.exec(`DELETE FROM sugg_votes WHERE sid = ?`, r.id); }
+        return json({ ok: true, cleared: hit.length + sg.length });
+      }
+      case "unban": this.sql.exec(`DELETE FROM bans WHERE word = ?`, String(body.word || "")); return json({ ok: true });
+      case "announce": {
+        const text = String(body.text || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 200);
+        this.kvSet("announce", text ? JSON.stringify({ text, at: now }) : null);
+        return json({ ok: true });
+      }
+      case "password": {
+        if (envKey) return json({ error: "The password is set as a Cloudflare secret (ADMIN_KEY). Change it there." }, 400);
+        const pw = String(body.password || "");
+        if (pw.length < 8) return json({ error: "Use at least 8 characters." }, 400);
+        this.kvSet("admin", await this.hash(pw));
+        return json({ ok: true });
+      }
+    }
+    return json({ error: "not-found" }, 404);
   }
   async who(ip) {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("oxidpvp:" + ip));
@@ -329,7 +447,7 @@ export class Leaderboard extends DurableObject {
     const who = await this.who(url.searchParams.get("ip") || "local");
     if (url.pathname === "/sugg") {
       const order = url.searchParams.get("sort") === "new" ? "created DESC" : "votes DESC, created DESC";
-      const rows = this.sql.exec(`SELECT id, text, name, votes, created FROM sugg ORDER BY ${order} LIMIT 200`).toArray();
+      const rows = this.sql.exec(`SELECT id, text, name, votes, created, status FROM sugg ORDER BY ${order} LIMIT 200`).toArray();
       const mine = new Set(this.sql.exec(`SELECT sid FROM sugg_votes WHERE who = ?`, who).toArray().map((r) => r.sid));
       return json({ rows: rows.map((r) => ({ ...r, voted: mine.has(r.id) })), total: this.sql.exec(`SELECT COUNT(*) AS n FROM sugg`).one().n });
     }
@@ -339,7 +457,7 @@ export class Leaderboard extends DurableObject {
       const text = String(body.text || "").replace(/[\u0000-\u001f<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 280);
       const name = cleanName(body.name) || "Anonymous";
       if (text.length < 6) return json({ error: "Write a bit more than that." }, 400);
-      if (rude(text) || rude(name)) return json({ error: "Keep it friendly, please." }, 400);
+      if (this.bad(text) || this.bad(name)) return json({ error: "Keep it friendly, please." }, 400);
       const now = Date.now(), last = this.lastPost.get(who) || 0;
       if (now - last < 60000) return json({ error: "One suggestion a minute, please." }, 429);
       const today = this.sql.exec(`SELECT COUNT(*) AS n FROM sugg WHERE who = ? AND created > ?`, who, now - 86400000).one().n;
@@ -363,10 +481,12 @@ export class Leaderboard extends DurableObject {
   async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname === "/sugg" || url.pathname === "/suggest" || url.pathname === "/vote") return this.suggestions(url, request);
+    if (url.pathname.startsWith("/admin/")) return this.admin(url, request);
+    if (url.pathname === "/announce") { const a = this.kvGet("announce"); return json(a ? JSON.parse(a) : {}); }
     if (url.pathname === "/add" && request.method === "POST") {
       const { game, name, r } = await request.json();
       const col = { win: "w", loss: "l", draw: "d" }[r];
-      if (!col || !game || !name) return json({ ok: false }, 400);
+      if (!col || !game || !name || this.banned(name)) return json({ ok: false }, 400);
       this.sql.exec(
         `INSERT INTO scores (game, key, name, ${col}, updated) VALUES (?, ?, ?, 1, ?)
          ON CONFLICT(game, key) DO UPDATE SET ${col} = ${col} + 1, name = excluded.name, updated = excluded.updated`,
