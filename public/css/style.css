@@ -751,3 +751,26 @@ body.touching .touch-ui { display: block; }
 @media (max-width: 480px) { .nav .btn.primary { padding: 0 12px; } .nav-right { gap: 6px; } }
 .bot-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .bot-row .btn { justify-content: center; }
+
+/* ---------- Daily hub tabs, sudoku, chess puzzle ---------- */
+.dtabs { flex: none; display: flex; justify-content: center; gap: 6px; padding: 10px 12px 0; }
+.dtabs a { padding: 7px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--muted); border: 1px solid transparent; }
+.dtabs a[aria-current="page"] { color: var(--text); background: var(--surface-2); border-color: var(--line-2); }
+.sd-top { display: flex; justify-content: space-between; width: min(470px, 100%); font-size: 14px; color: var(--muted); }
+.sd-time { font-family: var(--mono); color: var(--text); }
+.sd-grid { display: grid; grid-template-columns: repeat(9, 1fr); width: min(470px, 94vw); aspect-ratio: 1; border: 3px solid var(--text); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.sd-cell { border: 1px solid var(--line-2); font: 600 clamp(18px, 4.6vw, 26px) var(--sans); color: var(--accent-hi); background: var(--surface); display: grid; place-items: center; padding: 0; }
+.sd-cell.given { color: var(--text); font-weight: 800; }
+.sd-cell.br { border-right: 2px solid var(--text); } .sd-cell.bb { border-bottom: 2px solid var(--text); }
+.sd-cell.peer { background: var(--surface-2); }
+.sd-cell.same { background: rgba(var(--accent-rgb), .22); }
+.sd-cell.sel { background: rgba(var(--accent-rgb), .45); color: #fff; }
+.sd-cell.wrong { color: var(--danger) !important; }
+.sd-pad { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; width: min(470px, 94vw); }
+.sd-pad button { height: 50px; border-radius: 10px; background: var(--surface-3); color: var(--text); font: 700 20px var(--sans); touch-action: manipulation; }
+.sd-pad button.full { opacity: .3; }
+.sd-streak { font-size: 13px; color: var(--dim); }
+.dc-who { font-size: 18px; font-weight: 700; }
+.dc-tries { font-size: 14px; color: var(--muted); min-height: 20px; }
+.sq-c.bad { box-shadow: inset 0 0 0 4px var(--danger); }
+@media (max-width: 480px) { .sd-pad { grid-template-columns: repeat(5, 1fr); } }

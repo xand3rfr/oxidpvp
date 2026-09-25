@@ -5,6 +5,8 @@ window.CHANGELOG = [
     "Saved casino wallet with a daily bonus, an upgrade shop (bigger bets, lucky charm, insurance, golden chips, table colors) and transfer codes to move it between devices",
     "Friends can now drop into a casino table that's already running",
     "Play against the computer (Easy, Medium or Hard) in Chess, Connect 4, Checkers, Ultimate Tic-Tac-Toe and Dots & Boxes",
+    "Daily Sudoku and Daily Chess (mate in one) next to the Daily Word, each with its own streak",
+    "Practice alone: start Snake Battle or Type Race by yourself",
     "Suggestions page: send in ideas and upvote other people's",
     "This changelog, plus a \"What's new\" dot when there's an update",
     "Tidier top bar with Friends and Settings buttons",

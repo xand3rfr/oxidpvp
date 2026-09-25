@@ -198,9 +198,10 @@
       const ranked = [...v.players].sort((a, b) => (a.place || 99) - (b.place || 99) || b.i - a.i);
       const won = ranked[0] && ranked[0].id === room.myId && ranked[0].done;
       if (!(me && me.place === 1)) GameUtil.sfx(won ? "win" : "lose");
-      GameUtil.record("typing", won ? "win" : "loss");
+      const solo = v.players.length === 1;
+      if (!solo) GameUtil.record("typing", won ? "win" : "loss");
       results({
-        title: won ? "You win!" : ranked[0] && ranked[0].done ? `${ranked[0].name} wins` : "Time's up",
+        title: solo ? (me && me.done ? `${me.wpm} wpm!` : "Time's up") : won ? "You win!" : ranked[0] && ranked[0].done ? `${ranked[0].name} wins` : "Time's up",
         rows: ranked.map((p) => ({ p, value: p.done ? `${p.wpm} wpm · ${p.acc}%` : `${Math.round((p.i / v.text.length) * 100)}% done`, win: p.place === 1 })),
         isHost: room.isHost, meId: room.myId, again: "Race again",
       });
@@ -212,8 +213,8 @@
   Room.mount({
     game: "typing",
     title: "Type Race",
-    subtitle: "Everyone types the same passage. Fastest fingers win. 2 to 8 players.",
-    min: 2,
+    subtitle: "Everyone types the same passage. Fastest fingers win. 2 to 8 players, or start alone to practice.",
+    min: 1,
     max: 8,
     onStart(r) {
       room = r; V = null;

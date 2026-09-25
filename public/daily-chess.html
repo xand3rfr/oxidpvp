@@ -6,33 +6,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#07070a">
-  <title>Daily Word · OXIDPVP</title>
-  <meta name="description" content="One five-letter word a day. Six guesses. Keep your streak alive.">
+  <title>Daily Chess · OXIDPVP</title>
+  <meta name="description" content="A new chess puzzle every day: find mate in one.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/party.css">
 </head>
 <body class="game-page">
   <header class="topbar">
     <a class="back" href="index.html">&larr; <span>Games</span></a>
-    <div class="tb-title">Daily Word <span class="dw-num" id="num"></span></div>
+    <div class="tb-title">Daily Chess</div>
     <button class="btn ghost" type="button" onclick="GameUtil.openSettings()">Settings</button>
   </header>
-  <nav class="dtabs"><a href="daily.html" aria-current="page">📝 Word</a><a href="daily-sudoku.html">🔢 Sudoku</a><a href="daily-chess.html">♞ Chess</a></nav>
-  <main class="dw">
-    <div class="dw-grid" id="grid"></div>
-    <div class="dw-done" id="done" hidden>
-      <strong id="doneTitle"></strong>
-      <span id="doneSub"></span>
-      <div class="dw-stats" id="stats"></div>
-      <button class="btn primary" id="share" type="button">Share result</button>
-      <small id="next"></small>
-    </div>
-    <div class="dw-keys" id="keys"></div>
+  <nav class="dtabs"><a href="daily.html">📝 Word</a><a href="daily-sudoku.html">🔢 Sudoku</a><a href="daily-chess.html" aria-current="page">♞ Chess</a></nav>
+  <main class="dw dc">
+    <p class="dc-who" id="who"></p>
+    <div class="ch-board live" id="board" style="--b: min(92vw, 480px, calc(100vh - 260px))"></div>
+    <p class="dc-tries" id="tries"></p>
+    <div class="dw-done" id="done" hidden><strong>Nice! 🎉</strong><span>New puzzle tomorrow.</span></div>
+    <p class="sd-streak" id="streak"></p>
   </main>
   <script src="js/net.js"></script>
-  <script src="js/daily.js"></script>
+  <script src="js/chess-puzzles.js"></script>
+  <script type="module" src="js/daily-chess.js"></script>
 </body>
 </html>

@@ -131,6 +131,7 @@
       if (S.food.length > 40) S.food.length = 40;
       const alive = S.snakes.filter((s) => s.alive);
       if (alive.length <= (S.snakes.length > 1 ? 1 : 0)) {
+        if (S.snakes.length === 1) S.soloLen = S.snakes[0].body.length; // practice: how long did you get?
         const winner = alive[0] ? S.players.find((p) => p.id === alive[0].id) : null;
         if (winner) winner.wins++;
         S.rw = winner ? winner.id : -1;
@@ -145,7 +146,7 @@
     }
     function snapshot(full, events = []) {
       return {
-        t: "k", n: S.n, phase: S.phase, rw: S.rw, w: S.w, tick: TICK_MS, count: S.phase === "count" ? S.timer : 0, z: S.zone,
+        t: "k", n: S.n, phase: S.phase, rw: S.rw, w: S.w, tick: TICK_MS, count: S.phase === "count" ? S.timer : 0, z: S.zone, sl: S.soloLen || 0,
         zn: ROYALE && S.zone < maxZone ? Math.max(0, SHRINK_EVERY - ((S.roundTicks - SHRINK_AFTER) % SHRINK_EVERY + SHRINK_EVERY) % SHRINK_EVERY) + Math.max(0, SHRINK_AFTER - S.roundTicks) : -1,
         players: full ? S.players : undefined,
         s: S.snakes.map((s) => ({ id: s.id, c: s.c, a: s.alive ? 1 : 0, d: s.dir, b: s.body.flat(), g: s.grow > 0 ? 1 : 0 })),
@@ -304,7 +305,11 @@
         banner(n > 0 ? String(n) : "GO", 110);
       } else if (V.phase === "pause" || V.phase === "done") {
         const p = players.find((x) => x.id === V.rw);
-        banner(p ? (p.id === room.myId ? "ROUND TO YOU" : `${p.name.toUpperCase()} TAKES IT`) : "NO SURVIVORS", 56);
+        if (V.s.length === 1) {
+          let best = 0;
+          try { best = Math.max(+localStorage.getItem("oxidpvp-snake-best") || 0, V.sl); localStorage.setItem("oxidpvp-snake-best", best); } catch {}
+          banner(`LENGTH ${V.sl} · BEST ${best}`, 50);
+        } else banner(p ? (p.id === room.myId ? "ROUND TO YOU" : `${p.name.toUpperCase()} TAKES IT`) : "NO SURVIVORS", 56);
       }
     }
     for (const p of particles) {
@@ -355,8 +360,8 @@
   } : {
     game: "snake",
     title: "Snake Battle",
-    subtitle: "Eat, grow, and make everyone else crash. Last snake alive takes the round; first to 3 wins. 2 to 4 players.",
-    min: 2,
+    subtitle: "Eat, grow, and make everyone else crash. Last snake alive takes the round; first to 3 wins. 2 to 4 players, or start alone to practice.",
+    min: 1,
     max: 4,
   }, {
     onStart(r) {
