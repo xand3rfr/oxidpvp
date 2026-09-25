@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>try{var t=JSON.parse(localStorage.getItem("oxidpvp-theme")||"{}"),d=document.documentElement;if(t.mode==="light")d.dataset.theme="light";if(t.accent&&t.accent!=="violet")d.dataset.accent=t.accent}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#07070a">
+  <title>Suggestions · OXIDPVP</title>
+  <meta name="description" content="Suggest games and features for OXIDPVP, and upvote the best ideas.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-in">
+      <a class="brand" href="index.html"><i class="brand-mark"></i><span>OXID<b>PVP</b></span></a>
+      <div class="nav-links">
+        <a href="index.html#games">Games</a>
+        <a href="rooms.html">Public rooms</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <a href="suggestions.html" aria-current="page">Suggestions</a>
+        <a href="changelog.html">Changelog</a>
+      </div>
+      <div class="nav-right">
+        <a class="btn primary" href="index.html#games">Play now</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="hub">
+    <div class="wrap page">
+      <div class="page-head">
+        <div>
+          <h1>Suggestions</h1>
+          <p class="muted">Got an idea for a game or feature? Post it here and upvote the ones you want most.</p>
+        </div>
+        <div class="seg sg-sort"><button type="button" data-s="top" class="on">Top</button><button type="button" data-s="new">New</button></div>
+      </div>
+      <form class="sg-form" id="form" autocomplete="off">
+        <textarea id="text" maxlength="280" rows="3" placeholder="I think OXIDPVP should add…" aria-label="Your suggestion"></textarea>
+        <div class="sg-row"><input id="name" maxlength="16" placeholder="Your name (optional)" aria-label="Your name"><span class="sg-count" id="count">0 / 280</span><button class="btn primary" type="submit">Post idea</button></div>
+        <p class="sg-err" id="err" aria-live="polite"></p>
+      </form>
+      <p class="muted sg-total" id="total"></p>
+      <div class="sg-list" id="list"></div>
+      <div class="empty" id="empty" hidden><div class="empty-ico">💡</div><h2>No ideas yet</h2><p class="muted">Be the first to suggest something.</p></div>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      let sort = "top";
+      $("name").value = localStorage.getItem("oxidpvp-name") || "";
+      $("text").addEventListener("input", () => { $("count").textContent = `${$("text").value.length} / 280`; });
+      const ago = (t) => { const s = (Date.now() - t) / 1000; return s < 60 ? "just now" : s < 3600 ? `${Math.floor(s / 60)}m ago` : s < 86400 ? `${Math.floor(s / 3600)}h ago` : `${Math.floor(s / 86400)}d ago`; };
+      async function load() {
+        let d;
+        try { d = await (await fetch("/api/suggestions?sort=" + sort)).json(); } catch { return; }
+        const list = $("list");
+        list.textContent = "";
+        $("empty").hidden = d.rows.length > 0;
+        $("total").textContent = d.total ? `${d.total} idea${d.total === 1 ? "" : "s"} so far` : "";
+        for (const r of d.rows) {
+          const el = document.createElement("div");
+          el.className = "sg-item";
+          el.innerHTML = `<button class="sg-vote" type="button" aria-label="Upvote"><span>▲</span><b></b></button><div class="sg-body"><p></p><small></small></div>`;
+          const vb = el.querySelector(".sg-vote");
+          vb.classList.toggle("on", r.voted);
+          vb.querySelector("b").textContent = r.votes;
+          el.querySelector("p").textContent = r.text;
+          el.querySelector("small").textContent = `${r.name} · ${ago(r.created)}`;
+          vb.addEventListener("click", async () => {
+            vb.disabled = true;
+            try {
+              const res = await (await fetch("/api/suggestions/vote", { method: "POST", body: JSON.stringify({ id: r.id }) })).json();
+              if (res.ok) { vb.classList.toggle("on", res.voted); vb.querySelector("b").textContent = res.votes; GameUtil.sfx(res.voted ? "pop" : "click"); }
+            } catch {}
+            vb.disabled = false;
+          });
+          list.append(el);
+        }
+      }
+      for (const b of document.querySelectorAll(".sg-sort button")) b.addEventListener("click", () => {
+        sort = b.dataset.s;
+        document.querySelectorAll(".sg-sort button").forEach((x) => x.classList.toggle("on", x === b));
+        load();
+      });
+      $("form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        $("err").textContent = "";
+        const text = $("text").value.trim();
+        if (text.length < 6) { $("err").textContent = "Write a bit more than that."; return; }
+        const btn = e.target.querySelector("button[type=submit]");
+        btn.disabled = true;
+        try {
+          const res = await (await fetch("/api/suggestions", { method: "POST", body: JSON.stringify({ text, name: $("name").value }) })).json();
+          if (res.ok) { $("text").value = ""; $("count").textContent = "0 / 280"; GameUtil.toast("Thanks! Your idea is posted."); GameUtil.sfx("good"); sort = "new"; document.querySelectorAll(".sg-sort button").forEach((x) => x.classList.toggle("on", x.dataset.s === "new")); load(); }
+          else $("err").textContent = res.error || "Couldn't post that.";
+        } catch { $("err").textContent = "Couldn't reach the server. Try again."; }
+        btn.disabled = false;
+      });
+      load();
+      setInterval(load, 30000);
+    })();
+  </script>
+</body>
+</html>

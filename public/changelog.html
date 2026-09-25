@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>try{var t=JSON.parse(localStorage.getItem("oxidpvp-theme")||"{}"),d=document.documentElement;if(t.mode==="light")d.dataset.theme="light";if(t.accent&&t.accent!=="violet")d.dataset.accent=t.accent}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#07070a">
+  <title>Changelog · OXIDPVP</title>
+  <meta name="description" content="Everything new on OXIDPVP.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-in">
+      <a class="brand" href="index.html"><i class="brand-mark"></i><span>OXID<b>PVP</b></span></a>
+      <div class="nav-links">
+        <a href="index.html#games">Games</a>
+        <a href="rooms.html">Public rooms</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <a href="suggestions.html">Suggestions</a>
+        <a href="changelog.html" aria-current="page">Changelog</a>
+      </div>
+      <div class="nav-right">
+        <a class="btn primary" href="index.html#games">Play now</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="hub">
+    <div class="wrap page">
+      <div class="page-head"><div><h1>Changelog</h1><p class="muted">Everything that's changed on OXIDPVP, newest first.</p></div><a class="btn" href="suggestions.html">Suggest something</a></div>
+      <div class="cl-list" id="list"></div>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script src="js/changelog.js"></script>
+  <script>
+    (() => {
+      const list = document.getElementById("list");
+      for (const r of window.CHANGELOG) {
+        const el = document.createElement("article");
+        el.className = "cl-item";
+        el.innerHTML = `<div class="cl-meta"><span class="cl-v"></span><time></time></div><div><h2></h2><ul></ul></div>`;
+        el.querySelector(".cl-v").textContent = "v" + r.v;
+        el.querySelector("time").textContent = new Date(r.date + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+        el.querySelector("h2").textContent = r.title;
+        for (const it of r.items) { const li = document.createElement("li"); li.textContent = it; el.querySelector("ul").append(li); }
+        list.append(el);
+      }
+      try { localStorage.setItem("oxidpvp-seen-version", window.CHANGELOG[0].v); } catch {}
+    })();
+  </script>
+</body>
+</html>

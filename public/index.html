@@ -22,12 +22,14 @@
         <a href="#games">Games</a>
         <a href="rooms.html">Public rooms</a>
         <a href="leaderboard.html">Leaderboard</a>
+        <a href="suggestions.html">Suggestions</a>
+        <a href="changelog.html" id="navChangelog">Changelog</a>
         <a href="daily.html">Daily Word</a>
       </div>
       <div class="nav-right">
         <span class="status-pill"><i></i>Servers online</span>
-        <button class="btn ghost" id="navFriends" type="button">Friends</button>
-        <button class="btn ghost" id="navSettings" type="button">Settings</button>
+        <button class="btn ghost nav-icon" id="navFriends" type="button" title="Friends" aria-label="Friends"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c1.8.7 3 2.4 3.5 5.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        <button class="btn ghost nav-icon" id="navSettings" type="button" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2.1 1.2M17.7 15.3l2.1 1.2M4.2 16.5l2.1-1.2M17.7 8.7l2.1-1.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
         <a class="btn primary" href="#games">Play now</a>
       </div>
     </div>
@@ -978,6 +980,7 @@
   </div>
 
   <script src="js/net.js"></script>
+  <script src="js/changelog.js"></script>
   <script>
     (() => {
       const cards = [...document.querySelectorAll("#cards .game-card")];
@@ -999,6 +1002,11 @@
       try { saved = localStorage.getItem("oxidpvp-filter") || "all"; } catch {}
       apply(buttons.some((b) => b.dataset.f === saved) ? saved : "all");
 
+      // "What's new" dot until the latest changelog entry has been seen.
+      try {
+        const latest = window.CHANGELOG[0].v, link = document.getElementById("navChangelog");
+        if (link && localStorage.getItem("oxidpvp-seen-version") !== latest) { const d = document.createElement("i"); d.className = "nav-dot"; link.append(d); }
+      } catch {}
       document.getElementById("navSettings").addEventListener("click", () => GameUtil.openSettings());
       document.getElementById("navFriends").addEventListener("click", () => GameUtil.openFriends());
 

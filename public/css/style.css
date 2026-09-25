@@ -484,7 +484,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
   .steps3 { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
-  .nav-links { display: none; }
+  .nav-links { overflow-x: auto; scrollbar-width: none; gap: 16px; mask-image: linear-gradient(90deg, #000 85%, transparent); }
   .topbar { padding: 0 10px; height: 54px; gap: 8px; }
   .topbar .back span, .scoreboard .name { display: none; }
   .scoreboard { padding: 4px 10px; gap: 10px; }
@@ -711,3 +711,41 @@ body.touching .touch-ui { display: block; }
 
 /* Faster first paint: skip rendering off-screen game cards until they scroll into view. */
 .cards .game-card { content-visibility: auto; contain-intrinsic-size: auto 400px; }
+
+/* ---------- Suggestions + changelog ---------- */
+.sg-sort { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); }
+.sg-sort button { padding: 6px 16px; border-radius: 8px; font-size: 14px; color: var(--muted); }
+.sg-sort button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.sg-form { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line-2); margin-bottom: 18px; }
+.sg-form textarea, .sg-form input { width: 100%; border-radius: 10px; background: var(--field); border: 1px solid var(--line-2); color: var(--text); font: 500 15px var(--sans); padding: 10px 12px; outline: none; resize: vertical; }
+.sg-form textarea:focus, .sg-form input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .2); }
+.sg-row { display: flex; gap: 10px; align-items: center; }
+.sg-row input { flex: 1; max-width: 240px; }
+.sg-count { margin-left: auto; font: 500 12px var(--mono); color: var(--dim); }
+.sg-err { color: var(--danger); font-size: 13px; min-height: 18px; }
+.sg-total { margin-bottom: 10px; font-size: 13px; }
+.sg-list { display: flex; flex-direction: column; gap: 8px; }
+.sg-item { display: flex; gap: 14px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.sg-vote { display: flex; flex-direction: column; align-items: center; min-width: 48px; padding: 6px 0; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface-2); color: var(--muted); }
+.sg-vote span { font-size: 12px; } .sg-vote b { font: 700 16px var(--mono); color: var(--text); }
+.sg-vote.on { border-color: var(--accent); background: rgba(var(--accent-rgb), .16); color: var(--accent-hi); }
+.sg-body p { font-size: 15px; line-height: 1.45; word-break: break-word; }
+.sg-body small { font-size: 12px; color: var(--dim); }
+.cl-list { display: flex; flex-direction: column; gap: 14px; }
+.cl-item { display: grid; grid-template-columns: 130px 1fr; gap: 18px; padding: 18px 20px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); }
+.cl-item:first-child { border-color: rgba(var(--accent-rgb), .45); }
+.cl-meta { display: flex; flex-direction: column; gap: 4px; }
+.cl-v { font: 700 15px var(--mono); color: var(--accent-hi); }
+.cl-meta time { font-size: 12px; color: var(--dim); }
+.cl-item h2 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+.cl-item ul { padding-left: 18px; display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 14px; }
+.nav-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); margin-left: 5px; vertical-align: 2px; }
+@media (max-width: 640px) { .cl-item { grid-template-columns: 1fr; gap: 8px; } .sg-row { flex-wrap: wrap; } .sg-row input { max-width: none; } }
+
+.nav-links a { white-space: nowrap; }
+.nav-icon { width: 38px; padding: 0; display: inline-grid; place-items: center; }
+.nav-icon svg { width: 18px; height: 18px; }
+@media (max-width: 1340px) { .nav .status-pill { display: none; } .nav-links { gap: 18px; } }
+@media (max-width: 1100px) { .nav-in { gap: 18px; } .nav-links { gap: 14px; font-size: 13px; } }
+.nav .btn { white-space: nowrap; }
+@media (max-width: 480px) { .nav .btn.primary { padding: 0 12px; } .nav-right { gap: 6px; } }

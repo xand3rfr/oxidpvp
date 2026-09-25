@@ -48,6 +48,17 @@ export default {
       if (!/^[a-z0-9]+$/.test(game)) return json({ error: "bad-game" }, 400);
       return env.BOARD.get(env.BOARD.idFromName("board")).fetch(new Request("https://board/top?game=" + game));
     }
+    if (url.pathname === "/api/suggestions" || url.pathname === "/api/suggestions/vote") {
+      const ip = request.headers.get("CF-Connecting-IP") || "local";
+      const board = env.BOARD.get(env.BOARD.idFromName("board"));
+      if (request.method === "GET") return board.fetch(new Request("https://board/sugg?sort=" + (url.searchParams.get("sort") === "new" ? "new" : "top") + "&ip=" + encodeURIComponent(ip)));
+      if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+      const origin = request.headers.get("Origin");
+      if (origin && new URL(origin).host !== url.host) return new Response("Forbidden", { status: 403 });
+      const body = await request.text();
+      if (body.length > 2000) return json({ error: "too-long" }, 413);
+      return board.fetch(new Request("https://board/" + (url.pathname.endsWith("vote") ? "vote" : "suggest") + "?ip=" + encodeURIComponent(ip), { method: "POST", body }));
+    }
     if (url.pathname === "/api/presence") {
       if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected WebSocket", { status: 426 });
       const origin = request.headers.get("Origin");
@@ -303,9 +314,55 @@ export class Leaderboard extends DurableObject {
       game TEXT NOT NULL, key TEXT NOT NULL, name TEXT NOT NULL,
       w INTEGER NOT NULL DEFAULT 0, l INTEGER NOT NULL DEFAULT 0, d INTEGER NOT NULL DEFAULT 0,
       updated INTEGER NOT NULL, PRIMARY KEY (game, key))`);
+    // Suggestions box: ideas from players, upvoted once per visitor (keyed by a hash of their IP).
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS sugg (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, name TEXT NOT NULL, votes INTEGER NOT NULL DEFAULT 1,
+      created INTEGER NOT NULL, who TEXT NOT NULL)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS sugg_votes (sid INTEGER NOT NULL, who TEXT NOT NULL, PRIMARY KEY (sid, who))`);
+    this.lastPost = new Map();
+  }
+  async who(ip) {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("oxidpvp:" + ip));
+    return [...new Uint8Array(buf)].slice(0, 12).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  async suggestions(url, request) {
+    const who = await this.who(url.searchParams.get("ip") || "local");
+    if (url.pathname === "/sugg") {
+      const order = url.searchParams.get("sort") === "new" ? "created DESC" : "votes DESC, created DESC";
+      const rows = this.sql.exec(`SELECT id, text, name, votes, created FROM sugg ORDER BY ${order} LIMIT 200`).toArray();
+      const mine = new Set(this.sql.exec(`SELECT sid FROM sugg_votes WHERE who = ?`, who).toArray().map((r) => r.sid));
+      return json({ rows: rows.map((r) => ({ ...r, voted: mine.has(r.id) })), total: this.sql.exec(`SELECT COUNT(*) AS n FROM sugg`).one().n });
+    }
+    let body;
+    try { body = JSON.parse(await request.text()); } catch { return json({ error: "bad-json" }, 400); }
+    if (url.pathname === "/suggest") {
+      const text = String(body.text || "").replace(/[\u0000-\u001f<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 280);
+      const name = cleanName(body.name) || "Anonymous";
+      if (text.length < 6) return json({ error: "Write a bit more than that." }, 400);
+      if (rude(text) || rude(name)) return json({ error: "Keep it friendly, please." }, 400);
+      const now = Date.now(), last = this.lastPost.get(who) || 0;
+      if (now - last < 60000) return json({ error: "One suggestion a minute, please." }, 429);
+      const today = this.sql.exec(`SELECT COUNT(*) AS n FROM sugg WHERE who = ? AND created > ?`, who, now - 86400000).one().n;
+      if (today >= 10) return json({ error: "That's plenty for today. Thanks!" }, 429);
+      if (this.sql.exec(`SELECT COUNT(*) AS n FROM sugg WHERE lower(text) = lower(?)`, text).one().n) return json({ error: "Someone already suggested that. Upvote it instead!" }, 409);
+      this.lastPost.set(who, now);
+      const id = this.sql.exec(`INSERT INTO sugg (text, name, votes, created, who) VALUES (?, ?, 1, ?, ?) RETURNING id`, text, name, now, who).one().id;
+      this.sql.exec(`INSERT OR IGNORE INTO sugg_votes (sid, who) VALUES (?, ?)`, id, who);
+      return json({ ok: true, id });
+    }
+    if (url.pathname === "/vote") {
+      const id = body.id | 0;
+      if (!this.sql.exec(`SELECT COUNT(*) AS n FROM sugg WHERE id = ?`, id).one().n) return json({ error: "not-found" }, 404);
+      const had = this.sql.exec(`SELECT COUNT(*) AS n FROM sugg_votes WHERE sid = ? AND who = ?`, id, who).one().n;
+      if (had) { this.sql.exec(`DELETE FROM sugg_votes WHERE sid = ? AND who = ?`, id, who); this.sql.exec(`UPDATE sugg SET votes = votes - 1 WHERE id = ?`, id); }
+      else { this.sql.exec(`INSERT INTO sugg_votes (sid, who) VALUES (?, ?)`, id, who); this.sql.exec(`UPDATE sugg SET votes = votes + 1 WHERE id = ?`, id); }
+      return json({ ok: true, voted: !had, votes: this.sql.exec(`SELECT votes FROM sugg WHERE id = ?`, id).one().votes });
+    }
+    return json({ error: "not-found" }, 404);
   }
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname === "/sugg" || url.pathname === "/suggest" || url.pathname === "/vote") return this.suggestions(url, request);
     if (url.pathname === "/add" && request.method === "POST") {
       const { game, name, r } = await request.json();
       const col = { win: "w", loss: "l", draw: "d" }[r];
