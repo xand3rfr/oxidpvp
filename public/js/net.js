@@ -46,7 +46,6 @@
     { id: "phone", page: "telephone", title: "Telephone", min: 3, max: 8 },
     { id: "poker", page: "poker", title: "Poker", min: 2, max: 8 },
     { id: "cup", page: "tournament", title: "Tournament", min: 3, max: 8 },
-    { id: "casino", page: "casino", title: "Casino", min: 1, max: 8 },
     { id: "wordhunt", page: "wordhunt", title: "Word Hunt", min: 1, max: 8 },
     { id: "categories", page: "categories", title: "Categories", min: 2, max: 8 },
     { id: "emoji", page: "emoji", title: "Emoji Guess", min: 1, max: 10 },
@@ -431,7 +430,7 @@
   // Game of the Day: one game a day (same for everyone) that gives double XP.
   const dayNo = () => { const d = new Date(); return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5); };
   function gameOfDay() {
-    const pool = GAMES.filter((g) => g.id !== "cup" && g.id !== "casino");
+    const pool = GAMES.filter((g) => g.id !== "cup" && !g.hidden);
     return pool[(Math.imul(dayNo() ^ 0x5bd1e995, 2654435761) >>> 0) % pool.length];
   }
   function record(game, result) {
@@ -517,9 +516,9 @@
   }
   function passAdd(n) { const p = readPass(); p.xp += n; store.set(PASS_KEY, JSON.stringify(p)); }
   const PASS_REWARDS = [
-    { c: 250 }, { av: "🍓" }, { c: 300 }, { st: "heart" }, { c: 400 }, { f: 8 }, { c: 500 }, { st: "fire" }, { av: "🦋" }, { c: 750 },
-    { t: "icon" }, { st: "crown" }, { c: 1000 }, { av: "🌸" }, { f: 9 }, { c: 1200 }, { st: "skull" }, { av: "🪩" }, { c: 1500 }, { t: "nolife" },
-    { st: "money" }, { c: 2000 }, { av: "🐲" }, { f: 11 }, { c: 2500 }, { st: "rocket" }, { av: "🍒" }, { c: 3000 }, { f: 10 }, { f: 12, c: 5000 },
+    { st: "heart" }, { av: "🍓" }, { st: "ghost" }, { av: "🦩" }, { t: "menace" }, { f: 8 }, { st: "clown" }, { st: "fire" }, { av: "🦋" }, { t: "goat" },
+    { t: "icon" }, { st: "crown" }, { st: "brain" }, { av: "🌸" }, { f: 9 }, { t: "main" }, { st: "skull" }, { av: "🪩" }, { av: "🧁" }, { t: "nolife" },
+    { st: "money" }, { t: "sweaty" }, { av: "🐲" }, { f: 11 }, { st: "goat" }, { st: "rocket" }, { av: "🍒" }, { f: 10 }, { x: 500 }, { f: 12 },
   ];
   // Casino wallet (shared with casino.html): add or take play coins.
   const WALLET_KEY = "oxidpvp-wallet";
@@ -530,7 +529,7 @@
   };
   function grantReward(r) {
     const out = [];
-    if (r.c) { wallet.add(r.c); out.push(`${r.c.toLocaleString()} casino coins`); }
+    if (r.x) { addXP(r.x); out.push(`${r.x} bonus XP`); }
     if (r.av) { grant("av:" + r.av); out.push(`${r.av} avatar`); }
     if (r.f != null) { grant("frame:" + r.f); out.push(`${FRAMES[r.f].name} frame`); }
     if (r.t) { grant("title:" + r.t); out.push(`"${titleName(r.t)}" title`); }
@@ -647,7 +646,10 @@
     const st = readStats(), t = sum(st), m = readMeta();
     for (const a of ACHIEVEMENTS) if (!a.special && a.test(t, m, st)) unlock(a.id);
   }
-  const achievements = () => { const got = readAch(); return ACHIEVEMENTS.map((a) => ({ ...a, got: got[a.id] || 0 })); };
+  // Casino achievements only exist on casino.oxidpvp.net (it keeps its own progress).
+  const ON_CASINO = /^casino\./.test(location.hostname);
+  const CASINO_ACH = ["blackjack", "jackpot", "whale"];
+  const achievements = () => { const got = readAch(); return ACHIEVEMENTS.filter((a) => ON_CASINO || !CASINO_ACH.includes(a.id)).map((a) => ({ ...a, got: got[a.id] || 0 })); };
 
   // ---------- Titles (shown under your name) ----------
   const TITLE_KEY = "oxidpvp-title";
@@ -671,16 +673,16 @@
     { id: "pro", name: "Pro", desc: "Reach level 10", test: (t, m, st, got, lv) => lv >= 10 },
     { id: "legend", name: "Legend", desc: "Reach level 25", test: (t, m, st, got, lv) => lv >= 25 },
     { id: "sam", name: "Sam's Friend", desc: "Find the Sam corner", test: (t, m, st, got) => !!got.sam },
-    { id: "menace", name: "Pink Menace", desc: "Found in a casino crate", own: true },
-    { id: "goat", name: "The GOAT", desc: "Found in a casino crate", own: true },
-    { id: "main", name: "Main Character", desc: "Found in a casino crate", own: true },
-    { id: "sweaty", name: "Sweaty", desc: "Found in a casino crate", own: true },
+    { id: "menace", name: "Pink Menace", desc: "Season pass reward", own: true },
+    { id: "goat", name: "The GOAT", desc: "Season pass reward", own: true },
+    { id: "main", name: "Main Character", desc: "Season pass reward", own: true },
+    { id: "sweaty", name: "Sweaty", desc: "Season pass reward", own: true },
     { id: "nolife", name: "No Life", desc: "Season pass reward", own: true },
     { id: "icon", name: "Icon", desc: "Season pass reward", own: true },
   ];
   function titleList() {
     const st = readStats(), t = sum(st), m = readMeta(), got = readAch(), lv = level();
-    return TITLES.map((x) => ({ id: x.id, name: x.name, desc: x.desc, got: x.own ? owns("title:" + x.id) : !!x.test(t, m, st, got, lv) }));
+    return TITLES.filter((x) => ON_CASINO || !["lucky", "whale"].includes(x.id)).map((x) => ({ id: x.id, name: x.name, desc: x.desc, got: x.own ? owns("title:" + x.id) : !!x.test(t, m, st, got, lv) }));
   }
   const titleName = (id) => (TITLES.find((x) => x.id === id) || {}).name || "";
   function myTitle() {
@@ -1416,7 +1418,7 @@
         list.append(v);
       }
       for (const g of GAMES) {
-        if (g.id === switchCtx.game) continue;
+        if (g.id === switchCtx.game || g.hidden) continue;
         const b = document.createElement("button");
         b.type = "button";
         b.className = "switch-item";
@@ -1610,7 +1612,7 @@
       startPoll(cur, onDone) {
         if (!isHost() || (poll && !poll.done)) return;
         const n = people().length;
-        const others = shuffle(GAMES.filter((g) => g.id !== cur && fits(g, n))).slice(0, 5).map((g) => g.id);
+        const others = shuffle(GAMES.filter((g) => g.id !== cur && !g.hidden && fits(g, n))).slice(0, 5).map((g) => g.id);
         poll = { id: Math.random().toString(36).slice(2, 8), opts: [cur, ...others], cur, votes: new Map(), ends: Date.now() + POLL_MS, onDone };
         poll.timer = setTimeout(finishPoll, POLL_MS);
         pollSend();
@@ -2538,7 +2540,7 @@
     fitCanvas, toast, loop, shuffle, touchControls, isTouch: () => touchMode, openSettings, openFriends, achieve: unlock, achievements, friendCode: () => identity.id,
     level, xp: readXP, xpFor, addXP, weekly: weeklyView, dailySolved, frames: FRAMES, bonusAvatars: BONUS_AV,
     meta: readMeta, onNameChange: (f) => nameListeners.push(f), myName: savedName, myAvatar, avatar: avatarEl, cleanName,
-    sfx: (n) => sfx.play(n), record, stats: readStats, games: GAMES, joinByCode, pageFor, gameById,
+    sfx: (n) => sfx.play(n), record, stats: readStats, games: GAMES.filter((g) => !g.hidden), joinByCode, pageFor, gameById,
     gameOfDay, history: readHistory, pass: passView, passClaim, wallet, stickers: () => STICKERS, myStickers, titles: titleList, myTitle, setTitle, titleName, grant, owns, profile: myProf,
     clan: readClan, setClan: (c) => store.set(CLAN_KEY, c ? JSON.stringify(c) : ""), fid: () => identity.id, fidKey: () => ({ fid: identity.id, key: identity.key }),
     startPoll: () => dock.poll(), canPoll: () => dock.canPoll(),

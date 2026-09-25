@@ -59,37 +59,6 @@ export default {
       if (body.length > 2000) return json({ error: "too-long" }, 413);
       return board.fetch(new Request("https://board/" + (url.pathname.endsWith("vote") ? "vote" : "suggest") + "?ip=" + encodeURIComponent(ip), { method: "POST", body }));
     }
-    if (url.pathname === "/api/casino") {
-      const board = env.BOARD.get(env.BOARD.idFromName("board"));
-      if (request.method === "GET") return board.fetch(new Request("https://board/casino-top"));
-      if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
-      const origin = request.headers.get("Origin");
-      if (origin && new URL(origin).host !== url.host) return new Response("Forbidden", { status: 403 });
-      const body = await request.text();
-      if (body.length > 500) return json({ error: "too-long" }, 413);
-      const ip = request.headers.get("CF-Connecting-IP") || "local";
-      return board.fetch(new Request("https://board/casino-set?ip=" + encodeURIComponent(ip), { method: "POST", body }));
-    }
-    if (url.pathname === "/api/ranked" && request.method === "GET") {
-      const name = (url.searchParams.get("name") || "").slice(0, 16);
-      return env.BOARD.get(env.BOARD.idFromName("board")).fetch(new Request("https://board/ranked?name=" + encodeURIComponent(name)));
-    }
-    // Clans. Reading is open; changes need your friend code + key (checked with Presence).
-    if (url.pathname === "/api/clans" && request.method === "GET") {
-      const q = new URLSearchParams({ tag: url.searchParams.get("tag") || "", fid: url.searchParams.get("fid") || "" });
-      return env.BOARD.get(env.BOARD.idFromName("board")).fetch(new Request("https://board/clan/get?" + q));
-    }
-    if (url.pathname === "/api/clans" && request.method === "POST") {
-      const origin = request.headers.get("Origin");
-      if (origin && new URL(origin).host !== url.host) return new Response("Forbidden", { status: 403 });
-      const raw = await request.text();
-      if (raw.length > 1000) return json({ error: "too-long" }, 413);
-      let b;
-      try { b = JSON.parse(raw); } catch { return json({ error: "bad-json" }, 400); }
-      const v = await env.PRESENCE.get(env.PRESENCE.idFromName("presence")).fetch(new Request("https://presence/verify?" + new URLSearchParams({ id: String(b.fid || ""), key: String(b.key || "") })));
-      if (!(await v.json()).ok) return json({ error: "Couldn't confirm who you are. Reload the page and try again." }, 403);
-      return env.BOARD.get(env.BOARD.idFromName("board")).fetch(new Request("https://board/clan/" + String(b.action || "").replace(/[^a-z]/g, ""), { method: "POST", body: raw }));
-    }
     if (url.pathname === "/api/announce" && request.method === "GET") {
       return env.BOARD.get(env.BOARD.idFromName("board")).fetch(new Request("https://board/announce"));
     }
@@ -113,8 +82,6 @@ export default {
       return env.PRESENCE.get(env.PRESENCE.idFromName("presence")).fetch(request);
     }
     if (url.pathname.startsWith("/api/")) return new Response("Not found", { status: 404 });
-    // casino.oxidpvp.net: the front page is the casino. Every other file is shared with the main site.
-    if (url.hostname.startsWith("casino.") && url.pathname === "/") return env.ASSETS.fetch(new Request(new URL("/casino", url), request));
     return env.ASSETS.fetch(request);
   },
 };

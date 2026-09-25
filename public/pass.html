@@ -34,7 +34,7 @@
         <div>
           <p class="ps-kicker" id="psSeason"></p>
           <h1>Season Pass</h1>
-          <p class="muted">Every bit of XP you earn this month fills the pass. 30 tiers of free rewards: casino coins, avatars, frames, titles and stickers. Everything resets on the 1st.</p>
+          <p class="muted">Every bit of XP you earn this month fills the pass. 30 tiers of free rewards: avatars, frames, titles, stickers and bonus XP. Everything resets on the 1st.</p>
         </div>
         <div class="ps-now">
           <b id="psTier"></b>
@@ -61,12 +61,12 @@
         if (r.av) return r.av;
         if (r.t) return "🏷️";
         if (r.f != null) return "🖼️";
-        return "🪙";
+        return "⭐";
       }
       function label(r) {
         const parts = [];
         if (r.f != null) parts.push(frames[r.f].name + " frame");
-        if (r.c) parts.push(r.c.toLocaleString() + " coins");
+        if (r.x) parts.push(r.x + " bonus XP");
         if (r.av) parts.push("Avatar");
         if (r.t) parts.push(`“${GameUtil.titleName(r.t)}”`);
         if (r.st) parts.push("Sticker");

@@ -2,8 +2,6 @@
 // 8 hands. The host shuffles, deals and runs the betting (side pots included) and only sends
 // each player their own hole cards until a showdown. Last player with chips wins, or whoever
 // has the most after 30 hands.
-// Casino stakes (host option): everyone buys in with up to 1000 of their saved casino coins and
-// cashes out whatever they finish with.
 (() => {
   const START = 1000, BLINDS = [10, 20], BLIND_EVERY = 8, MAX_HANDS = 30, TURN_MS = 30000, RESULT_MS = 5500, RUNOUT_MS = 1100;
   const RANKS = "23456789TJQKA", SUITS = "shdc", SUIT_CH = { s: "♠", h: "♥", d: "♦", c: "♣" };
@@ -63,14 +61,12 @@
     const inHand = () => G.players.filter((p) => !p.folded && !p.out);
     const nextSeat = (i, pred) => { for (let k = 1; k <= G.players.length; k++) { const j = (i + k) % G.players.length; if (pred(P(j))) return j; } return -1; };
 
-    const wal = {};
     function view(id) {
       const me = seatOf(id), showdown = G.phase === "result" && G.result && G.result.show;
       const p = P(me);
       const v = {
         t: "st", phase: G.phase, hand: G.hand, maxHands: MAX_HANDS, sb: G.sb, bb: G.bb, dealer: G.dealer, board: G.board, street: G.street,
-        toAct: G.toAct, bet: G.bet, pot: G.players.reduce((a, q) => a + q.total, 0), result: G.result, log: G.log, stakes: !!G.stakes, game: G.gameNo,
-        start: p ? p.start : 0,
+        toAct: G.toAct, bet: G.bet, pot: G.players.reduce((a, q) => a + q.total, 0), result: G.result, log: G.log,
         left: Math.max(0, G.ends - Date.now()), me,
         players: G.players.map((q) => ({
           id: q.id, name: q.name, av: q.av, chips: q.chips, bet: q.bet, folded: q.folded, allIn: q.allIn, out: q.out, gone: q.gone, last: q.last,
@@ -87,13 +83,7 @@
     function newGame() {
       clearTimeout(G.timer);
       const gone = new Set(G.players.filter((p) => p.gone).map((p) => p.id));
-      G.stakes = stakes; G.gameNo = (G.gameNo || 0) + 1;
-      G.players = room.players.filter((p) => !gone.has(p.id)).map((p) => {
-        // Casino stakes: buy in with up to START of your wallet; under 100 coins sits this one out.
-        const chips = G.stakes ? Math.min(START, Math.max(0, Math.floor(wal[p.id] || 0))) : START;
-        const sit = G.stakes && chips < 100;
-        return { id: p.id, name: p.name, av: p.av, chips: sit ? 0 : chips, start: sit ? 0 : chips, bet: 0, total: 0, cards: [], folded: false, allIn: false, out: sit, gone: false, last: sit ? "Not enough coins" : "" };
-      });
+      G.players = room.players.filter((p) => !gone.has(p.id)).map((p) => ({ id: p.id, name: p.name, av: p.av, chips: START, bet: 0, total: 0, cards: [], folded: false, allIn: false, out: false, gone: false, last: "" }));
       G.hand = 0; G.dealer = -1;
       startHand();
     }
@@ -259,7 +249,7 @@
       if (G.players.filter((q) => !q.gone && (!q.out || G.phase === "end")).length < 2 && G.phase !== "end") return endGame();
       publish();
     }
-    return { G, newGame, act, leave, view, stop: () => clearTimeout(G.timer), wallet: (id, c) => { wal[id] = +c || 0; } };
+    return { G, newGame, act, leave, view, stop: () => clearTimeout(G.timer) };
   }
 
   // =====================================================================
@@ -334,7 +324,6 @@
     if (v.opts && !(prev && prev.opts && prev.toAct === v.toAct && prev.street === v.street && prev.bet === v.bet)) GameUtil.sfx("turn");
     if (prev && prev.board.length < v.board.length) GameUtil.sfx("pop");
     if (v.phase === "result" && (!prev || prev.phase !== "result")) GameUtil.sfx(v.result.wins.some((w) => w.id === room.myId) ? "good" : "tick");
-    settle(v);
     if (v.phase === "end" && (!prev || prev.phase !== "end")) {
       const sorted = [...v.players].sort((a, b) => b.chips - a.chips);
       const won = sorted[0] && sorted[0].id === room.myId;
@@ -342,37 +331,6 @@
       GameUtil.record("poker", won ? "win" : "loss");
       results({ title: won ? "You cleaned them out!" : `${sorted[0].name} wins`, rows: sorted.map((p) => ({ p, value: p.chips + " chips", win: p === sorted[0] })), isHost: room.isHost, meId: room.myId });
     } else if (v.phase !== "end") hideResults();
-  }
-
-  // Casino stakes: take the buy-in from the wallet when a game starts, pay out when it ends.
-  // Remembered per room + game so a reload doesn't charge you twice.
-  function settle(v) {
-    if (!v.stakes || !v.game) return;
-    const key = "oxid-poker-" + room.code + "-" + v.game;
-    let st = null;
-    try { st = sessionStorage.getItem(key); } catch {}
-    if (!st && v.start > 0) {
-      GameUtil.wallet.add(-v.start);
-      GameUtil.toast(`🪙 Bought in with ${v.start.toLocaleString()} casino coins`);
-      st = "paid";
-      try { sessionStorage.setItem(key, st); } catch {}
-    }
-    if (st === "paid" && v.phase === "end") {
-      const mine = v.players.find((p) => p.id === room.myId);
-      const back = mine ? mine.chips : 0;
-      GameUtil.wallet.add(back);
-      GameUtil.toast(back > v.start ? `🪙 +${(back - v.start).toLocaleString()} casino coins!` : back ? `🪙 ${back.toLocaleString()} coins back to your wallet` : "🪙 Busted. Better luck next time", 3200);
-      try { sessionStorage.setItem(key, "done"); } catch {}
-      room.send({ t: "wal", coins: GameUtil.wallet.coins() });
-    }
-  }
-  let stakes = false;
-  function buildSettings(el) {
-    try { stakes = localStorage.getItem("oxidpvp-poker-stakes") === "1"; } catch {}
-    el.innerHTML = `<label class="check"><input type="checkbox"> 🪙 Casino stakes: buy in with up to 1000 of everyone's saved casino coins</label>`;
-    const cb = el.querySelector("input");
-    cb.checked = stakes;
-    cb.addEventListener("change", () => { stakes = cb.checked; try { localStorage.setItem("oxidpvp-poker-stakes", stakes ? "1" : "0"); } catch {} });
   }
 
   $("fold").addEventListener("click", () => send("fold"));
@@ -389,7 +347,7 @@
     r.value = Math.max(V.opts.minTo, Math.min(V.opts.maxTo, target));
     $("raise").textContent = `${V.bet ? "Raise to" : "Bet"} ${r.value}`;
   });
-  $("again").addEventListener("click", () => { if (engine) { engine.wallet(room.myId, GameUtil.wallet.coins()); engine.newGame(); } });
+  $("again").addEventListener("click", () => { if (engine) engine.newGame(); });
 
   Room.mount({
     game: "poker",
@@ -397,21 +355,16 @@
     subtitle: "Texas Hold'em with play chips. Everyone starts with 1000. Last one with chips wins. 2 to 8 players.",
     min: 2,
     max: 8,
-    lobbyExtra: buildSettings,
     onStart(r) {
       room = r; V = null;
       if (r.isHost) {
         const out = { to: (id, m) => (id === r.myId ? onState(m) : r.sendTo(id, m)) };
         engine = createEngine(r, out);
-        engine.wallet(r.myId, GameUtil.wallet.coins());
-        r.onData((from, m) => { if (m && m.t === "act") engine.act(from, m.a, m.to); else if (m && m.t === "wal") engine.wallet(from, m.coins); });
+        r.onData((from, m) => { if (m && m.t === "act") engine.act(from, m.a, m.to); });
         r.onLeave((id) => engine.leave(id));
         r.onRejoin((id) => r.sendTo(id, engine.view(id)));
-        setTimeout(() => engine && engine.newGame(), stakes ? 1200 : 300); // give guests a moment to report their wallets
-      } else {
-        r.onData((_, m) => { if (m && m.t === "st") onState(m); });
-        r.send({ t: "wal", coins: GameUtil.wallet.coins() });
-      }
+        setTimeout(() => engine && engine.newGame(), 300);
+      } else r.onData((_, m) => { if (m && m.t === "st") onState(m); });
       return () => { if (engine) engine.stop(); if (stopClock) stopClock(); room = null; engine = null; V = null; hideResults(); };
     },
   });
