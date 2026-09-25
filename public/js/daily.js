@@ -95,7 +95,7 @@
     save();
     render(D.guesses.length - 1);
     sfx(won ? "win" : D.done ? "lose" : "pop");
-    if (won && window.GameUtil) { GameUtil.achieve("daily"); if (D.streak >= 7) GameUtil.achieve("daily7"); }
+    if (won && window.GameUtil) { GameUtil.dailySolved(); GameUtil.achieve("daily"); if (D.streak >= 7) GameUtil.achieve("daily7"); }
   }
   function shake() { const row = $("grid").children[D.guesses.length]; if (row) { row.classList.remove("shake"); void row.offsetWidth; row.classList.add("shake"); } }
   function type(k) {

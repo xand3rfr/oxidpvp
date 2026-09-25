@@ -775,3 +775,45 @@ body.touching .touch-ui { display: block; }
 .sq-c.bad { box-shadow: inset 0 0 0 4px var(--danger); }
 @media (max-width: 480px) { .sd-pad { grid-template-columns: repeat(5, 1fr); } }
 .avatar { flex: none; }
+
+/* ---------- Levels + cosmetics ---------- */
+.avatar { position: relative; }
+.av-lvl { position: absolute; right: -5px; bottom: -5px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line-3); color: var(--text); font: 800 9px/14px var(--mono); font-style: normal; text-align: center; }
+.avatar.fr-1 { box-shadow: 0 0 0 2px #b45309; }
+.avatar.fr-2 { box-shadow: 0 0 0 2px #d4d4d8, 0 0 8px rgba(255,255,255,.35); }
+.avatar.fr-3 { box-shadow: 0 0 0 2px #facc15, 0 0 12px rgba(250,204,21,.55); }
+.avatar.fr-4 { box-shadow: 0 0 0 2px #22d3ee, 0 0 14px #22d3ee; }
+.avatar.fr-5 { box-shadow: 0 0 0 2px transparent; background-clip: padding-box; outline: 2px solid transparent; animation: fr-rainbow 3s linear infinite; }
+@keyframes fr-rainbow { 0% { box-shadow: 0 0 0 2px #ef4444, 0 0 12px #ef4444; } 33% { box-shadow: 0 0 0 2px #22c55e, 0 0 12px #22c55e; } 66% { box-shadow: 0 0 0 2px #3b82f6, 0 0 12px #3b82f6; } 100% { box-shadow: 0 0 0 2px #ef4444, 0 0 12px #ef4444; } }
+.avatar.fr-6 { box-shadow: 0 0 0 2px #8b5cf6, 0 0 0 4px #c4b5fd; }
+.avatar.fr-7 { box-shadow: 0 0 0 2px #0ea5e9, 0 0 0 4px #fde047; }
+.avatar.sm { width: 24px; height: 24px; font-size: 13px; display: inline-grid; place-items: center; }
+.set-level { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; font-size: 13px; }
+.set-level small { color: var(--dim); font-family: var(--mono); }
+.lvl-track { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.lvl-track i { display: block; height: 100%; background: var(--grad); border-radius: inherit; }
+.set-frames { display: flex; flex-wrap: wrap; gap: 6px; }
+.set-frames button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); font-size: 12px; color: var(--text); }
+.set-frames button.on { border-color: var(--accent); background: rgba(var(--accent-rgb), .16); }
+.locked { opacity: .35; filter: grayscale(1); cursor: not-allowed !important; }
+.lvl-pill { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text); font: 700 12px var(--mono); }
+.lvl-pill i { width: 34px; height: 5px; border-radius: 999px; background: linear-gradient(90deg, var(--accent) var(--p), var(--surface-3) var(--p)); }
+.lvl-card { min-width: 240px; display: grid; gap: 6px; font-size: 13px; }
+.lvl-card small { color: var(--dim); font-family: var(--mono); }
+.wk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.wk { display: flex; gap: 12px; align-items: center; padding: 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.wk > div { flex: 1; display: grid; gap: 6px; }
+.wk b { font-size: 14px; } .wk small { font: 500 12px var(--mono); color: var(--dim); }
+.wk.done { border-color: rgba(34,197,94,.5); } .wk.done .lvl-track i { background: var(--green); }
+.wk-i { font-size: 24px; }
+@media (max-width: 640px) { .lvl-pill i { display: none; } }
+
+/* ---------- Seasonal themes ---------- */
+:root[data-season="halloween"]:not([data-accent]) { --accent: #f97316; --accent-hi: #fb923c; --accent-lo: #c2410c; --accent-rgb: 249, 115, 22; --accent-hi-rgb: 251, 146, 60; --grad: linear-gradient(135deg, #fdba74 0%, #ea580c 55%, #7c2d12 100%); }
+:root[data-season="winter"]:not([data-accent]) { --accent: #38bdf8; --accent-hi: #7dd3fc; --accent-lo: #0369a1; --accent-rgb: 56, 189, 248; --accent-hi-rgb: 125, 211, 252; --grad: linear-gradient(135deg, #e0f2fe 0%, #38bdf8 55%, #0c4a6e 100%); }
+.season-layer { position: fixed; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; }
+.season-layer i { position: absolute; top: -40px; font-style: normal; opacity: .55; animation: season-fall linear infinite; }
+.season-layer.halloween i { animation-name: season-float; top: auto; bottom: -40px; opacity: .4; }
+@keyframes season-fall { to { transform: translateY(110vh) rotate(360deg); } }
+@keyframes season-float { 0% { transform: translate(0, 0); } 50% { transform: translate(30px, -55vh); } 100% { transform: translate(-20px, -115vh); } }
+@media (prefers-reduced-motion: reduce) { .season-layer { display: none; } }

@@ -101,6 +101,7 @@
       D.streak = D.lastWin === day - 1 ? D.streak + 1 : 1;
       D.lastWin = day; D.best = Math.max(D.best, D.streak);
       GameUtil.sfx("win");
+      GameUtil.dailySolved();
       GameUtil.achieve("sudoku");
     }
     save();

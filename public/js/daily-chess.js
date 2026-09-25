@@ -64,6 +64,7 @@ function attempt(m) {
     D.lastWin = day; D.best = Math.max(D.best, D.streak);
     save();
     GameUtil.sfx("win");
+    GameUtil.dailySolved();
     GameUtil.achieve("puzzle");
     render();
     return;

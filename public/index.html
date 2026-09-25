@@ -28,6 +28,7 @@
       </div>
       <div class="nav-right">
         <span class="status-pill"><i></i>Servers online</span>
+        <button class="lvl-pill" id="navLevel" type="button" title="Your level"></button>
         <button class="btn ghost nav-icon" id="navFriends" type="button" title="Friends" aria-label="Friends"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c1.8.7 3 2.4 3.5 5.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
         <button class="btn ghost nav-icon" id="navSettings" type="button" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2.1 1.2M17.7 15.3l2.1 1.2M4.2 16.5l2.1-1.2M17.7 8.7l2.1-1.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
         <a class="btn primary" href="#games">Play now</a>
@@ -1238,6 +1239,11 @@
         <div class="stat-games" id="statGames"></div>
       </section>
 
+      <section class="section" id="weekly">
+        <div class="section-head"><div><h2>This week</h2><p id="weeklySub">Three challenges, new every Monday. Each one is worth 150 XP.</p></div><div class="lvl-card" id="lvlCard"></div></div>
+        <div class="wk-grid" id="weeklyGrid"></div>
+      </section>
+
       <section class="section" id="achievements">
         <div class="section-head"><div><h2>Achievements</h2><p id="achCount">Saved on this device.</p></div></div>
         <div class="ach-grid" id="achGrid"></div>
@@ -1313,6 +1319,28 @@
         }
       };
       renderAch();
+
+      // Level + weekly challenges
+      window.renderLevel = () => {
+        const lv = GameUtil.level(), xp = GameUtil.xp(), a = GameUtil.xpFor(lv), b = GameUtil.xpFor(lv + 1), pct = Math.round(((xp - a) / (b - a)) * 100);
+        const pill = document.getElementById("navLevel");
+        pill.innerHTML = `<b>Lv ${lv}</b><i style="--p:${pct}%"></i>`;
+        document.getElementById("lvlCard").innerHTML = `<b>Level ${lv}</b><div class="lvl-track"><i style="width:${pct}%"></i></div><small>${xp - a} / ${b - a} XP to level ${lv + 1}</small>`;
+        const grid = document.getElementById("weeklyGrid");
+        grid.textContent = "";
+        for (const c of GameUtil.weekly()) {
+          const el = document.createElement("div");
+          el.className = "wk" + (c.done ? " done" : "");
+          el.innerHTML = `<span class="wk-i"></span><div><b></b><div class="lvl-track"><i></i></div><small></small></div>`;
+          el.querySelector(".wk-i").textContent = c.done ? "✅" : "🎯";
+          el.querySelector("b").textContent = c.text;
+          el.querySelector(".lvl-track i").style.width = (c.n / c.goal) * 100 + "%";
+          el.querySelector("small").textContent = c.done ? "Done! +150 XP" : `${c.n} / ${c.goal}`;
+          grid.append(el);
+        }
+      };
+      renderLevel();
+      document.getElementById("navLevel").addEventListener("click", () => GameUtil.openSettings());
 
       // Daily Word streak on the button
       try {

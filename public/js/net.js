@@ -106,12 +106,21 @@
   const AV_COLORS = ["#8b5cf6", "#ec4899", "#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#14b8a6", "#64748b"];
   const cleanName = (n) => String(n || "").replace(/\s+/g, " ").trim().slice(0, 16) || "Player";
   const savedName = () => store.get(NAME_KEY) || "";
+  // Unlockables: bonus avatar emojis by level, and avatar frames by level or achievement.
+  const BONUS_AV = [{ e: "🐉", lvl: 5 }, { e: "🦖", lvl: 8 }, { e: "🧠", lvl: 12 }, { e: "🛸", lvl: 18 }, { e: "💎", lvl: 22 }, { e: "🌈", lvl: 30 }];
+  const ALL_AV = [...AVATARS, ...BONUS_AV.map((b) => b.e)];
+  const FRAMES = [
+    { id: 0, name: "None" }, { id: 1, name: "Bronze", lvl: 3 }, { id: 2, name: "Silver", lvl: 6 }, { id: 3, name: "Gold", lvl: 10 },
+    { id: 4, name: "Neon", lvl: 15 }, { id: 5, name: "Rainbow", lvl: 25 }, { id: 6, name: "Sam", ach: "sam" }, { id: 7, name: "Whale", ach: "whale" },
+  ];
   const cleanAv = (a) => ({
-    e: a && AVATARS.includes(a.e) ? a.e : AVATARS[0],
+    e: a && ALL_AV.includes(a.e) ? a.e : AVATARS[0],
     c: a && a.c >= 0 && a.c < AV_COLORS.length ? a.c | 0 : 0,
+    f: a && a.f >= 0 && a.f < FRAMES.length ? a.f | 0 : 0,
+    l: a && a.l >= 1 && a.l < 1000 ? a.l | 0 : 1,
   });
   function myAvatar() {
-    try { const a = JSON.parse(store.get(AV_KEY)); if (a) return cleanAv(a); } catch {}
+    try { const a = JSON.parse(store.get(AV_KEY)); if (a) return { ...cleanAv(a), l: level() }; } catch {}
     const a = { e: AVATARS[Math.floor(Math.random() * AVATARS.length)], c: Math.floor(Math.random() * AV_COLORS.length) };
     store.set(AV_KEY, JSON.stringify(a));
     return a;
@@ -125,6 +134,8 @@
       el.textContent = a.e;
       el.style.background = AV_COLORS[a.c];
       el.classList.add("emoji");
+      if (a.f) el.classList.add("fr-" + a.f);
+      if (a.l > 1 && !/\bxs\b/.test(cls)) { const b = document.createElement("i"); b.className = "av-lvl"; b.textContent = a.l; el.append(b); }
     } else el.textContent = ((p && p.name) || "?")[0].toUpperCase();
     return el;
   }
@@ -400,10 +411,69 @@
     meta.best = Math.max(meta.best || 0, meta.streak);
     store.set(META_KEY, JSON.stringify(meta));
     checkAchievements();
+    addXP(result === "win" ? 30 : result === "draw" ? 18 : 12, result === "win" ? "win" : "played");
+    weeklyEvent({ kind: "game", game, result });
     if (reportTo && !reportTo.conn.closed) reportTo.conn.send({ rec: { r: result, name: reportTo.name } });
     // Let other OXIDPVP tabs know (a tournament tab uses this to fill in the bracket).
     try { new BroadcastChannel("oxidpvp").postMessage({ t: "result", game, result, code: reportTo && reportTo.code }); } catch {}
   }
+
+  // ---------- XP, levels and weekly challenges ----------
+  const XP_KEY = "oxidpvp-xp", WEEK_KEY = "oxidpvp-weekly";
+  const readXP = () => Math.max(0, +store.get(XP_KEY) || 0);
+  // Level L needs 50·L·(L−1) total XP: 100 for level 2, 300 for 3, 600 for 4…
+  const levelOf = (xp) => Math.max(1, Math.floor((1 + Math.sqrt(1 + (8 * xp) / 100)) / 2));
+  const xpFor = (L) => 50 * L * (L - 1);
+  function level() { return levelOf(readXP()); }
+  function addXP(n, why) {
+    if (!n) return;
+    const before = level(), xp = readXP() + n;
+    store.set(XP_KEY, String(xp));
+    const after = levelOf(xp);
+    if (after > before) {
+      const unlocked = [...BONUS_AV.filter((b) => b.lvl > before && b.lvl <= after).map((b) => b.e), ...FRAMES.filter((f) => f.lvl > before && f.lvl <= after).map((f) => f.name + " frame")];
+      setTimeout(() => { toast(`⭐ Level ${after}!${unlocked.length ? " Unlocked: " + unlocked.join(", ") : ""}`, 3600); sfx.play("win"); }, 900);
+    } else if (why) setTimeout(() => toast(`+${n} XP · ${why}`, 1800), 300);
+  }
+  const weekNo = () => { const d = new Date(); const t = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()); return Math.floor((t / 864e5 + 3) / 7); }; // weeks start Monday
+  const CHALLENGES = [
+    { id: "win3", text: "Win 3 games", goal: 3, test: (e) => e.kind === "game" && e.result === "win" },
+    { id: "play6", text: "Play 6 games", goal: 6, test: (e) => e.kind === "game" },
+    { id: "variety", text: "Play 4 different games", goal: 4, distinct: true, test: (e) => e.kind === "game" },
+    { id: "party3", text: "Play 3 party games", goal: 3, test: (e) => e.kind === "game" && !(GAMES.find((g) => g.id === e.game) || {}).duel },
+    { id: "duel2", text: "Win 2 one-on-one games", goal: 2, test: (e) => e.kind === "game" && e.result === "win" && (GAMES.find((g) => g.id === e.game) || {}).duel },
+    { id: "daily2", text: "Solve 2 daily puzzles", goal: 2, test: (e) => e.kind === "daily" },
+    { id: "play12", text: "Play 12 games", goal: 12, test: (e) => e.kind === "game" },
+    { id: "win5", text: "Win 5 games", goal: 5, test: (e) => e.kind === "game" && e.result === "win" },
+  ];
+  function weekly() {
+    let w = null;
+    try { w = JSON.parse(store.get(WEEK_KEY)); } catch {}
+    const wk = weekNo();
+    if (!w || w.week !== wk) {
+      // Same three challenges for everyone this week.
+      const pick = [], pool = CHALLENGES.map((c) => c.id);
+      let x = Math.imul(wk, 2654435761) >>> 0;
+      for (let guard = 0; pick.length < 3 && guard < 200; guard++) { x = (Math.imul(x, 1103515245) + 12345) >>> 0; const id = pool[(x >>> 16) % pool.length]; if (!pick.includes(id)) pick.push(id); }
+      for (const id of pool) if (pick.length < 3 && !pick.includes(id)) pick.push(id);
+      w = { week: wk, list: pick.map((id) => ({ id, n: 0, seen: [], done: false })) };
+      store.set(WEEK_KEY, JSON.stringify(w));
+    }
+    return w;
+  }
+  function weeklyEvent(e) {
+    const w = weekly();
+    for (const c of w.list) {
+      const def = CHALLENGES.find((x) => x.id === c.id);
+      if (!def || c.done || !def.test(e)) continue;
+      if (def.distinct) { if (c.seen.includes(e.game)) continue; c.seen.push(e.game); }
+      c.n++;
+      if (c.n >= def.goal) { c.done = true; setTimeout(() => { toast(`🏅 Weekly challenge done: ${def.text} (+150 XP)`, 3400); sfx.play("win"); }, 1400); addXP(150); }
+    }
+    store.set(WEEK_KEY, JSON.stringify(w));
+  }
+  const weeklyView = () => weekly().list.map((c) => { const d = CHALLENGES.find((x) => x.id === c.id); return { text: d.text, n: Math.min(c.n, d.goal), goal: d.goal, done: c.done }; });
+  function dailySolved() { addXP(25, "daily puzzle"); weeklyEvent({ kind: "daily" }); }
 
   // ---------- Achievements ----------
   const META_KEY = "oxidpvp-meta", ACH_KEY = "oxidpvp-ach";
@@ -447,6 +517,7 @@
     if (!a) return false;
     got[id] = Date.now();
     store.set(ACH_KEY, JSON.stringify(got));
+    addXP(50);
     setTimeout(() => { toast(`${a.icon} Achievement unlocked: ${a.name}`, 3200); sfx.play("win"); }, 600);
     return true;
   }
@@ -482,6 +553,39 @@
     if (meta) meta.content = t.mode === "light" ? "#f4f4f7" : "#07070a";
   }
   applyTheme(readTheme());
+
+  // Seasonal themes: Halloween in October, winter from December to early January. The accent
+  // only changes if you haven't picked your own; floating decorations appear on the menus, not
+  // in games. Off switch in Settings; ?season=halloween|winter|none to preview.
+  const SEASON_KEY = "oxidpvp-season";
+  function seasonNow() {
+    const q = new URLSearchParams(location.search).get("season");
+    if (q) return q === "none" ? null : q;
+    if (store.get(SEASON_KEY) === "off") return null;
+    const d = new Date(), m = d.getMonth();
+    return m === 9 ? "halloween" : m === 11 || (m === 0 && d.getDate() <= 6) ? "winter" : null;
+  }
+  function applySeason() {
+    const season = seasonNow();
+    if (season) document.documentElement.dataset.season = season; else delete document.documentElement.dataset.season;
+    document.querySelector(".season-layer")?.remove();
+    if (!season || !document.body || document.body.classList.contains("game-page")) return;
+    const bits = season === "halloween" ? ["🎃", "🦇", "👻", "🕸️", "🦇"] : ["❄️", "❄", "❅", "❆", "⛄"];
+    const layer = document.createElement("div");
+    layer.className = "season-layer " + season;
+    layer.setAttribute("aria-hidden", "true");
+    for (let i = 0; i < 16; i++) {
+      const s2 = document.createElement("i");
+      s2.textContent = bits[i % bits.length];
+      s2.style.left = Math.random() * 100 + "%";
+      s2.style.animationDelay = -Math.random() * 20 + "s";
+      s2.style.animationDuration = 14 + Math.random() * 14 + "s";
+      s2.style.fontSize = 12 + Math.random() * 16 + "px";
+      layer.append(s2);
+    }
+    document.body.append(layer);
+  }
+  applySeason();
   const nameListeners = [];
   function openSettings() {
     document.querySelector(".settings-overlay")?.remove();
@@ -492,8 +596,10 @@
         <div class="set-top"><h2>Settings</h2><button class="chat-close" type="button" aria-label="Close">&times;</button></div>
         <section><h3>Profile</h3>
           <div class="set-profile"><span class="set-av"></span><input class="set-name" maxlength="16" placeholder="Your name" aria-label="Your name"></div>
+          <div class="set-level"></div>
           <div class="set-emojis"></div><div class="set-colors"></div>
-          <p class="set-note">Used in every game. Changes apply the next time you join a room.</p>
+          <h3>Avatar frame</h3><div class="set-frames"></div>
+          <p class="set-note">Used in every game. Changes apply the next time you join a room. Level up by playing to unlock more.</p>
         </section>
         <section><h3>Look</h3>
           <div class="seg set-mode"><button type="button" data-v="dark">Dark</button><button type="button" data-v="light">Light</button></div>
@@ -503,6 +609,9 @@
           <label class="set-row"><span>Sound effects</span><input type="range" class="set-vol" min="0" max="100"></label>
           <label class="set-row"><span>Background music</span><input type="checkbox" class="set-music"></label>
           <label class="set-row"><span>Music volume</span><input type="range" class="set-mvol" min="0" max="100"></label>
+        </section>
+        <section><h3>Extras</h3>
+          <label class="set-row"><span>Seasonal themes (Halloween, winter)</span><input type="checkbox" class="set-season"></label>
         </section>
       </div>`;
     document.body.append(ov);
@@ -520,11 +629,27 @@
       const el = q(".set-av"); el.replaceWith(Object.assign(avatarEl({ av, name: nameIn.value }, "lg set-av")));
       ov.querySelectorAll(".set-emojis button").forEach((b) => b.classList.toggle("on", b.textContent === av.e));
       ov.querySelectorAll(".set-colors button").forEach((b, i) => b.classList.toggle("on", i === av.c));
+      ov.querySelectorAll(".set-frames button").forEach((b) => b.classList.toggle("on", +b.dataset.f === (av.f | 0)));
     };
-    for (const e of AVATARS) {
+    const lv = level(), got = readAch();
+    for (const e of ALL_AV) {
+      const bonus = BONUS_AV.find((x) => x.e === e), locked = bonus && lv < bonus.lvl;
       const b = document.createElement("button"); b.type = "button"; b.textContent = e;
+      if (locked) { b.disabled = true; b.classList.add("locked"); b.title = `Unlocks at level ${bonus.lvl}`; }
       b.addEventListener("click", () => { av = { ...av, e }; store.set(AV_KEY, JSON.stringify(av)); paintAv(); sfx.play("click"); });
       q(".set-emojis").append(b);
+    }
+    const xp = readXP(), next = xpFor(lv + 1), prevX = xpFor(lv);
+    q(".set-level").innerHTML = `<b>Level ${lv}</b><div class="lvl-track"><i style="width:${Math.round(((xp - prevX) / (next - prevX)) * 100)}%"></i></div><small>${xp - prevX} / ${next - prevX} XP</small>`;
+    for (const f of FRAMES) {
+      const locked = (f.lvl && lv < f.lvl) || (f.ach && !got[f.ach]);
+      const b = document.createElement("button"); b.type = "button";
+      const prev = avatarEl({ av: { ...av, f: f.id, l: 1 } }, "sm");
+      b.append(prev, document.createTextNode(f.name));
+      if (locked) { b.disabled = true; b.classList.add("locked"); b.title = f.lvl ? `Unlocks at level ${f.lvl}` : "Unlock with a secret achievement"; }
+      b.dataset.f = f.id;
+      b.addEventListener("click", () => { av = { ...av, f: f.id }; store.set(AV_KEY, JSON.stringify(av)); paintAv(); sfx.play("click"); });
+      q(".set-frames").append(b);
     }
     AV_COLORS.forEach((c, i) => {
       const b = document.createElement("button"); b.type = "button"; b.style.background = c; b.setAttribute("aria-label", "Avatar color " + (i + 1));
@@ -556,6 +681,9 @@
     vol.addEventListener("change", () => sfx.play("pop"));
     mOn.addEventListener("change", () => { music.set(mOn.checked); if (mOn.checked && sfx.muted) toast("Sound is muted. Unmute to hear the music."); });
     mVol.addEventListener("input", () => music.setVolume(mVol.value / 100));
+    const seas = q(".set-season");
+    seas.checked = store.get(SEASON_KEY) !== "off";
+    seas.addEventListener("change", () => { store.set(SEASON_KEY, seas.checked ? "on" : "off"); applySeason(); });
   }
 
   // ---------- Friends + presence ----------
@@ -1050,9 +1178,11 @@
     let av = myAvatar();
     const paintAv = () => { avBtn.textContent = av.e; avBtn.style.background = AV_COLORS[av.c]; };
     paintAv();
-    for (const e of AVATARS) {
+    for (const e of ALL_AV) {
+      const bonus = BONUS_AV.find((x) => x.e === e);
       const b = document.createElement("button");
       b.type = "button"; b.textContent = e;
+      if (bonus && level() < bonus.lvl) { b.disabled = true; b.classList.add("locked"); b.title = `Unlocks at level ${bonus.lvl}`; }
       b.addEventListener("click", () => { av = { ...av, e }; store.set(AV_KEY, JSON.stringify(av)); paintAv(); paintPicker(); });
       $(".av-grid").append(b);
     }
@@ -1887,6 +2017,7 @@
   window.Room = { mount: mountRoom };
   window.GameUtil = {
     fitCanvas, toast, loop, shuffle, touchControls, isTouch: () => touchMode, openSettings, openFriends, achieve: unlock, achievements, friendCode: () => identity.id,
+    level, xp: readXP, xpFor, addXP, weekly: weeklyView, dailySolved, frames: FRAMES, bonusAvatars: BONUS_AV,
     meta: readMeta, onNameChange: (f) => nameListeners.push(f), myName: savedName, myAvatar, avatar: avatarEl, cleanName,
     sfx: (n) => sfx.play(n), record, stats: readStats, games: GAMES, joinByCode, pageFor, gameById,
   };
