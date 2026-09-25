@@ -23,6 +23,15 @@
     });
     const btn = document.getElementById("again");
     btn.hidden = !isHost; btn.textContent = again;
+    // Host can also let everyone vote on what to play next.
+    let vote = document.getElementById("voteNext");
+    if (!vote) {
+      vote = h("button", "btn", "🗳️ Vote next game");
+      vote.id = "voteNext"; vote.type = "button";
+      vote.addEventListener("click", () => { if (GameUtil.startPoll()) hideResults(); });
+      btn.after(vote);
+    }
+    vote.hidden = !isHost || !GameUtil.canPoll();
     document.getElementById("againWait").hidden = isHost;
     document.getElementById("result").hidden = false;
   }

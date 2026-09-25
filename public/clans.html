@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>try{var t=JSON.parse(localStorage.getItem("oxidpvp-theme")||"{}"),d=document.documentElement;if(t.mode==="light")d.dataset.theme="light";var a=t.accent;if(!t.b&&a==="violet")a="pink";if(a&&a!=="pink")d.dataset.accent=a}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#000000">
+  <title>Clans · OXIDPVP</title>
+  <meta name="description" content="Start or join a clan on OXIDPVP. Every win counts for your team.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-in">
+      <a class="brand" href="index.html"><i class="brand-mark"></i><span>OXID<b>PVP</b></span></a>
+      <div class="nav-links">
+        <a href="index.html#games">Games</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <a href="clans.html" aria-current="page">Clans</a>
+        <a href="profile.html">Profile</a>
+      </div>
+      <div class="nav-right"><a class="btn primary" href="index.html#games">Play now</a></div>
+    </div>
+  </nav>
+
+  <div class="hub">
+    <div class="wrap page">
+      <div class="page-head"><div><h1>Clans</h1><p class="muted">Team up with friends under one tag. Every win by a member adds a point to the clan. Your tag shows next to your name in every lobby.</p></div></div>
+
+      <section class="pf-card cl-mine" id="mine" hidden>
+        <div class="cl-mine-top">
+          <span class="cl-tag" id="myTag"></span>
+          <div><h2 id="myName"></h2><p class="muted" id="myMeta"></p></div>
+          <button class="btn ghost" id="leave" type="button">Leave clan</button>
+        </div>
+        <p class="muted cl-invite">Friends join with the tag <b id="myTag2"></b> on this page.</p>
+        <ol class="cl-members" id="members"></ol>
+      </section>
+
+      <div class="pf-grid" id="forms">
+        <form class="pf-card cl-form" id="createForm">
+          <h2>Start a clan</h2>
+          <input class="ad-in" id="cTag" maxlength="5" placeholder="Tag (2–5 letters, e.g. SAM)" autocomplete="off">
+          <input class="ad-in" id="cName" maxlength="24" placeholder="Clan name" autocomplete="off">
+          <button class="btn primary" type="submit">Create clan</button>
+          <p class="ad-err" id="cErr"></p>
+        </form>
+        <form class="pf-card cl-form" id="joinForm">
+          <h2>Join a clan</h2>
+          <input class="ad-in" id="jTag" maxlength="5" placeholder="Clan tag" autocomplete="off">
+          <button class="btn" type="submit">Join</button>
+          <p class="muted">Joining a new clan leaves your old one.</p>
+          <p class="ad-err" id="jErr"></p>
+        </form>
+      </div>
+
+      <section class="pf-card">
+        <h2>Top clans</h2>
+        <div class="lb">
+          <div class="lb-row lb-head lb-4"><span>#</span><span>Clan</span><span>Members</span><span>Points</span></div>
+          <div id="top"></div>
+        </div>
+        <p class="muted" id="noClans" hidden>No clans yet. Start the first one!</p>
+      </section>
+    </div>
+  </div>
+
+  <script src="js/net.js"></script>
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const post = async (body) => {
+        const r = await fetch("/api/clans", { method: "POST", body: JSON.stringify({ ...body, ...GameUtil.fidKey(), pname: GameUtil.myName() || "Player" }) });
+        return r.json().catch(() => ({ error: "Server error" }));
+      };
+      for (const id of ["cTag", "jTag"]) $(id).addEventListener("input", (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
+      let mine = null;
+      async function load() {
+        let d = { top: [], mine: null };
+        try { d = await (await fetch("/api/clans?fid=" + GameUtil.fid(), { cache: "no-store" })).json(); } catch {}
+        mine = d.mine;
+        GameUtil.setClan(mine ? { tag: mine.tag, name: mine.name } : null);
+        $("mine").hidden = !mine;
+        $("forms").querySelector("#createForm h2").textContent = mine ? "Start a new clan" : "Start a clan";
+        if (mine) {
+          $("myTag").textContent = mine.tag; $("myTag2").textContent = mine.tag;
+          $("myName").textContent = mine.name;
+          $("myMeta").textContent = `${mine.points.toLocaleString()} points · ${mine.members.length} / 30 members${mine.owner ? " · you're the leader" : ""}`;
+          const ol = $("members");
+          ol.textContent = "";
+          for (const m of mine.members) {
+            const li = document.createElement("li");
+            li.innerHTML = "<span></span><small></small>";
+            li.querySelector("span").textContent = (m.owner ? "👑 " : "") + m.name;
+            li.querySelector("small").textContent = "joined " + new Date(m.joined).toLocaleDateString();
+            if (mine.owner && !m.owner) {
+              const k = document.createElement("button");
+              k.type = "button"; k.className = "chat-close"; k.title = "Remove from clan"; k.innerHTML = "&times;";
+              k.addEventListener("click", async () => { if (!confirm(`Remove ${m.name} from the clan?`)) return; const r = await post({ action: "kick", name: m.name }); if (r.error) GameUtil.toast(r.error); load(); });
+              li.append(k);
+            }
+            ol.append(li);
+          }
+        }
+        const top = $("top");
+        top.textContent = "";
+        $("noClans").hidden = d.top.length > 0;
+        d.top.forEach((c, i) => {
+          const row = document.createElement("div");
+          row.className = "lb-row lb-4 cl-row" + (i < 3 ? " top t" + i : "") + (mine && mine.tag === c.tag ? " me" : "");
+          for (const v of [i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1, `[${c.tag}] ${c.name}`, c.members, c.points.toLocaleString()]) { const x = document.createElement("span"); x.textContent = v; row.append(x); }
+          row.title = "Join " + c.tag;
+          row.addEventListener("click", () => { $("jTag").value = c.tag; $("jTag").focus(); $("joinForm").scrollIntoView({ behavior: "smooth", block: "center" }); });
+          top.append(row);
+        });
+      }
+      $("createForm").addEventListener("submit", async (e) => {
+        e.preventDefault(); $("cErr").textContent = "";
+        if (mine && !confirm(`Leave [${mine.tag}] and start a new clan?`)) return;
+        const r = await post({ action: "create", tag: $("cTag").value, name: $("cName").value });
+        if (r.error) { $("cErr").textContent = r.error; return; }
+        GameUtil.toast(`Welcome to [${r.clan.tag}]!`); GameUtil.sfx("win"); $("cTag").value = $("cName").value = ""; load();
+      });
+      $("joinForm").addEventListener("submit", async (e) => {
+        e.preventDefault(); $("jErr").textContent = "";
+        const r = await post({ action: "join", tag: $("jTag").value });
+        if (r.error) { $("jErr").textContent = r.error; return; }
+        GameUtil.toast(`You joined [${r.clan.tag}] ${r.clan.name}!`); GameUtil.sfx("win"); $("jTag").value = ""; load();
+      });
+      $("leave").addEventListener("click", async () => {
+        if (!mine || !confirm(`Leave [${mine.tag}]?`)) return;
+        await post({ action: "leave" }); GameUtil.toast("You left the clan"); load();
+      });
+      const want = new URLSearchParams(location.search).get("join");
+      if (want) $("jTag").value = want.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
+      load();
+    })();
+  </script>
+</body>
+</html>

@@ -100,6 +100,20 @@
           d.append(bb, sp); $("pfStats").append(d);
         }
 
+        // Ranked rating (1v1 games) and clan, from the server.
+        fetch("/api/ranked?name=" + encodeURIComponent(name), { cache: "no-store" }).then((r) => r.json()).then((d) => {
+          const tile = document.getElementById("pfRank") || Object.assign(document.createElement("a"), { id: "pfRank", className: "stat pf-link", href: "leaderboard.html?game=ranked" });
+          tile.innerHTML = "<b></b><span></span>";
+          tile.querySelector("b").textContent = d.me ? d.me.rating : "–";
+          tile.querySelector("span").textContent = d.me ? `ranked rating · #${d.me.rank}` : "ranked rating (win a 1v1)";
+          $("pfStats").append(tile);
+        }).catch(() => {});
+        const cl = document.getElementById("pfClan") || Object.assign(document.createElement("a"), { id: "pfClan", className: "stat pf-link", href: "clans.html" });
+        cl.innerHTML = "<b></b><span></span>";
+        cl.querySelector("b").textContent = clan ? `[${clan.tag}]` : "–";
+        cl.querySelector("span").textContent = clan ? clan.name : "no clan yet · join one";
+        $("pfStats").append(cl);
+
         // Chart: wins/losses/draws per day for the last two weeks.
         const hist = GameUtil.history(), days = [];
         const start = new Date(); start.setHours(0, 0, 0, 0);

@@ -449,7 +449,7 @@
     hist.unshift({ g: game, r: result, at: Date.now() });
     store.set(HIST_KEY, JSON.stringify(hist.slice(0, 100)));
     weeklyEvent({ kind: "game", game, result });
-    if (reportTo && !reportTo.conn.closed) reportTo.conn.send({ rec: { r: result, name: reportTo.name } });
+    if (reportTo && !reportTo.conn.closed) reportTo.conn.send({ rec: { r: result, name: reportTo.name, fid: identity.id, duel: !!(gameById(game) || {}).duel } });
     // Let other OXIDPVP tabs know (a tournament tab uses this to fill in the bracket).
     try { new BroadcastChannel("oxidpvp").postMessage({ t: "result", game, result, code: reportTo && reportTo.code }); } catch {}
   }
@@ -990,6 +990,7 @@
           for (const f of listeners) f();
         } else if (m.t === "inv") showInvite(m);
         else if (m.t === "sent" && sentCb) sentCb(m);
+        else if (m.t === "dm") onDM(m);
       };
       ws.onclose = (e) => {
         clearInterval(pingT); ws = null;
@@ -1005,10 +1006,52 @@
     return {
       where, query, hello, status,
       invite(to, cb) { if (!reportTo) return false; sentCb = cb; send({ t: "inv", to, game: reportTo.game, code: reportTo.code }); return true; },
+      dm(to, text) { if (!ws || ws.readyState !== 1) return false; send({ t: "dm", to, text }); return true; },
       onChange(f) { listeners.add(f); return () => listeners.delete(f); },
     };
   })();
   nameListeners.push(() => presence.hello());
+  // Keep your name in your clan's member list up to date.
+  let clanRenameT = 0;
+  nameListeners.push(() => {
+    if (!readClan()) return;
+    clearTimeout(clanRenameT);
+    clanRenameT = setTimeout(() => fetch("/api/clans", { method: "POST", body: JSON.stringify({ action: "rename", fid: identity.id, key: identity.key, pname: savedName() }) }).catch(() => {}), 2000);
+  });
+
+  // ---------- Direct messages between friends ----------
+  // Saved in this browser. Only people on your friends list can message you.
+  const DM_KEY = "oxidpvp-dms";
+  const readDMs = () => { try { return JSON.parse(store.get(DM_KEY)) || {}; } catch { return {}; } };
+  const saveDMs = (d) => store.set(DM_KEY, JSON.stringify(d));
+  function dmPush(fid, msg) {
+    const d = readDMs(), c = d[fid] || (d[fid] = { m: [], unread: 0 });
+    c.m.push(msg); c.m = c.m.slice(-100);
+    if (!msg.me && dmOpen !== fid) c.unread = (c.unread || 0) + 1;
+    saveDMs(d);
+  }
+  const dmUnread = (fid) => { const d = readDMs(); return fid ? (d[fid] ? d[fid].unread || 0 : 0) : Object.values(d).reduce((a, x) => a + (x.unread || 0), 0); };
+  function dmRead(fid) { const d = readDMs(); if (d[fid] && d[fid].unread) { d[fid].unread = 0; saveDMs(d); } paintDMBadge(); }
+  let dmOpen = null;
+  const dmListeners = new Set();
+  function paintDMBadge() {
+    const n = dmUnread();
+    for (const b of document.querySelectorAll(".friends-btn, #navFriends")) {
+      let badge = b.querySelector(".dm-badge");
+      if (!n) { badge?.remove(); continue; }
+      if (!badge) { badge = document.createElement("b"); badge.className = "dm-badge"; b.append(badge); }
+      badge.textContent = n > 9 ? "9+" : n;
+    }
+  }
+  function onDM(m) {
+    const f = readFriends().find((x) => x.id === m.from);
+    if (!f) return;
+    dmPush(m.from, { me: 0, text: cleanText(m.text), at: m.at });
+    if (dmOpen !== m.from) { toast(`💬 ${f.name || m.name}: ${cleanText(m.text).slice(0, 80)}`, 4000); sfx.play("msg"); }
+    paintDMBadge();
+    for (const fn of dmListeners) fn(m.from);
+  }
+  whenReady(paintDMBadge);
 
   function showInvite(m) {
     const g = GAMES.find((x) => x.id === m.game);
@@ -1041,11 +1084,17 @@
           <form class="fr-add"><input class="set-name" maxlength="6" placeholder="Their code" aria-label="Friend code" autocomplete="off"><button class="btn primary" type="submit">Add</button></form>
         </section>
         <section><h3 class="fr-head">Friends</h3><div class="fr-list"></div></section>
+        <section class="dm-view" hidden>
+          <div class="dm-top"><button class="btn ghost sm dm-back" type="button">&larr; Back</button><b class="dm-name"></b><small class="dm-status"></small></div>
+          <ol class="dm-log" aria-live="polite"></ol>
+          <form class="dm-form"><input maxlength="300" placeholder="Message…" autocomplete="off" aria-label="Message"><button class="btn primary" type="submit">Send</button></form>
+        </section>
       </div>`;
     document.body.append(ov);
     const q = (sel) => ov.querySelector(sel);
     let off = () => {}, poll = 0;
-    const close = () => { off(); clearInterval(poll); ov.remove(); removeEventListener("keydown", esc, true); };
+    const close = () => { off(); offDM(); dmOpen = null; clearInterval(poll); ov.remove(); removeEventListener("keydown", esc, true); };
+    let offDM = () => {};
     const esc = (e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
     addEventListener("keydown", esc, true);
     q(".chat-close").addEventListener("click", close);
@@ -1085,6 +1134,13 @@
         row.innerHTML = `<i class="fr-dot"></i><div class="fr-who"><b></b><small></small></div>`;
         row.querySelector("b").textContent = f.name || f.id;
         row.querySelector("small").textContent = st.on ? (g ? `Playing ${g.title}` : "Online") : `Offline · ${f.id}`;
+        const chat = document.createElement("button");
+        chat.className = "btn ghost sm fr-chat"; chat.type = "button"; chat.title = "Message"; chat.setAttribute("aria-label", "Message " + (f.name || f.id));
+        chat.textContent = "💬";
+        const un = dmUnread(f.id);
+        if (un) { const bd = document.createElement("b"); bd.className = "dm-badge"; bd.textContent = un; chat.append(bd); }
+        chat.addEventListener("click", () => openChat(f));
+        row.append(chat);
         if (inRoom && st.on) {
           const inv = document.createElement("button");
           inv.className = "btn primary sm"; inv.type = "button"; inv.textContent = "Invite";
@@ -1100,6 +1156,54 @@
         row.append(rm);
         list.append(row);
       }
+    }
+    function openChat(f) {
+      dmOpen = f.id;
+      dmRead(f.id);
+      for (const sec of ov.querySelectorAll(".friends > section:not(.dm-view)")) sec.hidden = true;
+      const view = q(".dm-view");
+      view.hidden = false;
+      q(".dm-name").textContent = f.name || f.id;
+      const paint = () => {
+        const st = presence.status.get(f.id) || {};
+        q(".dm-status").textContent = st.on ? "online" : "offline · they'll get it next time they're on";
+        const log = q(".dm-log");
+        log.textContent = "";
+        const msgs = (readDMs()[f.id] || { m: [] }).m;
+        if (!msgs.length) { const li = document.createElement("li"); li.className = "sys"; li.textContent = "Say hi! Messages are saved in this browser."; log.append(li); }
+        for (const m of msgs) {
+          const li = document.createElement("li");
+          li.className = m.me ? "me" : "";
+          li.textContent = m.text;
+          li.title = new Date(m.at).toLocaleString();
+          log.append(li);
+        }
+        log.scrollTop = log.scrollHeight;
+      };
+      paint();
+      offDM();
+      const onMsg = (fid) => { if (fid === f.id) { dmRead(f.id); paint(); } };
+      dmListeners.add(onMsg);
+      offDM = () => dmListeners.delete(onMsg);
+      const input = q(".dm-form input");
+      input.focus();
+      q(".dm-form").onsubmit = (e) => {
+        e.preventDefault();
+        const text = cleanText(input.value);
+        if (!text) return;
+        if (!presence.dm(f.id, text)) { toast("Not connected. Try again in a moment."); return; }
+        dmPush(f.id, { me: 1, text, at: Date.now() });
+        input.value = "";
+        paint();
+        sfx.play("click");
+      };
+      input.onkeydown = (e) => e.stopPropagation();
+      q(".dm-back").onclick = () => {
+        dmOpen = null; offDM();
+        view.hidden = true;
+        for (const sec of ov.querySelectorAll(".friends > section:not(.dm-view)")) sec.hidden = false;
+        render(); paintDMBadge();
+      };
     }
     off = presence.onChange(render);
     presence.query();
@@ -1170,6 +1274,7 @@
       el.innerHTML = `
         <div class="chat-peek" hidden></div>
         <div class="dock-pop react-pop" hidden></div>
+        <div class="poll-card" hidden></div>
         <div class="dock-pop switch-pop" role="dialog" aria-label="Switch game" hidden>
           <div class="chat-head"><span>Switch everyone to…</span><button class="chat-close" type="button" aria-label="Close">&times;</button></div>
           <div class="switch-list"></div>
@@ -1218,10 +1323,11 @@
       document.addEventListener("fullscreenchange", paintFull);
       fullBtn.addEventListener("click", () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else document.documentElement.requestFullscreen().catch(() => toast("Fullscreen isn't allowed here")); });
       $(".friends-btn").addEventListener("click", () => openFriends());
+      setTimeout(paintDMBadge, 0);
       $(".chat-toggle").addEventListener("click", () => toggle());
       $(".chat-panel .chat-close").addEventListener("click", () => toggle(false));
       $(".switch-pop .chat-close").addEventListener("click", () => pop(null));
-      $(".react-btn").addEventListener("click", () => pop($(".react-pop").hidden ? "react" : null));
+      $(".react-btn").addEventListener("click", () => { if ($(".react-pop").hidden) paintStickers(); pop($(".react-pop").hidden ? "react" : null); });
       $(".switch-btn").addEventListener("click", () => { if ($(".switch-pop").hidden) { renderSwitch(); pop("switch"); } else pop(null); });
       $(".chat-peek").addEventListener("click", () => toggle(true));
       $(".chat-form").addEventListener("submit", (e) => {
@@ -1278,11 +1384,35 @@
       sendFn(text);
       return true;
     }
+    // Stickers you own go under the emoji reactions.
+    function paintStickers() {
+      const box = $(".react-pop");
+      box.querySelector(".react-stickers")?.remove();
+      const row = document.createElement("div");
+      row.className = "react-stickers";
+      for (const st of myStickers()) {
+        const b = document.createElement("button");
+        b.type = "button"; b.textContent = st.e; b.title = "Sticker"; b.setAttribute("aria-label", "Sticker " + st.e);
+        b.addEventListener("click", () => { if (reactFn) reactFn("st:" + st.id); pop(null); });
+        row.append(b);
+      }
+      const more = document.createElement("a");
+      more.href = "pass.html"; more.className = "react-more"; more.textContent = "Get more";
+      row.append(more);
+      box.append(row);
+    }
     function renderSwitch() {
       const list = $(".switch-list");
       list.textContent = "";
       if (!switchCtx) return;
       const n = switchCtx.count();
+      if (switchCtx.poll) {
+        const v = document.createElement("button");
+        v.type = "button"; v.className = "switch-item vote";
+        v.innerHTML = "<b>🗳️ Let everyone vote</b><span>Pick from 6 games</span>";
+        v.addEventListener("click", () => { pop(null); switchCtx.poll(); });
+        list.append(v);
+      }
       for (const g of GAMES) {
         if (g.id === switchCtx.game) continue;
         const b = document.createElement("button");
@@ -1309,6 +1439,38 @@
         $(".react-btn").hidden = false;
       },
       setSwitch(ctx) { ensure(); switchCtx = ctx; $(".switch-btn").hidden = !ctx; if (!ctx) $(".switch-pop").hidden = true; },
+      poll() { if (switchCtx && switchCtx.poll) { switchCtx.poll(); return true; } return false; },
+      canPoll() { return !!(switchCtx && switchCtx.poll); },
+      // The "vote on the next game" card, shown to everyone in the room.
+      showPoll(m, vote) {
+        ensure();
+        const card = $(".poll-card");
+        if (!m) { card.hidden = true; clearInterval(card._t); return; }
+        card.hidden = false;
+        const ends = performance.now() + (m.ends || 0);
+        card.innerHTML = `<div class="poll-head"><b>🗳️ Vote for the next game</b><span class="poll-time"></span></div><div class="poll-opts"></div><small class="poll-foot"></small>`;
+        const total = Object.values(m.counts).reduce((a, b) => a + b, 0);
+        for (const gid of m.opts) {
+          const g = gameById(gid);
+          if (!g) continue;
+          const b = document.createElement("button");
+          b.type = "button";
+          const n = m.counts[gid] || 0;
+          b.className = "poll-opt" + (m.mine === gid ? " mine" : "") + (m.done === gid ? " won" : "");
+          b.disabled = !!m.done;
+          b.innerHTML = `<i></i><b></b><span></span>`;
+          b.querySelector("i").style.width = total ? (n / total) * 100 + "%" : "0";
+          b.querySelector("b").textContent = (gid === m.cur ? "🔁 Play again: " : "") + g.title;
+          b.querySelector("span").textContent = n ? String(n) : "";
+          b.addEventListener("click", () => vote(gid));
+          card.querySelector(".poll-opts").append(b);
+        }
+        card.querySelector(".poll-foot").textContent = m.done ? `${gameById(m.done).title} wins!` : `${total} of ${m.total} voted`;
+        clearInterval(card._t);
+        const tick = () => { const left = Math.max(0, ends - performance.now()); card.querySelector(".poll-time").textContent = m.done ? "" : Math.ceil(left / 1000) + "s"; };
+        tick();
+        if (!m.done) card._t = setInterval(tick, 250);
+      },
       add(m) {
         if (!el || !sendFn) return;
         const text = cleanText(m.text);
@@ -1341,6 +1503,7 @@
       leave() {
         if (!el) return;
         sendFn = reactFn = switchCtx = null; unread = 0; badge();
+        $(".poll-card").hidden = true;
         for (const s of [".chat-toggle", ".react-btn", ".switch-btn", ".chat-panel", ".chat-peek", ".react-pop", ".switch-pop"]) $(s).hidden = true;
         $(".chat-log").textContent = "";
       },
@@ -1351,7 +1514,9 @@
     const el = document.createElement("div");
     el.className = "react-float";
     el.style.left = 20 + Math.random() * 60 + "%";
-    const e = document.createElement("span"); e.textContent = m.e;
+    const st = /^st:/.test(m.e) && STICKERS.find((x) => "st:" + x.id === m.e);
+    const e = document.createElement("span"); e.textContent = st ? st.e : m.e;
+    if (st) el.classList.add("sticker");
     if (/^[A-Za-z]/.test(m.e)) el.classList.add("txt");
     const n = document.createElement("small"); n.textContent = m.me ? "You" : cleanName(m.name);
     el.append(e, n);
@@ -1365,6 +1530,7 @@
   function social({ isHost, myId, people, toGuests, toHost, specOnly = () => false, amSpectator = () => false }) {
     const seen = new Map();
     function show(m) {
+      if (m.__sys === "poll") return showPoll(m);
       if (m.__sys === "chat" && m.spec && !amSpectator()) return;
       if (m.__sys === "chat") dock.add({ ...m, name: m.spec ? "👀 " + m.name : m.name, me: !m.sys && m.id === myId() });
       else if (m.__sys === "react") { floatReaction({ ...m, me: m.id === myId() }); if (m.id !== myId()) sfx.play("pop"); }
@@ -1380,13 +1546,53 @@
       show(m);
     }
     const person = (id) => people().find((p) => p.id === id);
+    // ---- "Vote for the next game" (the host runs the count) ----
+    let poll = null, myVote = null, lastPoll = null;
+    const POLL_MS = 20000;
+    function pollMsg() {
+      const counts = {};
+      for (const g of poll.votes.values()) counts[g] = (counts[g] || 0) + 1;
+      return { __sys: "poll", pid: poll.id, opts: poll.opts, cur: poll.cur, counts, total: people().length, ends: Math.max(0, poll.ends - Date.now()), done: poll.done || null };
+    }
+    function pollSend() { const m = pollMsg(); toGuests(m); showPoll(m); }
+    function showPoll(m) {
+      if (!lastPoll || lastPoll.pid !== m.pid) myVote = null;
+      lastPoll = m;
+      dock.showPoll({ ...m, mine: myVote }, (g) => {
+        if (m.done) return;
+        myVote = g;
+        if (isHost()) castVote(myId(), m.pid, g); else { toHost({ __sys: "vote", pid: m.pid, g }); showPoll(lastPoll); }
+        sfx.play("click");
+      });
+      if (m.done) setTimeout(() => { if (lastPoll === m) dock.showPoll(null); }, 2500);
+    }
+    function castVote(id, pid, g) {
+      if (!poll || poll.done || pid !== poll.id || !poll.opts.includes(g) || !person(id)) return;
+      poll.votes.set(id, g);
+      if (poll.votes.size >= people().length) return finishPoll();
+      pollSend();
+    }
+    function finishPoll() {
+      if (!poll || poll.done) return;
+      clearTimeout(poll.timer);
+      const counts = {};
+      for (const g of poll.votes.values()) counts[g] = (counts[g] || 0) + 1;
+      const best = Math.max(0, ...Object.values(counts));
+      const top = poll.opts.filter((g) => (counts[g] || 0) === best && best > 0);
+      poll.done = top.length ? top[Math.floor(Math.random() * top.length)] : poll.cur;
+      pollSend();
+      sfx.play("win");
+      const done = poll.done, cb = poll.onDone;
+      setTimeout(() => cb(done), 2200);
+    }
     return {
       show,
       fromGuest(id, d) {
         const p = person(id);
         if (!p) return false;
         if (d.__sys === "chat") { relay({ __sys: "chat", id, name: p.name, av: p.av, text: cleanText(d.text), spec: specOnly(id) || undefined }); return true; }
-        if (d.__sys === "react" && REACTIONS.includes(d.e)) { relay({ __sys: "react", id, name: p.name, e: d.e }); return true; }
+        if (d.__sys === "react" && (REACTIONS.includes(d.e) || (/^st:[a-z]+$/.test(d.e) && STICKERS.some((x) => "st:" + x.id === d.e)))) { relay({ __sys: "react", id, name: p.name, e: d.e }); return true; }
+        if (d.__sys === "vote") { castVote(id, d.pid, d.g); return true; }
         return false;
       },
       say(text) {
@@ -1398,6 +1604,16 @@
         else toHost({ __sys: "react", e });
       },
       system(text) { if (isHost()) relay({ __sys: "chat", sys: true, text }); },
+      // Host: open a vote between the current game and five others that fit the room.
+      startPoll(cur, onDone) {
+        if (!isHost() || (poll && !poll.done)) return;
+        const n = people().length;
+        const others = shuffle(GAMES.filter((g) => g.id !== cur && fits(g, n))).slice(0, 5).map((g) => g.id);
+        poll = { id: Math.random().toString(36).slice(2, 8), opts: [cur, ...others], cur, votes: new Map(), ends: Date.now() + POLL_MS, onDone };
+        poll.timer = setTimeout(finishPoll, POLL_MS);
+        pollSend();
+        this.system("Vote for the next game!");
+      },
     };
   }
 
@@ -1713,7 +1929,7 @@
 
     function enterDock() {
       dock.enter({ send: (t) => talk.say(t), react: (e) => talk.react(e) });
-      dock.setSwitch(isHost ? { game, count: () => peopleList().length, go: moveTo } : null);
+      dock.setSwitch(isHost ? { game, count: () => peopleList().length, go: moveTo, poll: () => talk.startPoll(game, (g) => { if (g !== game && gameById(g)) moveTo(gameById(g)); else talk.system("Staying on this game. Rematch time!"); }) } : null);
     }
     function moveTo(g) {
       const next = makeCode();
@@ -1879,7 +2095,7 @@
       if (d.__sys === "reject" && d.reason === "__pw") { const c = code; fail(ui.joinPassword() ? "Wrong password." : "This room needs a password."); ui.askPassword(c); return; }
       if (d.__sys === "reject") return fail(d.reason);
       if (d.__sys === "move") return follow(d);
-      if (d.__sys === "chat" || d.__sys === "react") return talk.show(d);
+      if (d.__sys === "chat" || d.__sys === "react" || d.__sys === "poll") return talk.show(d);
       deliver(d);
     }
 
@@ -1999,7 +2215,7 @@
     }
     function enterDock() {
       dock.enter({ send: (t) => talk.say(t), react: (e) => talk.react(e) });
-      dock.setSwitch(isHost ? { game, count: () => players.length, go: moveTo } : null);
+      dock.setSwitch(isHost ? { game, count: () => players.length, go: moveTo, poll: () => talk.startPoll(game, (g) => { if (g !== game && gameById(g)) moveTo(gameById(g)); else talk.system("Staying on this game. Hit Play again!"); }) } : null);
     }
     function moveTo(g) {
       const next = makeCode();
@@ -2139,7 +2355,7 @@
               if (d.__sys === "welcome") {
                 myId = d.id;
                 if (!started) { ui.showRoom(c, { isHost: false, party: true }); ui.setStatus(""); enterDock(); }
-              } else if (d.__sys === "chat" || d.__sys === "react") talk.show(d);
+              } else if (d.__sys === "chat" || d.__sys === "react" || d.__sys === "poll") talk.show(d);
               else if (d.__sys === "lobby") { players = d.players; render(); }
               else if (d.__sys === "reject" && d.reason === "__pw") { const c = code; backToMenu(ui.joinPassword() ? "Wrong password." : "This room needs a password."); ui.askPassword(c); }
               else if (d.__sys === "reject") backToMenu(d.reason);
@@ -2322,6 +2538,7 @@
     meta: readMeta, onNameChange: (f) => nameListeners.push(f), myName: savedName, myAvatar, avatar: avatarEl, cleanName,
     sfx: (n) => sfx.play(n), record, stats: readStats, games: GAMES, joinByCode, pageFor, gameById,
     gameOfDay, history: readHistory, pass: passView, passClaim, wallet, stickers: () => STICKERS, myStickers, titles: titleList, myTitle, setTitle, titleName, grant, owns, profile: myProf,
-    clan: readClan, setClan: (c) => store.set(CLAN_KEY, c ? JSON.stringify(c) : ""), fid: () => identity.id,
+    clan: readClan, setClan: (c) => store.set(CLAN_KEY, c ? JSON.stringify(c) : ""), fid: () => identity.id, fidKey: () => ({ fid: identity.id, key: identity.key }),
+    startPoll: () => dock.poll(), canPoll: () => dock.canPoll(),
   };
 })();

@@ -70,6 +70,26 @@ export default {
       const ip = request.headers.get("CF-Connecting-IP") || "local";
       return board.fetch(new Request("https://board/casino-set?ip=" + encodeURIComponent(ip), { method: "POST", body }));
     }
+    if (url.pathname === "/api/ranked" && request.method === "GET") {
+      const name = (url.searchParams.get("name") || "").slice(0, 16);
+      return env.BOARD.get(env.BOARD.idFromName("board")).fetch(new Request("https://board/ranked?name=" + encodeURIComponent(name)));
+    }
+    // Clans. Reading is open; changes need your friend code + key (checked with Presence).
+    if (url.pathname === "/api/clans" && request.method === "GET") {
+      const q = new URLSearchParams({ tag: url.searchParams.get("tag") || "", fid: url.searchParams.get("fid") || "" });
+      return env.BOARD.get(env.BOARD.idFromName("board")).fetch(new Request("https://board/clan/get?" + q));
+    }
+    if (url.pathname === "/api/clans" && request.method === "POST") {
+      const origin = request.headers.get("Origin");
+      if (origin && new URL(origin).host !== url.host) return new Response("Forbidden", { status: 403 });
+      const raw = await request.text();
+      if (raw.length > 1000) return json({ error: "too-long" }, 413);
+      let b;
+      try { b = JSON.parse(raw); } catch { return json({ error: "bad-json" }, 400); }
+      const v = await env.PRESENCE.get(env.PRESENCE.idFromName("presence")).fetch(new Request("https://presence/verify?" + new URLSearchParams({ id: String(b.fid || ""), key: String(b.key || "") })));
+      if (!(await v.json()).ok) return json({ error: "Couldn't confirm who you are. Reload the page and try again." }, 403);
+      return env.BOARD.get(env.BOARD.idFromName("board")).fetch(new Request("https://board/clan/" + String(b.action || "").replace(/[^a-z]/g, ""), { method: "POST", body: raw }));
+    }
     if (url.pathname === "/api/announce" && request.method === "GET") {
       return env.BOARD.get(env.BOARD.idFromName("board")).fetch(new Request("https://board/announce"));
     }
@@ -270,9 +290,18 @@ export class GameRoom extends DurableObject {
     ws.serializeAttachment({ ...me, lastRec: now });
     const name = cleanName(rec.name);
     if (!name || /^player\d*$/i.test(name) || rude(name)) return;
-    await this.env.BOARD.get(this.env.BOARD.idFromName("board")).fetch(new Request("https://board/add", {
-      method: "POST", body: JSON.stringify({ game, name, r }),
-    }));
+    const fid = typeof rec.fid === "string" && /^[A-Z0-9]{6}$/.test(rec.fid) ? rec.fid : "";
+    const board = this.env.BOARD.get(this.env.BOARD.idFromName("board"));
+    await board.fetch(new Request("https://board/add", { method: "POST", body: JSON.stringify({ game, name, r, fid }) }));
+    // Ranked (1v1 games): when both players have reported opposite results, update ratings.
+    if (!rec.duel) return;
+    this.pend = (this.pend || []).filter((x) => now - x.t < 30000);
+    const want = r === "win" ? "loss" : r === "loss" ? "win" : "draw";
+    const i = this.pend.findIndex((x) => x.r === want && x.id !== me.id && x.name.toLowerCase() !== name.toLowerCase());
+    if (i < 0) { this.pend.push({ r, name, id: me.id, t: now }); return; }
+    const other = this.pend.splice(i, 1)[0];
+    const [w, l] = r === "loss" ? [other.name, name] : [name, other.name];
+    await board.fetch(new Request("https://board/elo", { method: "POST", body: JSON.stringify({ w, l, draw: r === "draw" }) }));
   }
 
   async endRoom() {
@@ -356,6 +385,11 @@ export class Leaderboard extends DurableObject {
     // Casino: each player's latest play-coin balance this week (for "Richest this week").
     this.sql.exec(`CREATE TABLE IF NOT EXISTS casino (week INTEGER NOT NULL, key TEXT NOT NULL, name TEXT NOT NULL, coins INTEGER NOT NULL, updated INTEGER NOT NULL, PRIMARY KEY (week, key))`);
     this.lastCasino = new Map();
+    // Ranked: one Elo rating per player name across all 1v1 games.
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS ranked (key TEXT PRIMARY KEY, name TEXT NOT NULL, rating REAL NOT NULL DEFAULT 1000, w INTEGER NOT NULL DEFAULT 0, l INTEGER NOT NULL DEFAULT 0, d INTEGER NOT NULL DEFAULT 0, updated INTEGER NOT NULL)`);
+    // Clans: a tag like [SAM], up to 30 members; members' wins add up to the clan's points.
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS clans (tag TEXT PRIMARY KEY, name TEXT NOT NULL, owner TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS clan_members (fid TEXT PRIMARY KEY, tag TEXT NOT NULL, name TEXT NOT NULL, joined INTEGER NOT NULL)`);
     this.lastPost = new Map();
     this.fails = new Map();
   }
@@ -374,6 +408,74 @@ export class Leaderboard extends DurableObject {
 
   // The admin password is ADMIN_KEY (a Worker secret) if set; otherwise the first person to open
   // admin.html picks one, and it's stored here (hashed).
+  async clan(url, request) {
+    const action = url.pathname.split("/")[2];
+    const memberOf = (fid) => this.sql.exec(`SELECT tag FROM clan_members WHERE fid = ?`, fid).toArray()[0]?.tag || null;
+    const info = (tag) => {
+      const c = this.sql.exec(`SELECT tag, name, owner, points, created FROM clans WHERE tag = ?`, tag).toArray()[0];
+      if (!c) return null;
+      const members = this.sql.exec(`SELECT fid, name, joined FROM clan_members WHERE tag = ? ORDER BY joined`, tag).toArray().map((m) => ({ name: m.name, joined: m.joined, owner: m.fid === c.owner }));
+      return { tag: c.tag, name: c.name, points: c.points, created: c.created, members };
+    };
+    if (action === "get") {
+      const tag = String(url.searchParams.get("tag") || "").toUpperCase(), fid = url.searchParams.get("fid") || "";
+      if (tag) { const c = info(tag); return c ? json({ clan: c }) : json({ error: "No clan with that tag." }, 404); }
+      const mine = fid ? memberOf(fid) : null;
+      const top = this.sql.exec(`SELECT c.tag, c.name, c.points, COUNT(m.fid) AS members FROM clans c LEFT JOIN clan_members m ON m.tag = c.tag GROUP BY c.tag ORDER BY c.points DESC, members DESC LIMIT 50`).toArray();
+      return json({ mine: mine ? { ...info(mine), owner: this.sql.exec(`SELECT owner FROM clans WHERE tag = ?`, mine).one().owner === fid } : null, top });
+    }
+    const b = await request.json();
+    const fid = String(b.fid || ""), pname = cleanName(b.pname) || "Player";
+    if (!/^[A-Z0-9]{6}$/.test(fid)) return json({ error: "bad-id" }, 400);
+    if (this.bad(pname)) return json({ error: "Pick a friendlier name first." }, 400);
+    const leave = () => {
+      const tag = memberOf(fid);
+      if (!tag) return;
+      this.sql.exec(`DELETE FROM clan_members WHERE fid = ?`, fid);
+      const c = this.sql.exec(`SELECT owner FROM clans WHERE tag = ?`, tag).toArray()[0];
+      const next = this.sql.exec(`SELECT fid FROM clan_members WHERE tag = ? ORDER BY joined LIMIT 1`, tag).toArray()[0];
+      if (!next) this.sql.exec(`DELETE FROM clans WHERE tag = ?`, tag);
+      else if (c && c.owner === fid) this.sql.exec(`UPDATE clans SET owner = ? WHERE tag = ?`, next.fid, tag);
+    };
+    const now = Date.now();
+    if (action === "create") {
+      const tag = String(b.tag || "").toUpperCase(), name = String(b.name || "").replace(/[\u0000-\u001f<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 24);
+      if (!/^[A-Z0-9]{2,5}$/.test(tag)) return json({ error: "Tags are 2 to 5 letters or numbers." }, 400);
+      if (name.length < 3) return json({ error: "Give your clan a name (3+ characters)." }, 400);
+      if (this.bad(tag) || this.bad(name)) return json({ error: "Keep it friendly, please." }, 400);
+      if (this.sql.exec(`SELECT COUNT(*) AS n FROM clans WHERE tag = ?`, tag).one().n) return json({ error: "That tag is taken." }, 409);
+      if (this.sql.exec(`SELECT COUNT(*) AS n FROM clans WHERE owner = ? AND created > ?`, fid, now - 3600000).one().n) return json({ error: "You just made a clan. Try again in an hour." }, 429);
+      leave();
+      this.sql.exec(`INSERT INTO clans (tag, name, owner, points, created) VALUES (?, ?, ?, 0, ?)`, tag, name, fid, now);
+      this.sql.exec(`INSERT INTO clan_members (fid, tag, name, joined) VALUES (?, ?, ?, ?)`, fid, tag, pname, now);
+      return json({ ok: true, clan: info(tag) });
+    }
+    if (action === "join") {
+      const tag = String(b.tag || "").toUpperCase();
+      if (!this.sql.exec(`SELECT COUNT(*) AS n FROM clans WHERE tag = ?`, tag).one().n) return json({ error: "No clan with that tag." }, 404);
+      if (memberOf(fid) === tag) return json({ ok: true, clan: info(tag) });
+      if (this.sql.exec(`SELECT COUNT(*) AS n FROM clan_members WHERE tag = ?`, tag).one().n >= 30) return json({ error: "That clan is full (30 members)." }, 409);
+      leave();
+      this.sql.exec(`INSERT INTO clan_members (fid, tag, name, joined) VALUES (?, ?, ?, ?)`, fid, tag, pname, now);
+      return json({ ok: true, clan: info(tag) });
+    }
+    if (action === "leave") { leave(); return json({ ok: true }); }
+    if (action === "kick") {
+      const tag = memberOf(fid);
+      const c = tag && this.sql.exec(`SELECT owner FROM clans WHERE tag = ?`, tag).toArray()[0];
+      if (!c || c.owner !== fid) return json({ error: "Only the clan leader can do that." }, 403);
+      const target = this.sql.exec(`SELECT fid FROM clan_members WHERE tag = ? AND lower(name) = lower(?) AND fid != ?`, tag, cleanName(b.name), fid).toArray()[0];
+      if (!target) return json({ error: "No member by that name." }, 404);
+      this.sql.exec(`DELETE FROM clan_members WHERE fid = ?`, target.fid);
+      return json({ ok: true, clan: info(tag) });
+    }
+    if (action === "rename") { // keeps your name in the member list up to date
+      if (memberOf(fid)) this.sql.exec(`UPDATE clan_members SET name = ? WHERE fid = ?`, pname, fid);
+      return json({ ok: true });
+    }
+    return json({ error: "not-found" }, 404);
+  }
+
   async admin(url, request) {
     const action = url.pathname.split("/")[2];
     const ip = url.searchParams.get("ip") || "local", now = Date.now();
@@ -502,6 +604,30 @@ export class Leaderboard extends DurableObject {
     const url = new URL(request.url);
     if (url.pathname === "/sugg" || url.pathname === "/suggest" || url.pathname === "/vote") return this.suggestions(url, request);
     if (url.pathname.startsWith("/admin/")) return this.admin(url, request);
+    if (url.pathname === "/elo" && request.method === "POST") {
+      const b = await request.json();
+      const W = cleanName(b.w), L = cleanName(b.l);
+      if (!W || !L || this.bad(W) || this.bad(L) || W.toLowerCase() === L.toLowerCase()) return json({ ok: false });
+      const get = (n) => this.sql.exec(`SELECT rating FROM ranked WHERE key = ?`, n.toLowerCase()).toArray()[0]?.rating ?? 1000;
+      const ra = get(W), rb = get(L), ea = 1 / (1 + 10 ** ((rb - ra) / 400)), sa = b.draw ? 0.5 : 1, K = 32;
+      const na = ra + K * (sa - ea), nb = rb + K * ((1 - sa) - (1 - ea)), now = Date.now();
+      const up = (n, r, col) => this.sql.exec(`INSERT INTO ranked (key, name, rating, ${col}, updated) VALUES (?, ?, ?, 1, ?)
+        ON CONFLICT(key) DO UPDATE SET rating = excluded.rating, name = excluded.name, ${col} = ${col} + 1, updated = excluded.updated`, n.toLowerCase(), n, r, now);
+      up(W, na, b.draw ? "d" : "w"); up(L, nb, b.draw ? "d" : "l");
+      return json({ ok: true });
+    }
+    if (url.pathname === "/ranked") {
+      const name = cleanName(url.searchParams.get("name") || "").toLowerCase();
+      if (name) {
+        const r = this.sql.exec(`SELECT name, rating, w, l, d FROM ranked WHERE key = ?`, name).toArray()[0];
+        if (!r) return json({ me: null });
+        const rank = this.sql.exec(`SELECT COUNT(*) AS n FROM ranked WHERE rating > ?`, r.rating).one().n + 1;
+        return json({ me: { ...r, rating: Math.round(r.rating), rank } });
+      }
+      const rows = this.sql.exec(`SELECT name, rating, w, l, d FROM ranked ORDER BY rating DESC LIMIT 50`).toArray().map((r) => ({ ...r, rating: Math.round(r.rating) }));
+      return json({ rows });
+    }
+    if (url.pathname.startsWith("/clan/")) return this.clan(url, request);
     if (url.pathname === "/casino-top") {
       const rows = this.sql.exec(`SELECT name, coins FROM casino WHERE week = ? ORDER BY coins DESC LIMIT 25`, weekOf(Date.now())).toArray();
       return json({ rows });
@@ -522,9 +648,10 @@ export class Leaderboard extends DurableObject {
     }
     if (url.pathname === "/announce") { const a = this.kvGet("announce"); return json(a ? JSON.parse(a) : {}); }
     if (url.pathname === "/add" && request.method === "POST") {
-      const { game, name, r } = await request.json();
+      const { game, name, r, fid } = await request.json();
       const col = { win: "w", loss: "l", draw: "d" }[r];
       if (!col || !game || !name || this.banned(name)) return json({ ok: false }, 400);
+      if (r === "win" && fid) this.sql.exec(`UPDATE clans SET points = points + 1 WHERE tag = (SELECT tag FROM clan_members WHERE fid = ?)`, fid);
       this.sql.exec(
         `INSERT INTO scores (game, key, name, ${col}, updated) VALUES (?, ?, ?, 1, ?)
          ON CONFLICT(game, key) DO UPDATE SET ${col} = ${col} + 1, name = excluded.name, updated = excluded.updated`,
@@ -557,6 +684,12 @@ export class Presence extends DurableObject {
   async fetch(request) {
     const url = new URL(request.url);
     const id = url.searchParams.get("id") || "", key = url.searchParams.get("key") || "";
+    if (url.pathname === "/verify") {
+      if (!FID_RE.test(id) || !KEY_RE.test(key)) return json({ ok: false });
+      const saved = await this.ctx.storage.get("k:" + id);
+      if (!saved) await this.ctx.storage.put("k:" + id, key);
+      return json({ ok: !saved || saved === key });
+    }
     const [client, server] = Object.values(new WebSocketPair());
     const done = () => new Response(null, { status: 101, webSocket: client });
     if (!FID_RE.test(id) || !KEY_RE.test(key)) {
@@ -579,7 +712,7 @@ export class Presence extends DurableObject {
     return done();
   }
 
-  webSocketMessage(ws, raw) {
+  async webSocketMessage(ws, raw) {
     if (typeof raw !== "string" || raw.length > 2000) return;
     let m;
     try { m = JSON.parse(raw); } catch { return; }
@@ -587,6 +720,31 @@ export class Presence extends DurableObject {
     if (m.t === "hi") {
       a.name = cleanName(m.name);
       ws.serializeAttachment(a);
+      // Messages that arrived while this person was offline.
+      const box = await this.ctx.storage.get("mail:" + a.id);
+      if (box && box.length) {
+        await this.ctx.storage.delete("mail:" + a.id);
+        const fresh = box.filter((x) => Date.now() - x.at < 7 * 864e5);
+        for (const x of fresh) trySend(ws, JSON.stringify(x));
+      }
+    } else if (m.t === "dm" && FID_RE.test(m.to) && m.to !== a.id) {
+      // Direct messages between friends. The receiving browser only shows them if the sender is
+      // on its friends list.
+      const now = Date.now();
+      if (now - (a.lastDm || 0) < 500) return;
+      a.lastDm = now;
+      ws.serializeAttachment(a);
+      const text = String(m.text || "").replace(/[\u0000-\u001f<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 300);
+      if (!text) return;
+      const msg = { t: "dm", from: a.id, name: a.name || "A friend", text, at: now };
+      const socks = this.ctx.getWebSockets(m.to);
+      for (const s of socks) trySend(s, JSON.stringify(msg));
+      if (!socks.length) {
+        const box = (await this.ctx.storage.get("mail:" + m.to)) || [];
+        box.push(msg);
+        await this.ctx.storage.put("mail:" + m.to, box.slice(-30));
+      }
+      trySend(ws, JSON.stringify({ t: "dmok", to: m.to, at: now, stored: !socks.length }));
     } else if (m.t === "where") {
       a.game = typeof m.game === "string" && /^[a-z0-9]{1,16}$/.test(m.game) ? m.game : null;
       ws.serializeAttachment(a);

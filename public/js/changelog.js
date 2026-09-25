@@ -1,5 +1,13 @@
 // Release notes, newest first. Add a new entry at the top for every update.
 window.CHANGELOG = [
+  { v: "3.4", date: "2026-09-25", title: "Clans, messages and ranked", items: [
+    "Clans: start or join a clan with a 2 to 5 letter tag. Your tag shows in every lobby, and members' wins earn clan points",
+    "Messages: chat privately with friends from the Friends panel, even when they're offline",
+    "Vote for the next game: the host can let everyone vote between six games, from the Switch game menu or the results screen",
+    "Stickers: big animated reactions from the 😀 button. Get more from the Season Pass and casino crates",
+    "Ranked: every 1v1 win or loss changes your rating. See the top players on the Leaderboard (Ranked)",
+    "Your rating and clan now show on your profile",
+  ] },
   { v: "3.3", date: "2026-09-25", title: "Crash, Plinko, Mines and crates", items: [
     "Casino: Crash. Everyone at the table rides the same rocket, so cash out before it blows up. Auto cash-out included",
     "Casino: Plinko, with low, medium and high risk boards",
