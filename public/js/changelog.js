@@ -1,5 +1,11 @@
 // Release notes, newest first. Add a new entry at the top for every update.
 window.CHANGELOG = [
+  { v: "3.1", date: "2026-09-25", title: "Pink and black", items: [
+    "New look: the whole site is now pink and black, with a new logo",
+    "Pink chess boards to match",
+    "Want the old purple back? Settings → Look → pick violet",
+    "Fixed the emoji panel sometimes showing up open by itself",
+  ] },
   { v: "3.0", date: "2026-09-25", title: "Casino, bots and a lot more", items: [
     "Casino: blackjack, roulette, slots and coinflip duels with friends, using play coins only",
     "Saved casino wallet with a daily bonus, an upgrade shop (bigger bets, lucky charm, insurance, golden chips, table colors) and transfer codes to move it between devices",

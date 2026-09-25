@@ -261,7 +261,7 @@
   function banner(t, size) {
     ctx.font = `800 ${size}px Geist, system-ui, sans-serif`;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.shadowColor = "rgba(139,92,246,0.9)"; ctx.shadowBlur = 40;
+    ctx.shadowColor = "rgba(236, 72, 153,0.9)"; ctx.shadowBlur = 40;
     ctx.fillStyle = "#fff"; ctx.fillText(t, W / 2, H / 2);
     ctx.shadowBlur = 0;
   }

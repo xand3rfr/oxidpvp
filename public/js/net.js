@@ -103,7 +103,7 @@
   // ---------- Identity: name + avatar ----------
   const NAME_KEY = "oxidpvp-name", AV_KEY = "oxidpvp-avatar";
   const AVATARS = ["😎", "🤖", "👻", "🐸", "🦊", "🐱", "🐼", "🦄", "🐙", "👽", "🔥", "⚡", "🍕", "🎮", "💀", "🌵", "🐧", "🦈", "🍩", "👑"];
-  const AV_COLORS = ["#8b5cf6", "#ec4899", "#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#14b8a6", "#64748b"];
+  const AV_COLORS = ["#ec4899", "#ec4899", "#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#14b8a6", "#64748b"];
   const cleanName = (n) => String(n || "").replace(/\s+/g, " ").trim().slice(0, 16) || "Player";
   const savedName = () => store.get(NAME_KEY) || "";
   // Unlockables: bonus avatar emojis by level, and avatar frames by level or achievement.
@@ -634,14 +634,21 @@
 
   // ---------- Settings panel: profile, look, sound ----------
   const THEME_KEY = "oxidpvp-theme";
-  const ACCENTS = { violet: "#8b5cf6", blue: "#3b82f6", teal: "#14b8a6", green: "#22c55e", orange: "#f97316", red: "#ef4444", pink: "#ec4899" };
-  const readTheme = () => { try { return { mode: "dark", accent: "violet", ...(JSON.parse(store.get(THEME_KEY)) || {}) }; } catch { return { mode: "dark", accent: "violet" }; } };
+  const ACCENTS = { pink: "#ec4899", violet: "#8b5cf6", blue: "#3b82f6", teal: "#14b8a6", green: "#22c55e", orange: "#f97316", red: "#ef4444" };
+  // Pink and black is the house look. Saves from before the rebrand had violet as the default, so
+  // move those over to pink once; anyone who picks violet again afterwards keeps it.
+  const readTheme = () => {
+    let t = {};
+    try { t = JSON.parse(store.get(THEME_KEY)) || {}; } catch {}
+    if (!t.b) { if (!t.accent || t.accent === "violet") t.accent = "pink"; t.b = 2; }
+    return { mode: "dark", accent: "pink", ...t };
+  };
   function applyTheme(t) {
     const d = document.documentElement;
     if (t.mode === "light") d.dataset.theme = "light"; else delete d.dataset.theme;
-    if (t.accent && t.accent !== "violet") d.dataset.accent = t.accent; else delete d.dataset.accent;
+    if (t.accent && t.accent !== "pink") d.dataset.accent = t.accent; else delete d.dataset.accent;
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = t.mode === "light" ? "#f4f4f7" : "#07070a";
+    if (meta) meta.content = t.mode === "light" ? "#fff5fa" : "#000000";
   }
   applyTheme(readTheme());
 

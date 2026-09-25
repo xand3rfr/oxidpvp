@@ -5,7 +5,7 @@
 (() => {
   const W = 800, H = 600;
   const CHOOSE_MS = 15000, REVEAL_MS = 5000;
-  const COLORS = ["#111111", "#ffffff", "#9ca3af", "#ef4444", "#f97316", "#facc15", "#22c55e", "#14b8a6", "#3b82f6", "#8b5cf6", "#ec4899", "#8b5a2b"];
+  const COLORS = ["#111111", "#ffffff", "#9ca3af", "#ef4444", "#f97316", "#facc15", "#22c55e", "#14b8a6", "#3b82f6", "#ec4899", "#ec4899", "#8b5a2b"];
   const SIZES = [3, 7, 14, 28];
   const { h, fmt, results, hideResults, countdown } = Party;
   const $ = (id) => document.getElementById(id);

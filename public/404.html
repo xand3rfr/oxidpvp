@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <script>try{var t=JSON.parse(localStorage.getItem("oxidpvp-theme")||"{}"),d=document.documentElement;if(t.mode==="light")d.dataset.theme="light";if(t.accent&&t.accent!=="violet")d.dataset.accent=t.accent}catch(e){}</script>
+  <script>try{var t=JSON.parse(localStorage.getItem("oxidpvp-theme")||"{}"),d=document.documentElement;if(t.mode==="light")d.dataset.theme="light";var a=t.accent;if(!t.b&&a==="violet")a="pink";if(a&&a!=="pink")d.dataset.accent=a}catch(e){}</script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <meta name="theme-color" content="#07070a">
+  <meta name="theme-color" content="#000000">
   <title>Page not found · OXIDPVP</title>
   <meta name="description" content="This page doesn't exist, but you can play a game while you're here.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -66,7 +66,7 @@
         ctx.fillStyle = css.getPropertyValue("--line-3").trim() || "#444"; ctx.fillRect(0, GROUND + 2, W, 2);
         // the runner: a little ghost
         const bob = S.y < GROUND ? 0 : Math.sin(S.t * 18) * 2;
-        ctx.fillStyle = css.getPropertyValue("--accent").trim() || "#8b5cf6";
+        ctx.fillStyle = css.getPropertyValue("--accent").trim() || "#ec4899";
         ctx.beginPath(); ctx.arc(120, S.y - 24 + bob, 18, Math.PI, 0); ctx.lineTo(138, S.y + bob); for (let k = 0; k < 4; k++) ctx.lineTo(138 - 9 * (k + 0.5), S.y - (k % 2 ? 0 : 6) + bob); ctx.lineTo(102, S.y + bob); ctx.fill();
         ctx.fillStyle = "#fff"; ctx.fillRect(112, S.y - 30 + bob, 5, 7); ctx.fillRect(124, S.y - 30 + bob, 5, 7);
         // broken links

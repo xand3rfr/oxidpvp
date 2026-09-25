@@ -20,7 +20,7 @@
     { id: "table", name: "VIP felt", icon: "🎨", desc: (l) => `Unlock table color ${l + 2} of 5`, cost: [3000, 6000, 12000, 24000] },
   ];
   const limitFor = (l) => [500, 2500, 10000, 50000, 250000][l] || 250000;
-  const FELTS = ["#0f5132", "#1e3a8a", "#7f1d1d", "#4c1d95", "#111827"];
+  const FELTS = ["#0f5132", "#1e3a8a", "#7f1d1d", "#831843", "#111827"];
   function loadWallet() {
     let w = null;
     try { w = JSON.parse(localStorage.getItem(WALLET_KEY)); } catch {}

@@ -6,7 +6,7 @@
 (() => {
   const W = 480, H = 360;
   const WRITE_MS = 50000, DRAW_MS = 90000, DESC_MS = 45000, GRACE_MS = 3000;
-  const COLORS = ["#111111", "#ffffff", "#ef4444", "#f97316", "#facc15", "#22c55e", "#3b82f6", "#8b5cf6", "#ec4899", "#8b5a2b"];
+  const COLORS = ["#111111", "#ffffff", "#ef4444", "#f97316", "#facc15", "#22c55e", "#3b82f6", "#ec4899", "#ec4899", "#8b5a2b"];
   const SIZES = [3, 7, 14, 26];
   const MAX_POINTS = 5000; // keeps a drawing well under the 64 KB message limit
   const { h, fmt, results, hideResults, countdown } = Party;
