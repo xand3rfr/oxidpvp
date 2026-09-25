@@ -774,3 +774,4 @@ body.touching .touch-ui { display: block; }
 .dc-tries { font-size: 14px; color: var(--muted); min-height: 20px; }
 .sq-c.bad { box-shadow: inset 0 0 0 4px var(--danger); }
 @media (max-width: 480px) { .sd-pad { grid-template-columns: repeat(5, 1fr); } }
+.avatar { flex: none; }

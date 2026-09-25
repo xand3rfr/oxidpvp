@@ -8,6 +8,7 @@ window.CHANGELOG = [
     "Daily Sudoku and Daily Chess (mate in one) next to the Daily Word, each with its own streak",
     "Practice alone: start Snake Battle or Type Race by yourself",
     "New game: Word Hunt, which is racing to find words in a letter grid by dragging across tiles",
+    "New game: Categories, which is one letter, six categories and only unique answers score",
     "Suggestions page: send in ideas and upvote other people's",
     "This changelog, plus a \"What's new\" dot when there's an update",
     "Tidier top bar with Friends and Settings buttons",
