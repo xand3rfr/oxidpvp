@@ -27,13 +27,13 @@
     <div class="wrap page">
       <div class="page-head"><div><h1>Admin</h1><p class="muted">Owner tools for OXIDPVP.</p></div></div>
 
-      <form class="pf-card ad-login" id="loginForm" hidden>
+      <form class="pf-card op-login" id="loginForm" hidden>
         <h2 id="loginTitle">Log in</h2>
         <p class="muted" id="loginNote">Enter the admin password.</p>
-        <input class="ad-in" id="pw" type="password" autocomplete="current-password" placeholder="Admin password" aria-label="Admin password">
-        <input class="ad-in" id="pw2" type="password" autocomplete="new-password" placeholder="Type it again" aria-label="Confirm password" hidden>
+        <input class="op-in" id="pw" type="password" autocomplete="current-password" placeholder="Admin password" aria-label="Admin password">
+        <input class="op-in" id="pw2" type="password" autocomplete="new-password" placeholder="Type it again" aria-label="Confirm password" hidden>
         <button class="btn primary" type="submit" id="loginBtn">Log in</button>
-        <p class="ad-err" id="loginErr"></p>
+        <p class="op-err" id="loginErr"></p>
       </form>
 
       <div id="panel" hidden>
@@ -42,40 +42,40 @@
         <section class="pf-card">
           <h2>Live broadcast</h2>
           <p class="muted">Pops up right now for everyone with OXIDPVP open.</p>
-          <form class="ad-row" id="bcForm"><input class="ad-in" id="bcText" maxlength="300" placeholder="e.g. Tournament starts in 5 minutes!"><select class="ad-in" id="bcStyle" aria-label="Style" style="flex:none"><option value="info">📣 Info</option><option value="warn">⚠️ Warning</option><option value="party">🎉 Party</option></select><button class="btn primary" type="submit">Send</button></form>
+          <form class="op-row" id="bcForm"><input class="op-in" id="bcText" maxlength="300" placeholder="e.g. Tournament starts in 5 minutes!"><select class="op-in" id="bcStyle" aria-label="Style" style="flex:none"><option value="info">📣 Info</option><option value="warn">⚠️ Warning</option><option value="party">🎉 Party</option></select><button class="btn primary" type="submit">Send</button></form>
         </section>
 
         <section class="pf-card">
           <h2>Announcement</h2>
           <p class="muted">Shows as a bar at the top of the home page for everyone. Leave empty to remove it.</p>
-          <form class="ad-row" id="annForm"><input class="ad-in" id="annText" maxlength="200" placeholder="e.g. New games this weekend!"><button class="btn primary" type="submit">Save</button></form>
+          <form class="op-row" id="annForm"><input class="op-in" id="annText" maxlength="200" placeholder="e.g. New games this weekend!"><button class="btn primary" type="submit">Save</button></form>
         </section>
 
         <section class="pf-card">
           <h2>Suggestions <small class="muted" id="sgCount"></small></h2>
-          <div class="ad-filter seg" id="sgFilter"><button type="button" data-f="" class="on">All</button><button type="button" data-f="new">New</button><button type="button" data-f="planned">Planned</button><button type="button" data-f="done">Done</button></div>
-          <div class="ad-list" id="sgList"></div>
+          <div class="op-filter seg" id="sgFilter"><button type="button" data-f="" class="on">All</button><button type="button" data-f="new">New</button><button type="button" data-f="planned">Planned</button><button type="button" data-f="done">Done</button></div>
+          <div class="op-list" id="sgList"></div>
         </section>
 
         <div class="pf-grid">
           <section class="pf-card">
             <h2>Banned words</h2>
             <p class="muted">Names and suggestions containing these are blocked, and anything already posted with them is removed.</p>
-            <form class="ad-row" id="banForm"><input class="ad-in" id="banWord" maxlength="30" placeholder="word"><button class="btn" type="submit">Ban</button></form>
-            <div class="ad-chips" id="bans"></div>
+            <form class="op-row" id="banForm"><input class="op-in" id="banWord" maxlength="30" placeholder="word"><button class="btn" type="submit">Ban</button></form>
+            <div class="op-chips" id="bans"></div>
           </section>
           <section class="pf-card">
             <h2>Leaderboard</h2>
             <p class="muted">Remove a name from the leaderboard.</p>
-            <form class="ad-row" id="lbForm"><input class="ad-in" id="lbName" maxlength="16" placeholder="Player name"><button class="btn" type="submit">Remove</button></form>
-            <h2 class="ad-sub">Most played</h2>
-            <ol class="ad-top" id="top"></ol>
+            <form class="op-row" id="lbForm"><input class="op-in" id="lbName" maxlength="16" placeholder="Player name"><button class="btn" type="submit">Remove</button></form>
+            <h2 class="op-sub">Most played</h2>
+            <ol class="op-top" id="top"></ol>
           </section>
         </div>
 
         <section class="pf-card">
           <h2>Change password</h2>
-          <form class="ad-row" id="pwForm"><input class="ad-in" id="newPw" type="password" autocomplete="new-password" placeholder="New password (8+ characters)"><button class="btn" type="submit">Change</button></form>
+          <form class="op-row" id="pwForm"><input class="op-in" id="newPw" type="password" autocomplete="new-password" placeholder="New password (8+ characters)"><button class="btn" type="submit">Change</button></form>
         </section>
       </div>
     </div>
@@ -133,7 +133,7 @@
         try { $("annText").value = s.announce ? JSON.parse(s.announce).text : ""; } catch { $("annText").value = ""; }
         $("bans").textContent = "";
         for (const w of s.bans) {
-          const c = document.createElement("button"); c.type = "button"; c.className = "ad-chip"; c.textContent = w + " ×"; c.title = "Unban";
+          const c = document.createElement("button"); c.type = "button"; c.className = "op-chip"; c.textContent = w + " ×"; c.title = "Unban";
           c.addEventListener("click", async () => { await call("unban", { word: w }); refresh(); });
           $("bans").append(c);
         }
@@ -151,14 +151,14 @@
         const shown = rows.filter((r) => !filter || (filter === "new" ? !r.status : r.status === filter));
         $("sgCount").textContent = `${shown.length} shown · ${rows.length} total`;
         for (const r of shown) {
-          const el = document.createElement("div"); el.className = "ad-sg";
-          el.innerHTML = `<b class="ad-votes"></b><div class="ad-sg-body"><p></p><small></small></div><select aria-label="Status"><option value="">New</option><option value="planned">Planned</option><option value="done">Done</option></select><button class="btn ghost ad-del" type="button" title="Delete">Delete</button>`;
-          el.querySelector(".ad-votes").textContent = "▲ " + r.votes;
+          const el = document.createElement("div"); el.className = "op-sg";
+          el.innerHTML = `<b class="op-votes"></b><div class="op-sg-body"><p></p><small></small></div><select aria-label="Status"><option value="">New</option><option value="planned">Planned</option><option value="done">Done</option></select><button class="btn ghost op-del" type="button" title="Delete">Delete</button>`;
+          el.querySelector(".op-votes").textContent = "▲ " + r.votes;
           el.querySelector("p").textContent = r.text;
           el.querySelector("small").textContent = `${r.name} · ${new Date(r.created).toLocaleString()}`;
           const sel = el.querySelector("select"); sel.value = r.status || "";
           sel.addEventListener("change", async () => { await call("sugg-status", { id: r.id, status: sel.value }); r.status = sel.value; GameUtil.toast("Saved"); paintSugg(); });
-          el.querySelector(".ad-del").addEventListener("click", async () => {
+          el.querySelector(".op-del").addEventListener("click", async () => {
             if (!confirm("Delete this suggestion?\n\n" + r.text)) return;
             await call("sugg-del", { id: r.id }); rows = rows.filter((x) => x !== r); paintSugg();
           });

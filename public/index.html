@@ -1505,7 +1505,7 @@
       }
     })();
   </script>
-  <a class="casino-banner" id="casinoBanner" href="https://casino.oxidpvp.net/" aria-label="OXID Casino: gamble with friends">
+  <a class="gwf-card" id="gwfCard" href="https://casino.oxidpvp.net/" aria-label="OXID Casino: gamble with friends">
     <span class="cb-chips">🎰</span>
     <span class="cb-text"><small>Wanting to gamble with friends?</small><b>Click me</b></span>
     <span class="cb-sub">OXID Casino · play coins only</span>
@@ -1513,9 +1513,9 @@
   </a>
   <script>
     (() => {
-      const b = document.getElementById("casinoBanner");
-      try { if (sessionStorage.getItem("oxid-casino-banner") === "off") b.hidden = true; } catch {}
-      b.querySelector(".cb-x").addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); b.hidden = true; try { sessionStorage.setItem("oxid-casino-banner", "off"); } catch {} });
+      const b = document.getElementById("gwfCard");
+      try { if (sessionStorage.getItem("oxid-gwf-card") === "off") b.hidden = true; } catch {}
+      b.querySelector(".cb-x").addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); b.hidden = true; try { sessionStorage.setItem("oxid-gwf-card", "off"); } catch {} });
     })();
   </script>
   <div class="sam-corner">
