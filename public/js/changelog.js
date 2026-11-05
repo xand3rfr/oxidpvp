@@ -1,5 +1,9 @@
 // Release notes, newest first. Add a new entry at the top for every update.
 window.CHANGELOG = [
+  { v: "4.0", date: "2026-11-05", title: "OXID Casino could come back", items: [
+    "Removed the \"gamble with friends\" banner, since OXID Casino has shut down",
+    "New pop-up: if we get more people on this game, OXID Casino comes back for a limited time",
+  ] },
   { v: "3.9", date: "2026-09-25", title: "Live announcements", items: [
     "The owner can now send live announcements that pop up for everyone online",
   ] },

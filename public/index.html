@@ -1505,17 +1505,33 @@
       }
     })();
   </script>
-  <a class="gwf-card" id="gwfCard" href="https://casino.oxidpvp.net/" aria-label="OXID Casino: gamble with friends">
-    <span class="cb-chips">🎰</span>
-    <span class="cb-text"><small>Wanting to gamble with friends?</small><b>Click me</b></span>
-    <span class="cb-sub">OXID Casino · play coins only</span>
-    <button class="cb-x" type="button" aria-label="Hide">&times;</button>
-  </a>
+  <div class="overlay oxc-pop" id="oxcPop" role="dialog" aria-modal="true" aria-labelledby="oxcPopTitle" hidden>
+    <div class="panel">
+      <button class="oxc-x" type="button" aria-label="Close">&times;</button>
+      <div class="oxc-icon">🎰</div>
+      <h1 id="oxcPopTitle">OXID Casino could come back</h1>
+      <p class="sub">If we get more people on this game, I'll re-release OXID Casino for a limited time. Bring your friends.</p>
+      <button class="btn primary lg full oxc-ok" type="button">Got it</button>
+    </div>
+  </div>
   <script>
     (() => {
-      const b = document.getElementById("gwfCard");
-      try { if (sessionStorage.getItem("oxid-gwf-card") === "off") b.hidden = true; } catch {}
-      b.querySelector(".cb-x").addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); b.hidden = true; try { sessionStorage.setItem("oxid-gwf-card", "off"); } catch {} });
+      const pop = document.getElementById("oxcPop");
+      try { if (sessionStorage.getItem("oxid-casino-pop") === "seen") return; } catch {}
+      const close = () => {
+        pop.hidden = true;
+        document.removeEventListener("keydown", onKey);
+        try { sessionStorage.setItem("oxid-casino-pop", "seen"); } catch {}
+      };
+      const onKey = (e) => { if (e.key === "Escape") close(); };
+      pop.querySelector(".oxc-x").addEventListener("click", close);
+      pop.querySelector(".oxc-ok").addEventListener("click", close);
+      pop.addEventListener("click", (e) => { if (e.target === pop) close(); });
+      setTimeout(() => {
+        pop.hidden = false;
+        document.addEventListener("keydown", onKey);
+        pop.querySelector(".oxc-ok").focus();
+      }, 800);
     })();
   </script>
   <div class="sam-corner">
